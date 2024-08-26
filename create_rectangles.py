@@ -1,13 +1,12 @@
 import geopandas as gpd
 import pandas as pd
 import re
-from shapely.geometry import Point, box
-import pyproj
-
+from shapely.geometry import Point, Polygon
+from geopy.distance import geodesic
 
 def dms_to_dd(dms_str):
     dms_str = str(dms_str).strip()
-    parts = re.split(r'[^\w\d.]+', dms_str) #re.split('[^\d\w]+', dms_str)
+    parts = re.split(r'[^\w\d.]+', dms_str)
     degrees = float(parts[0])
     minutes = float(parts[1])
     seconds = float(parts[2])
@@ -18,39 +17,31 @@ def dms_to_dd(dms_str):
         dd *= -1
     return dd
 
-# Function to determine the UTM zone for a given longitude
-def utm_zone(longitude):
-    return int(1 + (longitude + 180.0) / 6.0)
-
-# Function to create a 400m x 250m rectangle centered on a point
-def create_rectangle_wgs84(point, width, height):
+# Function to create a rectangle using geodesic distances
+def create_rectangle_wgs84_geodesic(point, target_width, target_height):
     lon, lat = point.x, point.y
-    zone_number = utm_zone(lon)
-    is_northern = lat >= 0  # Determine if the zone is in the northern hemisphere
-
-    # Define the UTM projection string
-    utm_proj = f"+proj=utm +zone={zone_number} +{'north' if is_northern else 'south'} +ellps=WGS84 +datum=WGS84 +units=m +no_defs"
-
-    # Transform the point to UTM coordinates
-    project_to_utm = pyproj.Transformer.from_crs("EPSG:4326", utm_proj, always_xy=True)
-    project_to_wgs84 = pyproj.Transformer.from_crs(utm_proj, "EPSG:4326", always_xy=True)
     
-    x, y = project_to_utm.transform(lon, lat)
-
-    # Create the rectangle in UTM coordinates
-    rectangle = box(x, y, x + width, y + height)
-
-    # Transform the rectangle back to WGS84 coordinates
-    minx, miny = project_to_wgs84.transform(rectangle.bounds[0], rectangle.bounds[1])
-    maxx, maxy = project_to_wgs84.transform(rectangle.bounds[2], rectangle.bounds[3])
-
-    return box(minx, miny, maxx, maxy)
-
+    # Define the four corners of the rectangle using geodesic distances
+    lower_left = (lat, lon)
+    lower_right = geodesic(meters=target_width).destination(lower_left, 90)  # 90 degrees -> East
+    upper_left = geodesic(meters=target_height).destination(lower_left, 0)  # 0 degrees -> North
+    upper_right = geodesic(meters=target_height).destination(lower_right, 0)  # 0 degrees -> North
+    
+    # Create the polygon using the four corners
+    rectangle = Polygon([
+        (lower_left[1], lower_left[0]), 
+        (lower_right[1], lower_right[0]), 
+        (upper_right[1], upper_right[0]), 
+        (upper_left[1], upper_left[0]), 
+        (lower_left[1], lower_left[0])
+    ])
+    
+    return rectangle
 
 # Load the CSV file into a pandas DataFrame
-df = pd.read_csv('data/pilot_coordinates.csv')#,sep=";", encoding = "ISO-8859-1")
+df = pd.read_csv('data/pilot_coordinates.csv', sep=';', encoding='ISO-8859-1')
 
-# Assuming your CSV has columns 'latitude' and 'longitude' in DMS format
+# Convert DMS to decimal degrees
 df['latitude_dd'] = df['Lat'].apply(dms_to_dd)
 df['longitude_dd'] = df['Lon'].apply(dms_to_dd)
 
@@ -58,10 +49,12 @@ df['longitude_dd'] = df['Lon'].apply(dms_to_dd)
 geometry = [Point(xy) for xy in zip(df['longitude_dd'], df['latitude_dd'])]
 gdf = gpd.GeoDataFrame(df, geometry=geometry)
 
-# Apply the rectangle creation for each point
-gdf['geometry'] = gdf['geometry'].apply(lambda point: create_rectangle_wgs84(point, 400, 250))
+# Define target dimensions in meters
+target_width = 400  # in meters
+target_height = 250  # in meters
 
-# gdf now contains 400m x 250m rectangles across the area of interest in WGS84 coordinates
+# Apply the rectangle creation for each point using geodesic distances
+gdf['geometry'] = gdf['geometry'].apply(lambda point: create_rectangle_wgs84_geodesic(point, target_width, target_height))
 
-
+# Save the result to a GeoJSON file
 gdf.to_file('./data/rectangles.geojson', driver='GeoJSON')

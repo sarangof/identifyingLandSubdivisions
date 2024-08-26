@@ -53,15 +53,19 @@ def overturemaps_save(overture_file, request_type: str, id: int):
 def osmnx_command(bbox):
     print(f"Running OSM command with bbox={bbox}")
     try:
-        oms_file = ox.features_from_bbox(bbox=bbox, tags={'building': True, 'highway': True})
-        oms_file = oms_file.apply(lambda c: c.astype(str) if c.name != "geometry" else c, axis=0)
-        return oms_file
+        oms_buildings = ox.features_from_bbox(bbox=bbox, tags={'building': True})
+        oms_buildings = oms_buildings.apply(lambda c: c.astype(str) if c.name != "geometry" else c, axis=0)
+
+        G = ox.graph_from_bbox(bbox=bbox, network_type='drive')
+        intersections, roads = ox.graph_to_gdfs(G)
+
+        return oms_buildings, oms_roads, oms_intersections
     except Exception as e:
         print(f"Error getting OSM data: {e}")
         return None
 
 #@delayed
-def osmnx_save(osm_file, id: int):
+def osmnx_save(osm_files, id: int):
     if osm_file is not None:
         output_path = f"./output_data/OSM_building_footprints_highways_{id}.gpkg"
         print(f"Saving OSM file to {output_path}")
