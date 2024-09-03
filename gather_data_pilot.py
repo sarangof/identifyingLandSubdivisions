@@ -1,3 +1,4 @@
+
 import subprocess
 from io import StringIO
 import geopandas as gpd
@@ -7,9 +8,10 @@ import pandas as pd
 import dask.dataframe as dd
 import os
 
+
 # Create output directory if it does not exist
-if not os.path.exists('./output_data'):
-    os.makedirs('./output_data')
+#if not os.path.exists('./output_data'):
+#    os.makedirs('./output_data')
 
 # DEFINE LOADING FUNCTIONS
 
@@ -160,6 +162,6 @@ def run_all():
     print(f"Results: {computed_results}")
 
 # Execute the function
-run_all()
-print("All tasks completed.")
+#run_all()
+#print("All tasks completed.")
 
