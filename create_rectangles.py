@@ -43,8 +43,8 @@ def create_expanded_rectangle_wgs84_geodesic(point, target_width, target_height,
     lon, lat = point.x, point.y
 
     original_lower_left = (lat, lon)
-    reference_point_left = geodesic(meters=-(expansion_factor*target_width)+(target_width/2.)).destination(original_lower_left, 90)  
-    lower_left_expanded = geodesic(meters=-(expansion_factor*target_height)+(target_height/2.)).destination(reference_point_left, 0)  
+    reference_point_left = geodesic(meters=-target_width*(expansion_factor-1)/2.).destination(original_lower_left, 90)  
+    lower_left_expanded = geodesic(meters=-target_height*(expansion_factor-1)/2.).destination(reference_point_left, 0)  
     lower_right_expanded = geodesic(meters=expansion_factor*target_width).destination(lower_left_expanded, 90)  
     upper_left_expanded = geodesic(meters=expansion_factor*target_height).destination(lower_left_expanded, 0) 
     upper_right_expanded = geodesic(meters=expansion_factor*target_height).destination(lower_right_expanded, 0)
