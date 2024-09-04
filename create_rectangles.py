@@ -42,7 +42,9 @@ def create_rectangle_wgs84_geodesic(point, target_width, target_height):
 def create_expanded_rectangle_wgs84_geodesic(point, target_width, target_height, expansion_factor: float):
     lon, lat = point.x, point.y
 
-    lower_left_expanded = (lat, lon)
+    reference_point_0 = (lat, lon)
+    reference_point = geodesic(meters=-expansion_factor*(target_width/2.)).destination(reference_point_0, 0)  
+    lower_left_expanded = geodesic(meters=-expansion_factor*(target_width/2.)).destination(reference_point, 90)  
     lower_right_expanded = geodesic(meters=expansion_factor*target_width).destination(lower_left_expanded, 90)  
     upper_left_expanded = geodesic(meters=expansion_factor*target_height).destination(lower_left_expanded, 0) 
     upper_right_expanded = geodesic(meters=expansion_factor*target_height).destination(lower_right_expanded, 0)
@@ -67,7 +69,7 @@ target_width = 400  # in meters
 target_height = 250  # in meters
 # Apply the rectangle creation for each point using geodesic distances
 rectangles['geometry'] = rectangles['geometry'].apply(lambda point: create_rectangle_wgs84_geodesic(point, target_width, target_height))
-rectangles[['minx_expanded','miny_expanded','maxx_expanded','maxy_expanded']] = rectangles['geometry'].apply(lambda point: create_expanded_rectangle_wgs84_geodesic(point.centroid, target_width, target_height, expansion_factor=3)).apply(pd.Series)
+rectangles[['minx_expanded','miny_expanded','maxx_expanded','maxy_expanded']] = pd.Series(geometry).apply(lambda point: create_expanded_rectangle_wgs84_geodesic(point, target_width, target_height, expansion_factor=3)).apply(pd.Series)
 rectangles[['minx', 'miny', 'maxx', 'maxy']] = rectangles.bounds 
 # Save the result to a GeoJSON file
 rectangles.to_file('./data/rectangles.geojson', driver='GeoJSON')
