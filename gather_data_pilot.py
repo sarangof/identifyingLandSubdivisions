@@ -10,8 +10,8 @@ import os
 
 
 # Create output directory if it does not exist
-#if not os.path.exists('./output_data'):
-#    os.makedirs('./output_data')
+if not os.path.exists('./output_data'):
+    os.makedirs('./output_data')
 
 # DEFINE LOADING FUNCTIONS
 
@@ -67,7 +67,7 @@ def osmnx_command(bbox):
         osm_buildings = ox.features_from_bbox(bbox=bbox, tags={'building': True})
         osm_buildings = osm_buildings.apply(lambda c: c.astype(str) if c.name != "geometry" else c, axis=0)
 
-        G = ox.graph_from_bbox(bbox=bbox, network_type='drive')
+        G = ox.graph_from_bbox(bbox=bbox, network_type='all_private')
         osm_intersections, osm_roads = ox.graph_to_gdfs(G)
 
         return osm_buildings, osm_intersections, osm_roads
@@ -94,8 +94,6 @@ def osmnx_save(osm_files, id: int):
         print(f"Skipping save for OSM ID: {id}")
     return None
 
-
-
 def make_requests(partition):
     print(f"Processing partition with {len(partition)} rows")
     results = []
@@ -119,7 +117,7 @@ def make_requests(partition):
 
         try:
             # Open street maps commands
-            bbox = [rectangle['maxy'], rectangle['miny'], rectangle['maxx'], rectangle['minx']]
+            bbox = [rectangle['maxy_expanded'], rectangle['miny_expanded'], rectangle['maxx_expanded'], rectangle['minx_expanded']]
             print("About to trigger osm command")
             osm_buildings, osm_intersections, osm_roads = osmnx_command(bbox)
             osm_files = {'OSM_buildings': osm_buildings, 
@@ -137,15 +135,12 @@ def make_requests(partition):
 
 def run_all():
     # Load rectangles file
-    rectangles = gpd.read_file('data/rectangles.geojson')
-    
-    # Print columns and first few rows
-    #print(f"Columns in the rectangles DataFrame: {rectangles.columns.tolist()}")
-    #print(rectangles.head())
+    rectangles = gpd.read_file('data/rectangles.geojson').iloc[[17, 19, 24, 28, 42, 46, 47]]
     
     # Prepare DataFrame for Dask
     rectangles[['minx', 'miny', 'maxx', 'maxy']] = rectangles.bounds
     bounds_list = rectangles[['minx', 'miny', 'maxx', 'maxy']].copy()
+    bounds_list[['minx_expanded','miny_expanded','maxx_expanded','maxy_expanded']] = rectangles[['minx_expanded','miny_expanded','maxx_expanded','maxy_expanded']]
     bounds_list['n'] = bounds_list.index
     
     # Create Dask DataFrame
@@ -162,6 +157,5 @@ def run_all():
     print(f"Results: {computed_results}")
 
 # Execute the function
-#run_all()
-#print("All tasks completed.")
-
+run_all()
+print("All tasks completed.")
