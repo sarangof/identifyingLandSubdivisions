@@ -289,8 +289,8 @@ def metric_5_4way_intersections(intersections):
 
 #6 Average building footprint orientation of the tile
 def metric_6_deviation_of_building_azimuth(buildings):
-    buildings.loc[:,'azimuth'] = buildings['geometry'].apply(lambda x: calculate_azimuth(longest_segment(x)))
-    azimuth_range = (buildings.azimuth.apply(lambda x: (x) % 90)).quantile(0.95) - (buildings.azimuth.apply(lambda x: (x) % 90)).quantile(0.05)
+    buildings.loc[:,'azimuth'] = buildings['geometry'].apply(lambda x: calculate_azimuth(longest_segment(x)) % 90)
+    azimuth_range = buildings.azimuth.quantile(0.95) - (buildings.azimuth.apply(lambda x: (x) % 90)).quantile(0.05)
     m6 = azimuth_range/1.
     return m6, buildings
 
@@ -306,8 +306,9 @@ def metric_7_average_block_width(blocks):
     return m7, blocks
 
 #8 Two row blocks
-def metric_8_two_row_blocks(blocks, buildings,row_epsilon):
-    for block_id, block in blocks.iterrows():
+def metric_8_two_row_blocks(blocks_clipped, buildings, utm_proj_rectangle, row_epsilon):
+    internal_buffers = []
+    for block_id, block in blocks_clipped.iterrows():
         #print("fid")
         #print(block['fid'])
         block_area = block.area
@@ -320,66 +321,64 @@ def metric_8_two_row_blocks(blocks, buildings,row_epsilon):
         union_area = result_union.area
         internal_buffer_area = internal_buffer.area  
         internal_buffer = block.geometry.difference(internal_buffer)
-        
-        # Plotting
-        #fig, ax = plt.subplots()
-
-        # Plot the block
-        #x, y = block.geometry.exterior.xy
-        #ax.fill(x, y, alpha=0.5, fc='lightcoral', ec='blue', label='Block')
-        #gpd.GeoSeries(block).to_file(f"blocks_tile_0_{block_id}_exterior.gpkg", driver="GPKG")
-        #geojson = mapping(block.geometry)
-        #with open(f'blocks_tile_17_{block_id}_exterior.geojson', 'w') as f:
-        #    json.dump(geojson, f)
-        # Plot the internal buffer
-
-        #if isinstance(internal_buffer, Polygon):
-        #    # Handle single Polygon
-        #    x2, y2 = internal_buffer.exterior.xy
-        #    ax.fill(x2, y2, alpha=0.5, fc='lightblue', ec='red', label='Internal Buffer')
-        #elif isinstance(internal_buffer, MultiPolygon):
-        # Handle MultiPolygon
-        #    for polygon in internal_buffer.geoms:
-        #        x2, y2 = polygon.exterior.xy
-        #        ax.fill(x2, y2, alpha=0.5, fc='lightblue', ec='red')#, label='Internal Buffer')
-
-        #gpd.GeoSeries(internal_buffer).to_file(f"internal_buffer_tile_0_{block_id}_exterior.geojson", driver="GPKG")
-        #geojson = mapping(internal_buffer)
-        #with open(f'internal_buffer_tile_17_{block_id}_exterior.geojson', 'w') as f:
-        #    json.dump(geojson, f)
-        
-        #plt.gca().set_aspect('equal', adjustable='box')
-        #plt.legend()
-        #plt.show()
-
-        #print("union_area")
-        #print(union_area)
-        #print("internal_buffer_area")
-        #print(internal_buffer_area)
+        internal_buffers.append(internal_buffer)
         if union_area > internal_buffer_area:
-            blocks.loc[block_id,'buildings_outside_buffer'] = True
+            blocks_clipped.loc[block_id,'buildings_outside_buffer'] = True
         elif union_area <= internal_buffer_area:
-            blocks.loc[block_id,'buildings_outside_buffer'] = False
-        m8 = blocks['buildings_outside_buffer'].mean()
-    return m8
+            blocks_clipped.loc[block_id,'buildings_outside_buffer'] = False
+        m8 = blocks_clipped['buildings_outside_buffer'].mean()
+    internal_buffers = gpd.GeoDataFrame(geometry=internal_buffers).set_crs(utm_proj_rectangle)
+    return m8, internal_buffers
 
 #9 Tortuosity index
 def metric_9_tortuosity_index(roads, intersections, angular_threshold=20, tortuosity_tolerance=0.5):
     inflection_points_gdf = get_inflection_points(roads, angular_threshold)
     all_road_vertices = pd.concat([inflection_points_gdf, intersections], ignore_index=True)
-    all_road_vertices = all_road_vertices.set_geometry('geometry')
-    # Ensure CRS consistency
-    all_road_vertices.set_crs(roads.crs, inplace=True)
-    # Create a graph to determine the order of points
-    G = nx.Graph()
-    # Add nodes to the graph for each point in the combined GeoDataFrame
-    for idx, point in all_road_vertices.iterrows():
-        G.add_node(idx, geometry=point.geometry)
-    # Add edges between each pair of points based on proximity along the road network
-    for i in range(len(all_road_vertices)):
-        for j in range(i + 1, len(all_road_vertices)):
-            point_A = all_road_vertices.iloc[i].geometry
-            point_B = all_road_vertices.iloc[j].geometry
+    all_road_vertices['point_type'] = 'inflection point' 
+    all_road_vertices.loc[all_road_vertices.geometry.isin(intersections.geometry), 'point_type'] = 'intersection'
+    all_road_vertices = all_road_vertices.drop_duplicates(subset='geometry', keep='last')
+
+    if not all_road_vertices.empty:
+        all_road_vertices = all_road_vertices.set_geometry('geometry')
+        # Ensure CRS consistency
+        all_road_vertices.set_crs(roads.crs, inplace=True)
+        # Create a graph to determine the order of points
+        G = nx.Graph()
+        # Add nodes to the graph for each point in the combined GeoDataFrame
+        for idx, point in all_road_vertices.iterrows():
+            G.add_node(idx, geometry=point.geometry)
+        # Add edges between each pair of points based on proximity along the road network
+        for i in range(len(all_road_vertices)):
+            for j in range(i + 1, len(all_road_vertices)):
+                point_A = all_road_vertices.iloc[i].geometry
+                point_B = all_road_vertices.iloc[j].geometry
+                # Find the nearest points on the road network for A and B
+                nearest_A = nearest_points(roads.unary_union, point_A)[0]
+                nearest_B = nearest_points(roads.unary_union, point_B)[0]
+                # Calculate the road network distance
+                road_network_distance = roads.geometry.length.loc[
+                    roads.intersects(nearest_A.buffer(1e-6)) & roads.intersects(nearest_B.buffer(1e-6))
+                ].min()
+                # Handle NaN values
+                if np.isnan(road_network_distance):
+                    road_network_distance = 1e6  # Arbitrary large number, adjust if necessary
+                # Add the edge with the distance as weight
+                G.add_edge(i, j, weight=road_network_distance)
+        # Find the minimum spanning tree to order the points
+        mst = nx.minimum_spanning_tree(G)
+        # Get the ordered points by traversing the minimum spanning tree
+        ordered_indices = list(nx.dfs_preorder_nodes(mst, source=0))  # Starting from the first point
+        ordered_vertices = all_road_vertices.iloc[ordered_indices].reset_index(drop=True)
+        # Initialize lists to store distances
+        euclidean_distances = []
+        road_network_distances = []
+        indices_to_keep = []
+        # Iterate through contiguous points
+        for i in range(len(ordered_vertices) - 1):
+            point_A = ordered_vertices.iloc[i].geometry
+            point_B = ordered_vertices.iloc[i + 1].geometry
+            # Calculate the straight-line Euclidean distance
+            euclidean_distance = point_A.distance(point_B)
             # Find the nearest points on the road network for A and B
             nearest_A = nearest_points(roads.unary_union, point_A)[0]
             nearest_B = nearest_points(roads.unary_union, point_B)[0]
@@ -387,45 +386,20 @@ def metric_9_tortuosity_index(roads, intersections, angular_threshold=20, tortuo
             road_network_distance = roads.geometry.length.loc[
                 roads.intersects(nearest_A.buffer(1e-6)) & roads.intersects(nearest_B.buffer(1e-6))
             ].min()
-            # Handle NaN values
-            if np.isnan(road_network_distance):
-                road_network_distance = 1e6  # Arbitrary large number, adjust if necessary
-            # Add the edge with the distance as weight
-            G.add_edge(i, j, weight=road_network_distance)
-    # Find the minimum spanning tree to order the points
-    mst = nx.minimum_spanning_tree(G)
-    # Get the ordered points by traversing the minimum spanning tree
-    ordered_indices = list(nx.dfs_preorder_nodes(mst, source=0))  # Starting from the first point
-    ordered_vertices = all_road_vertices.iloc[ordered_indices].reset_index(drop=True)
-    # Initialize lists to store distances
-    euclidean_distances = []
-    road_network_distances = []
-    indices_to_keep = []
-    # Iterate through contiguous points
-    for i in range(len(ordered_vertices) - 1):
-        point_A = ordered_vertices.iloc[i].geometry
-        point_B = ordered_vertices.iloc[i + 1].geometry
-        # Calculate the straight-line Euclidean distance
-        euclidean_distance = point_A.distance(point_B)
-        # Find the nearest points on the road network for A and B
-        nearest_A = nearest_points(roads.unary_union, point_A)[0]
-        nearest_B = nearest_points(roads.unary_union, point_B)[0]
-        # Calculate the road network distance
-        road_network_distance = roads.geometry.length.loc[
-            roads.intersects(nearest_A.buffer(1e-6)) & roads.intersects(nearest_B.buffer(1e-6))
-        ].min()
-        if road_network_distance > tortuosity_tolerance:
-            euclidean_distances.append(euclidean_distance)
-            road_network_distances.append(road_network_distance)
-            indices_to_keep.append(i)
-    # Combine the results into a DataFrame
-    distance_comparison = pd.DataFrame({
-        'Point_A': ordered_vertices.geometry[:-1].reset_index(drop=True).iloc[indices_to_keep],
-        'Point_B': ordered_vertices.geometry[1:].reset_index(drop=True).iloc[indices_to_keep],
-        'Euclidean_Distance': euclidean_distances,
-        'Road_Network_Distance': road_network_distances
-    })
-    m9 = (distance_comparison['Euclidean_Distance']/distance_comparison['Road_Network_Distance']).mean()
+            if road_network_distance > tortuosity_tolerance:
+                euclidean_distances.append(euclidean_distance)
+                road_network_distances.append(road_network_distance)
+                indices_to_keep.append(i)
+        # Combine the results into a DataFrame
+        distance_comparison = pd.DataFrame({
+            'Point_A': ordered_vertices.geometry[:-1].reset_index(drop=True).iloc[indices_to_keep],
+            'Point_B': ordered_vertices.geometry[1:].reset_index(drop=True).iloc[indices_to_keep],
+            'Euclidean_Distance': euclidean_distances,
+            'Road_Network_Distance': road_network_distances
+        })
+        m9 = (distance_comparison['Euclidean_Distance']/distance_comparison['Road_Network_Distance']).mean()
+    else:
+        m9 = np.nan
     return m9, all_road_vertices
 
 #10 Average angle between road segments
@@ -435,41 +409,19 @@ def metric_10_average_angle_between_road_segments(intersections, roads):
     # In 3-way intersections, include only the smallest angle in the tile average. 
     df_3_way = intersection_angles_df[(intersection_angles_df.street_count==3)]
     if not df_3_way.empty:
-        to_keep_3 = df_3_way.reset_index().loc[(df_3_way.reset_index().groupby(df_3_way.index)['Angle'].idxmin())].set_index('index')
+        to_keep_3 = df_3_way.reset_index().loc[(df_3_way.reset_index().groupby(df_3_way.index)['Angle'].idxmin())]#.set_index('index')
     else:
         to_keep_3 = pd.DataFrame([])
     # In 4-way intersections, include only the two smallest angles in the tile average.
     df_4_way = intersection_angles_df[intersection_angles_df.street_count==4]
     if not df_4_way.empty:
-        to_keep_4 = df_4_way.groupby(df_4_way.index).apply(lambda x: x.nsmallest(2, 'Angle')).reset_index().set_index('level_0')
+        to_keep_4 = df_4_way.groupby(df_4_way.index).apply(lambda x: x.nsmallest(2, 'Angle')).reset_index(drop=True)   
     else:
         to_keep_4 = pd.DataFrame([])
     to_keep_4.index.names = ['index']
     to_keep_df = pd.concat([to_keep_3,to_keep_4])
     if not to_keep_df.empty:
-        m10 = pd.concat([to_keep_3,to_keep_4])['Angle'].median()
+        m10 = to_keep_df['Angle'].median()
     else:
         m10 = np.nan
     return m10
-    
-
-def draw_optimal_circle(block,optimal_point,max_radius):
-    circle = optimal_point.buffer(max_radius)
-
-    # Plot the block polygon
-    fig, ax = plt.subplots()
-    x, y = block.geometry.exterior.xy
-    ax.fill(x, y, alpha=0.5, fc='lightblue', ec='blue')  # Draw the polygon
-
-    # Plot the circle
-    x, y = circle.exterior.xy
-    ax.plot(x, y, color='red', linewidth=2)  # Draw the circle
-
-    # Plot the optimal point (center of the circle)
-    ax.plot(optimal_point.x, optimal_point.y, 'ro')  # Red point for the center
-
-    # Set limits and show the plot
-    #ax.set_xlim(-1, 5)
-    #ax.set_ylim(-1, 4)
-    plt.gca().set_aspect('equal', adjustable='box')
-    plt.show()
