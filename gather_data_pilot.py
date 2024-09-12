@@ -1,4 +1,3 @@
-
 import subprocess
 from io import StringIO
 import geopandas as gpd
@@ -66,8 +65,8 @@ def osmnx_command(bbox):
     try:
         osm_buildings = ox.features_from_bbox(bbox=bbox, tags={'building': True})
         osm_buildings = osm_buildings.apply(lambda c: c.astype(str) if c.name != "geometry" else c, axis=0)
-
-        G = ox.graph_from_bbox(bbox=bbox, network_type='all_private')
+        custom_filter = '["highway"~"trunk|motorway|primary|secondary|tertiary|primary_link|secondary_link|tertiary_link|trunk_link|motorway_link|residential|unclassified|road"]'
+        G = ox.graph_from_bbox(bbox=bbox, custom_filter=custom_filter)
         osm_intersections, osm_roads = ox.graph_to_gdfs(G)
 
         return osm_buildings, osm_intersections, osm_roads
@@ -135,7 +134,7 @@ def make_requests(partition):
 
 def run_all():
     # Load rectangles file
-    rectangles = gpd.read_file('data/rectangles.geojson').iloc[[17, 19, 24, 28, 42, 46, 47]]
+    rectangles = gpd.read_file('data/rectangles.geojson')
     
     # Prepare DataFrame for Dask
     rectangles[['minx', 'miny', 'maxx', 'maxy']] = rectangles.bounds
