@@ -260,13 +260,13 @@ def metric_1_distance_less_than_10m(buildings, road_union, utm_proj_rectangle):
     # Apply the distance calculation to each building
     buildings.loc[:,'distance_to_road'] = buildings['geometry'].apply(lambda x: x.centroid).apply(calculate_minimum_distance_to_roads, 
                                                                                                   road_union = road_union)
-    m1 = 100.*((sum(buildings['distance_to_road']<=10))/len(buildings))
+    m1 = 1.*((sum(buildings['distance_to_road']<=10))/len(buildings))
     return m1, gpd.GeoDataFrame(buildings)
 
 #2 Average distance of building footprint centroids to roads
 # THIS FUNCTION CAN ONLY BE CALLED AFTER metric_1
 def metric_2_average_distance_to_roads(buildings):
-    m2 = buildings['distance_to_road'].mean()
+    m2 = buildings['distance_to_road'].median()
     return m2
 
 #3 Density of roads
@@ -289,21 +289,24 @@ def metric_5_4way_intersections(intersections):
 
 #6 Average building footprint orientation of the tile
 def metric_6_deviation_of_building_azimuth(buildings):
-    buildings.loc[:,'azimuth'] = buildings['geometry'].apply(lambda x: calculate_azimuth(longest_segment(x)) % 90)
-    azimuth_range = buildings.azimuth.quantile(0.95) - (buildings.azimuth.apply(lambda x: (x) % 90)).quantile(0.05)
-    m6 = azimuth_range/1.
+    buildings.loc[:,'azimuth'] = buildings['geometry'].apply(lambda x: calculate_azimuth(longest_segment(x)) % 45.)
+    #azimuth_range = buildings.azimuth.quantile(0.95) - (buildings.azimuth.apply(lambda x: (x) % 90)).quantile(0.05)
+    m6 = buildings.azimuth.std()#azimuth_range/1.
     return m6, buildings
 
 #7 Average block width
-def metric_7_average_block_width(blocks):
-    max_area = max(blocks['area'])  
-    min_area = min(blocks['area'])
-    for block_id, block in blocks.iterrows():
+def metric_7_average_block_width(blocks_clipped, rectangle_projected, rectangle_area):
+    #max_area = max(blocks['area'])  
+    #min_area = min(blocks['area'])
+    for block_id, block in blocks_clipped.iterrows():
         optimal_point, max_radius = get_largest_inscribed_circle(block)
-        weighted_width = (((max_radius*block['area'])-min_area)/max_area)
-        blocks.loc[block_id,'weighted_width'] = weighted_width
-    m7 = blocks['weighted_width'].mean()
-    return m7, blocks
+        block_area = (gpd.GeoSeries(block.geometry).intersection(gpd.GeoSeries(rectangle_projected.geometry))).area.sum()
+        block_weight = block_area / rectangle_area
+        #weighted_width = (((max_radius*block['area'])-min_area)/max_area)
+        weighted_width = block_weight*max_radius
+        blocks_clipped.loc[block_id,'weighted_width'] = weighted_width
+    m7 = blocks_clipped['weighted_width'].sum()
+    return m7, blocks_clipped
 
 #8 Two row blocks
 def metric_8_two_row_blocks(blocks_clipped, buildings, utm_proj_rectangle, row_epsilon):
@@ -316,18 +319,27 @@ def metric_8_two_row_blocks(blocks_clipped, buildings, utm_proj_rectangle, row_e
         target_area = block_area*(1.-row_epsilon)  # Set your target area
         internal_buffer = get_internal_buffer_with_target_area(block, target_area)
         #print(type(internal_buffer))
-        buildings_for_union = unary_union(buildings.clip(block.geometry).geometry)
+        buildings_in_block = buildings.clip(block.geometry)
+        buildings_for_union = unary_union(buildings_in_block.geometry)
         result_union = internal_buffer.union(buildings_for_union)
         union_area = result_union.area
         internal_buffer_area = internal_buffer.area  
+
         internal_buffer = block.geometry.difference(internal_buffer)
+        buildings_intersecting_buffer = buildings_in_block[buildings_in_block.geometry.intersects(internal_buffer)]
+        buildings_intersecting_buffer_area = buildings_intersecting_buffer.area.sum()
+        buildings_area_all = buildings_in_block.area.sum()
+        buildings_inside_buffer_area = buildings.intersection(internal_buffer).area.sum()
         internal_buffers.append(internal_buffer)
-        if union_area > internal_buffer_area:
-            blocks_clipped.loc[block_id,'buildings_outside_buffer'] = True
-        elif union_area <= internal_buffer_area:
-            blocks_clipped.loc[block_id,'buildings_outside_buffer'] = False
-        m8 = blocks_clipped['buildings_outside_buffer'].mean()
+        blocks_clipped.loc[block_id,'share_of_buildings_inside_buffer_intersection'] = buildings_inside_buffer_area/buildings_intersecting_buffer_area
+        blocks_clipped.loc[block_id,'share_of_buildings_inside_buffer_all'] = buildings_inside_buffer_area/buildings_area_all
+        #if union_area > internal_buffer_area:
+        #    blocks_clipped.loc[block_id,'buildings_outside_buffer'] = True
+        #elif union_area <= internal_buffer_area:
+        #    blocks_clipped.loc[block_id,'buildings_outside_buffer'] = False
+        #m8 = blocks_clipped['buildings_outside_buffer'].mean()
     internal_buffers = gpd.GeoDataFrame(geometry=internal_buffers).set_crs(utm_proj_rectangle)
+    m8 = blocks_clipped.share_of_buildings_inside_buffer_intersection.mean()
     return m8, internal_buffers
 
 #9 Tortuosity index
