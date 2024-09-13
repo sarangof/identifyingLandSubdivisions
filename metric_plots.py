@@ -93,11 +93,11 @@ def plot_largest_inscribed_circle(rectangle_id, rectangle_projected, blocks_clip
 def plot_two_row_blocks(rectangle_id, rectangle_projected, blocks_clipped, internal_buffers, buildings_clipped, roads, row_epsilon):
     fig, ax = plt.subplots()
     roads.plot(ax=ax, color='gray', linewidth=0.5, zorder=1)
-    blocks_clipped.plot(ax=ax, ec='black', fc='royalblue', zorder=2, linewidth=0.2, legend=True, label='Blocks')
+    blocks_clipped.plot(ax=ax, ec='black', fc='lightsteelblue', zorder=2, linewidth=0.2, legend=True, label='Blocks')
     x, y = rectangle_projected.geometry.exterior.xy
     ax.fill(x, y, linewidth=1, fc='none', ec='lightseagreen', zorder=3, label='Study area')
-    buildings_clipped.plot(ax=ax, ec='black', fc='tomato', zorder=4, linewidth=0.3, legend=True, label='Buildings')
-    internal_buffers.plot(ax=ax, ec='black', fc='gold', zorder=5, alpha=0.7,  linewidth=0.2, legend=True, label='Internal buffer')
+    buildings_clipped.plot(ax=ax, ec='black', fc='pink', zorder=4, linewidth=0.3, legend=True, label='Buildings')
+    internal_buffers.plot(ax=ax, ec='black', fc='yellow', zorder=5, alpha=0.7,  linewidth=0.2, legend=True, label='Internal buffer')
     plt.gca().set_aspect('equal', adjustable='box')
     plt.legend()
     plt.savefig(f'pilot_plots/plot_two_row_blocks_{rectangle_id}_epsilon_{str(row_epsilon)}.png', dpi=500, bbox_inches='tight')

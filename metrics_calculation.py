@@ -80,6 +80,7 @@ def calculate_sequential_angles(intersections, roads):
         vectors = []
         
         for _, road in connected_roads.iterrows():
+            print(_)
             coords = list(road.geometry.coords)
             
             # Determine the vector for the road segment away from the intersection
@@ -89,7 +90,7 @@ def calculate_sequential_angles(intersections, roads):
                 vector = (coords[-2][0] - coords[-1][0], coords[-2][1] - coords[-1][1])
             
             vectors.append((vector, road['u'], road['v']))
-        
+
         # Sort vectors based on the angle relative to a fixed axis (e.g., x-axis)
         vectors.sort(key=lambda v: np.arctan2(v[0][1], v[0][0]))
 
@@ -106,7 +107,7 @@ def calculate_sequential_angles(intersections, roads):
                 'Angle': angle
             }
             records.append(record)
-    
+
     # Create a DataFrame from the records
     df_angles = pd.DataFrame(records)
     
@@ -284,8 +285,9 @@ def metric_4_share_3_and_4way_intersections(intersections):
     return m4
 
 #5 Number of 4-way intersections
-def metric_5_4way_intersections(intersections):
-    return 1.*len(intersections[(intersections.street_count == 4)])
+def metric_5_4way_intersections(intersections, rectangle_area):
+    m5 = (1000.**2)*(len(intersections[(intersections.street_count == 4)])/rectangle_area)
+    return m5
 
 #6 Average building footprint orientation of the tile
 def metric_6_deviation_of_building_azimuth(buildings):
@@ -298,14 +300,24 @@ def metric_6_deviation_of_building_azimuth(buildings):
 def metric_7_average_block_width(blocks_clipped, rectangle_projected, rectangle_area):
     #max_area = max(blocks['area'])  
     #min_area = min(blocks['area'])
+    blocks_within_rectangle = []
+    radius_avg = []
     for block_id, block in blocks_clipped.iterrows():
         optimal_point, max_radius = get_largest_inscribed_circle(block)
-        block_area = (gpd.GeoSeries(block.geometry).intersection(gpd.GeoSeries(rectangle_projected.geometry))).area.sum()
-        block_weight = block_area / rectangle_area
+        block_within_rectangle = (gpd.GeoSeries(block.geometry).intersection(gpd.GeoSeries(rectangle_projected.geometry)))
+        block_area_within_rectangle = block_within_rectangle.area.sum()
+        block_weight = block_area_within_rectangle / rectangle_area
         #weighted_width = (((max_radius*block['area'])-min_area)/max_area)
         weighted_width = block_weight*max_radius
         blocks_clipped.loc[block_id,'weighted_width'] = weighted_width
-    m7 = blocks_clipped['weighted_width'].sum()
+        blocks_within_rectangle.append(block_within_rectangle)
+        radius_avg.append(max_radius)
+    #print(np.mean(radius_avg))
+    blocks_within_rectangle = gpd.GeoDataFrame(pd.concat(blocks_within_rectangle, ignore_index=True), columns=['geometry'])
+    blocks_within_rectangle.set_geometry('geometry', inplace=True)
+    area_of_blocks_within_rectangle = blocks_within_rectangle.area.sum()
+    share_of_rectangle_tiled_by_blocks = area_of_blocks_within_rectangle/rectangle_area
+    m7 = blocks_clipped['weighted_width'].sum()/share_of_rectangle_tiled_by_blocks
     return m7, blocks_clipped
 
 #8 Two row blocks
@@ -339,7 +351,8 @@ def metric_8_two_row_blocks(blocks_clipped, buildings, utm_proj_rectangle, row_e
         #    blocks_clipped.loc[block_id,'buildings_outside_buffer'] = False
         #m8 = blocks_clipped['buildings_outside_buffer'].mean()
     internal_buffers = gpd.GeoDataFrame(geometry=internal_buffers).set_crs(utm_proj_rectangle)
-    m8 = blocks_clipped.share_of_buildings_inside_buffer_intersection.mean()
+    #m8 = blocks_clipped.share_of_buildings_inside_buffer_intersection.mean()
+    m8 = blocks_clipped.share_of_buildings_inside_buffer_all.mean()
     return m8, internal_buffers
 
 #9 Tortuosity index
