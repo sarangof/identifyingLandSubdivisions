@@ -121,7 +121,7 @@ for rectangle_id, rectangle in rectangles.iterrows():
         m7, blocks_clipped = metric_7_average_block_width(blocks_clipped, rectangle_projected, rectangle_area)
         #m7=np.nan
         m8, internal_buffers = metric_8_two_row_blocks(blocks_clipped, buildings_clipped, utm_proj_rectangle, row_epsilon=row_epsilon)
-        plot_largest_inscribed_circle(rectangle_id, rectangle_projected,  blocks_clipped, roads)
+        #plot_largest_inscribed_circle(rectangle_id, rectangle_projected,  blocks_clipped, roads)
         #plot_two_row_blocks(rectangle_id, rectangle_projected, blocks_clipped, internal_buffers, buildings_clipped, roads, row_epsilon=0.01)
         #plot_two_row_blocks(rectangle_id, rectangle_projected, blocks_clipped, internal_buffers, buildings_clipped, roads, row_epsilon=0.1)
         #plot_two_row_blocks(rectangle_id, rectangle_projected, blocks_clipped, internal_buffers, buildings_clipped, roads, row_epsilon=0.001)

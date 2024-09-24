@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from metrics_calculation import get_largest_inscribed_circle
 from shapely.geometry import Polygon, MultiPolygon
 import matplotlib as mpl
+import matplotlib.patches as mpatches
 
 def plot_distance_to_roads(buildings_clipped, roads, rectangle_projected, rectangle_id):
     fig, ax = plt.subplots(1, 1, figsize=(10, 10))
@@ -23,24 +24,25 @@ def plot_distance_to_roads(buildings_clipped, roads, rectangle_projected, rectan
     plt.savefig(f'pilot_plots/distance_to_roads_plot_{rectangle_id}.png', dpi=500, bbox_inches='tight')
 
 
-def plot_azimuth(buildings_clipped, roads, rectangle_projected, rectangle_id):
+def plot_azimuth(buildings_clipped, roads, rectangle_projected, rectangle_id, n_orientation_groups):
     fig, ax = plt.subplots(1, 1, figsize=(10, 10))
 
-    roads.plot(ax=ax, zorder=1, color='grey', linewidth=0.5, label='Roads')
+    try:
+        roads.plot(ax=ax, zorder=1, color='grey', linewidth=0.5, label='Roads')
+    except AttributeError:
+        pass
     x, y = rectangle_projected.geometry.exterior.xy
     ax.fill(x, y, alpha=0.5, zorder=2, fc='none', ec='blue', label='Study area')
-    buildings_clipped_plot = buildings_clipped.plot(column='azimuth', zorder=3, ax=ax, cmap='Greens', label='Buildings')
+    buildings_clipped_plot = buildings_clipped.plot(column='azimuth_group', zorder=3, ax=ax, cmap='Accent', label='Buildings')
 
-    #ax.set_title('Building orientation', fontsize=15)
-    norm = mpl.colors.Normalize(vmin=buildings_clipped['azimuth'].min(), vmax=buildings_clipped['azimuth'].max())
-    sm = plt.cm.ScalarMappable(cmap='Greens', norm=norm)
-    sm._A = []  
-    cbar = fig.colorbar(sm, ax=ax, shrink=0.6)  
+    norm = mpl.colors.Normalize(vmin=1, vmax=n_orientation_groups)
+    colors = plt.cm.Accent(norm(range(1, n_orientation_groups+1)))
+    patches = [mpatches.Patch(color=colors[i], label=f'Group {i+1}') for i in range(n_orientation_groups)]
+    ax.legend(handles=patches, loc='upper right')
 
-    plt.legend(loc='upper right')
     plt.tight_layout()
-    plt.savefig(f'pilot_plots/azimuth_plot_{rectangle_id}.png', dpi=500, bbox_inches='tight')
- 
+    plt.savefig(f'pilot_plots/azimuth_group_plot_{rectangle_id}_{n_orientation_groups}_orientation_groups.png', dpi=500, bbox_inches='tight')
+
 def plot_inflection_points(rectangle_id, rectangle_projected, all_road_vertices, roads):
     inflection_points = all_road_vertices[all_road_vertices['point_type'] == 'inflection point']
     intersections = all_road_vertices[all_road_vertices['point_type'] == 'intersection']
