@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 from pyproj import Geod
 import math
 import numpy as np
-import json
 import pandas as pd
 import osmnx as ox
 import networkx as nx

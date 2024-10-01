@@ -7,6 +7,38 @@ import pandas as pd
 import dask.dataframe as dd
 import os
 
+def remove_duplicate_roads(osm_roads):
+    osm_roads_reset = osm_roads.reset_index()
+    osm_roads_reset['sorted_pair'] = osm_roads_reset.apply(lambda row: tuple(sorted([row['u'], row['v']])), axis=1)
+    osm_roads = osm_roads_reset.drop_duplicates(subset=['sorted_pair'])
+    osm_roads = osm_roads.drop(columns=['sorted_pair'])
+    return osm_roads
+
+def remove_list_columns(gdf):
+    """
+    This function removes any columns that contain lists or converts them to a valid format.
+    """
+    for col in gdf.columns:
+        if gdf[col].apply(lambda x: isinstance(x, list)).any():
+            gdf[col] = gdf[col].apply(lambda x: ', '.join(map(str, x)) if isinstance(x, list) else x)
+    return gdf
+
+analysis_buffers = gpd.read_file('12 city analysis buffers.geojson')
+search_buffers = gpd.read_file('12 city search buffers.geojson')
+
+# Gather OSM roads and intersections data for the borders.
+for _, city in search_buffers.iterrows():
+    city_name = city['city_name']
+    print(city_name)
+    custom_filter = '["highway"~"trunk|motorway|primary|secondary|tertiary|primary_link|secondary_link|tertiary_link|trunk_link|motorway_link|residential|unclassified|road"]'
+    G = ox.graph_from_polygon(polygon=search_buffers[search_buffers.city_name==city_name]['geometry'].iloc[0], custom_filter=custom_filter)
+    osm_intersections, osm_roads = ox.graph_to_gdfs(G)
+    osm_roads = remove_duplicate_roads(osm_roads)
+    road_output_file = f"./output_data/{city_name}_osm_roads.gpkg"
+    osm_roads = osm_roads.drop(columns=['osmid','reversed'])
+    osm_roads = remove_list_columns(osm_roads)
+    osm_roads.to_file(road_output_file, driver="GPKG")    
+    osm_intersections.to_file(f"./output_data/{city_name}_osm_intersections.gpkg", driver="GPKG")  
 
 # Create output directory if it does not exist
 if not os.path.exists('./output_data'):
@@ -51,47 +83,6 @@ def overturemaps_save(overture_file, request_type: str, id: int):
     return None
 
 
-def remove_duplicate_roads(osm_roads):
-    osm_roads_reset = osm_roads.reset_index()
-    osm_roads_reset['sorted_pair'] = osm_roads_reset.apply(lambda row: tuple(sorted([row['u'], row['v']])), axis=1)
-    osm_roads = osm_roads_reset.drop_duplicates(subset=['sorted_pair'])
-    osm_roads = osm_roads.drop(columns=['sorted_pair'])
-    return osm_roads
-
-
-#@delayed
-def osmnx_command(bbox):
-    print(f"Running OSM command with bbox={bbox}")
-    try:
-        osm_buildings = ox.features_from_bbox(bbox=bbox, tags={'building': True})
-        osm_buildings = osm_buildings.apply(lambda c: c.astype(str) if c.name != "geometry" else c, axis=0)
-        custom_filter = '["highway"~"trunk|motorway|primary|secondary|tertiary|primary_link|secondary_link|tertiary_link|trunk_link|motorway_link|residential|unclassified|road"]'
-        G = ox.graph_from_bbox(bbox=bbox, custom_filter=custom_filter)
-        osm_intersections, osm_roads = ox.graph_to_gdfs(G)
-
-        return osm_buildings, osm_intersections, osm_roads
-    except Exception as e:
-        print(f"Error getting OSM data: {e}")
-        return None
-
-#@delayed
-def osmnx_save(osm_files, id: int):
-    if osm_files is not None:
-        for file_type, file in osm_files.items():
-            try:
-                output_path = f"./output_data/{file_type}_{id}.gpkg"
-                print(f"Saving OSM file to {output_path}")
-                if file_type =='OSM_roads':
-                    file = remove_duplicate_roads(file)
-                    file.drop(columns=['osmid','reversed']).to_file(output_path, driver="GPKG")    
-                else:
-                    file.to_file(output_path, driver="GPKG")    
-            except Exception as e:
-                print(f"Error saving OSM file: {e}")
-        return True
-    else:
-        print(f"Skipping save for OSM ID: {id}")
-    return None
 
 def make_requests(partition):
     print(f"Processing partition with {len(partition)} rows")

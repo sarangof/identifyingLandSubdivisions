@@ -1,15 +1,14 @@
 import ee
 import geemap
 import geopandas as gpd
-import matplotlib.pyplot as plt
-import geopandas as gpd
 import pandas as pd
-from shapely.geometry import Point, box
+from shapely.geometry import box
+from math import sqrt, pi, floor
+from pyproj import CRS, Transformer
 
 # Authenticate and initialize Earth Engine
 ee.Authenticate()
 ee.Initialize(project='city-extent')
-
 
 # List of cities to process
 cities = ["Belo Horizonte", "Campinas", "Bogota", "Nairobi", "Bamako", 
@@ -19,154 +18,105 @@ cities = ["Belo Horizonte", "Campinas", "Bogota", "Nairobi", "Bamako",
 # Urban extent dataset
 urban_extent = ee.FeatureCollection("projects/wri-datalab/cities/urban_land_use/data/global_cities_Aug2024/urbanextents_unions_2020")
 
-# GHSL Population dataset for the projection
-GHSLpop = ee.ImageCollection("users/emackres/GHS_POP_GLOBE_R2023A_4326_3ss")
-GHSLpop_proj = GHSLpop.first().select('b1').projection()
-GHSLpop_scale = GHSLpop_proj.nominalScale()
+# GeoDataFrames to hold results
+analysis_buffers = gpd.GeoDataFrame(columns=['city_name', 'geometry'], crs='EPSG:4326')
+search_buffers = gpd.GeoDataFrame(columns=['city_name', 'geometry'], crs='EPSG:4326')
 
-# Buffer and grid creation function
-def buffer_and_grid(city_name, buffer_distance, grid_size):
-    # Filter the urban extent for the specific city
-    city_fc = urban_extent.filter(ee.Filter.eq('city_name_large', city_name))
-    
-    # Debug: Print city feature collection info
-    #print(f"City Feature Collection for {city_name}: ", city_fc.getInfo())
-    
-    # Get the city's geometry and apply buffer
-    city_geom = city_fc.geometry()
-    
-    # Debug: Check if city_geom is None
-    if city_geom is None:
-        print(f"No geometry found for city: {city_name}")
-        return None, None
-    
-    buffered_city = city_geom.buffer(buffer_distance)
-    
-    # Create a grid around the buffered city
-    grid = buffered_city.coveringGrid(ee.Projection(GHSLpop_proj), grid_size)
-    
-    # Extract the left corners of grid cells
-    left_corners = grid.map(lambda f: ee.Feature(ee.Geometry.Point(f.geometry().coordinates().get(0))))
-    
-    # Get the bounding box of the buffer
-    bounding_box = buffered_city.bounds()
-    
-    return left_corners, bounding_box
+# Function to compute the buffer radius based on city area
+def compute_buffer_radius(city_area):
+    return sqrt(city_area / pi) / 4
 
-# Process each city
-buffer_distance = 2000  # 2 km buffer
-grid_size = GHSLpop_scale.multiply(2)  # Adjust grid size
+# Function to determine UTM zone for a given longitude
+def get_utm_crs(longitude):
+    zone_number = floor((longitude + 180) / 6) + 1
+    hemisphere = '326' if longitude >= 0 else '327'
+    return f'EPSG:{hemisphere}{zone_number:02d}'
 
-# Dictionary to store grids and bounding boxes
-city_grids = {}
-city_bounding_boxes = {}
+# Function to create grids within the analysis area
+def create_grid_within_analysis_area(analysis_geom, city_geom, square_width, local_crs):
+    bounds = analysis_geom.bounds
+    min_x, min_y, max_x, max_y = bounds
+    
+    # Create local projection transformer
+    transformer = Transformer.from_crs("EPSG:4326", local_crs, always_xy=True)
+    inv_transformer = Transformer.from_crs(local_crs, "EPSG:4326", always_xy=True)
+    
+    min_x_proj, min_y_proj = transformer.transform(min_x, min_y)
+    max_x_proj, max_y_proj = transformer.transform(max_x, max_y)
+    
+    grid_cells = []
+    x = min_x_proj
+    while x < max_x_proj:
+        y = min_y_proj
+        while y < max_y_proj:
+            # Create a square grid cell in the projected space
+            cell = box(x, y, x + square_width, y + square_width)
+            # Transform back to lat/lon
+            cell_latlon = gpd.GeoSeries([cell], crs=local_crs).to_crs('EPSG:4326').geometry[0]
+            if cell_latlon.intersects(analysis_geom):  # Only add cells intersecting with the analysis buffer
+                grid_cells.append(cell_latlon)
+            y += square_width
+        x += square_width
 
+    # Create grid GeoDataFrame
+    grid_gdf = gpd.GeoDataFrame(geometry=grid_cells, crs='EPSG:4326')
+    # Add a column to indicate if each grid cell is within the city boundary
+    grid_gdf['in_city_boundary'] = grid_gdf.geometry.apply(lambda x: x.within(city_geom))
+    
+    return grid_gdf
+
+# Function to process each city
+def process_city(city_name, search_buffer_distance=500):
+    # Filter urban extent for the city
+    city_extent = urban_extent.filter(ee.Filter.eq('city_name_large', city_name))
+
+    # Convert the Earth Engine object to a GeoJSON and then to GeoDataFrame
+    city_extent_geojson = geemap.ee_to_geojson(city_extent)
+    city_extent_gdf = gpd.GeoDataFrame.from_features(city_extent_geojson, crs='EPSG:4326')
+
+    # Get centroid longitude and determine UTM zone for local projection
+    centroid = city_extent_gdf.geometry.centroid.iloc[0]
+    local_crs = get_utm_crs(centroid.x)  # CRS for the city's UTM zone
+
+    # Reproject city extents to local UTM zone
+    city_extent_gdf = city_extent_gdf.to_crs(local_crs)
+
+    # Calculate city area (in square meters)
+    city_area = city_extent_gdf.geometry.area.sum()
+
+    # Create analysis buffer
+    analysis_buffer_radius = compute_buffer_radius(city_area)
+    analysis_buffer = city_extent_gdf.geometry.buffer(analysis_buffer_radius)
+
+    # Create search buffer by buffering both outward and inward
+    search_buffer_outward = analysis_buffer.buffer(search_buffer_distance)
+    search_buffer_inward = analysis_buffer.buffer(-search_buffer_distance)
+    
+    # Union the inward and outward buffers to get the complete search buffer
+    search_buffer = search_buffer_outward.union(search_buffer_inward)
+    
+    # Reproject buffers back to EPSG:4326 for consistent outputs
+    analysis_buffer = analysis_buffer.to_crs('EPSG:4326')
+    search_buffer = search_buffer.to_crs('EPSG:4326')
+
+    # Append buffers to respective GeoDataFrames
+    global analysis_buffers, search_buffers
+    analysis_buffers = pd.concat([analysis_buffers, gpd.GeoDataFrame({'city_name': [city_name], 'geometry': analysis_buffer}, crs='EPSG:4326')], ignore_index=True)
+    search_buffers = pd.concat([search_buffers, gpd.GeoDataFrame({'city_name': [city_name], 'geometry': search_buffer}, crs='EPSG:4326')], ignore_index=True)
+
+    # Create grids only within the analysis buffer and check city boundaries
+    grid_200m = create_grid_within_analysis_area(analysis_buffer.iloc[0], city_extent_gdf.iloc[0].geometry, 200, local_crs)
+    grid_100m = create_grid_within_analysis_area(analysis_buffer.iloc[0], city_extent_gdf.iloc[0].geometry, 100, local_crs)
+
+    return grid_200m, grid_100m
+
+# Process each city and gather grids
 for city in cities:
-    city_grid, city_bbox = buffer_and_grid(city, buffer_distance, grid_size)
-    city_grids[city] = city_grid
-    city_bounding_boxes[city] = city_bbox
+    grid_200m, grid_100m = process_city(city)
+    # Save or plot grid as necessary
+    grid_200m.to_file(f'{city}_200m_grid.geojson', driver='GeoJSON')
+    grid_100m.to_file(f'{city}_100m_grid.geojson', driver='GeoJSON')
 
-# Example: Get the grid and bounding box for 'Bogotá'
-bogota_grid = city_grids["Bogota"]
-bogota_bbox = city_bounding_boxes["Bogota"]
-
-# Check if the bounding box is still None
-if bogota_bbox is None:
-    print("Failed to generate bounding box for Bogotá")
-else:
-    print("Bounding Box for Bogotá: ", bogota_bbox.getInfo())
-
-# Visualize Bogotá's grid and bounding box using geemap
-Map = geemap.Map()
-
-# Add the grid and bounding box to the map
-if bogota_grid:
-    Map.addLayer(bogota_grid, {'color': 'blue'}, 'Grid for Bogotá')
-if bogota_bbox:
-    Map.addLayer(bogota_bbox, {'color': 'green'}, 'Bounding Box for Bogotá')
-
-# Safely center map around Bogotá's bounding box if valid
-if bogota_bbox:
-    Map.centerObject(bogota_bbox)
-
-# Display the map in a browser as an HTML file
-Map.to_html('bogota_grid_map.html')
-
-
-## GET GRID DATA FOR FIRST 12 CITIES
-
-
-# Sample function to process the features as polygons
-def get_polygons_from_feature_collection(feature_collection):
-    """
-    Function to ensure that only polygon geometries are processed
-    """
-    # Define a function to map over the features in Earth Engine
-    def process_feature(feature):
-        # Ensure that the geometry is a polygon
-        geom = feature.geometry()
-        return ee.Feature(geom)
-
-    # Map over the feature collection to apply the process_feature function
-    polygons_fc = feature_collection.map(process_feature)
-    
-    return polygons_fc
-
-# Example: Process one of the city grids
-city_grids_processed = {}
-
-# Loop through each city in the city_grids dictionary
-for city_name, feature_collection in city_grids.items():
-    # Process the feature collection for polygons
-    processed_fc = get_polygons_from_feature_collection(feature_collection)
-    
-    # Retrieve the processed polygons as a list of features (client-side with getInfo)
-    features = processed_fc.getInfo()['features']
-    
-    # Convert the features to shapely polygons
-    for feature in features:
-        geometry = feature['geometry']
-        if geometry['type'] == 'Polygon':
-            # Extract the outer boundary of the polygon
-            polygon_coords = [tuple(coord) for coord in geometry['coordinates'][0]]
-            # Create a shapely Polygon object
-            polygon_geom = Polygon(polygon_coords)
-            # Append the city name and polygon geometry to the list
-            grid_data.append({
-                'city_name': city_name,
-                'geometry': polygon_geom
-            })
-
-# Convert the processed grid data to a GeoDataFrame
-gdf_city_grids = gpd.GeoDataFrame(grid_data, geometry='geometry')
-gdf_city_grids.set_crs(epsg=4326, inplace=True)  # Set the CRS to WGS84
-
-
-
-
-
-## GET LIST OF BOUNDING BOXES FOR FIRST 12 CITIES
-
-
-
-bbox_data = []
-for city_name, bbox_ee_geometry in city_bounding_boxes.items():
-    # Get the bounding box coordinates from Earth Engine
-    bbox_info = bbox_ee_geometry.bounds().getInfo()
-    
-    # Extract the bounding box coordinates from the GeoJSON
-    min_lon, min_lat, max_lon, max_lat = bbox_info['coordinates'][0][0][0], bbox_info['coordinates'][0][0][1], bbox_info['coordinates'][0][2][0], bbox_info['coordinates'][0][2][1]
-    
-    # Create a bounding box geometry using shapely
-    bbox_geom = box(min_lon, min_lat, max_lon, max_lat)
-    
-    # Append city name and bounding box geometry to the list
-    bbox_data.append({
-        'city_name': city_name,
-        'geometry': bbox_geom
-    })
-
-# Create a GeoDataFrame from the bounding boxes
-gdf_city_bounding_boxes = gpd.GeoDataFrame(bbox_data, geometry='geometry')
-gdf_city_bounding_boxes.set_crs(epsg=4326, inplace=True)
-gdf_city_bounding_boxes.to_file('gdf_12_city_bounding_boxes.shp')
+# Save the buffers to GeoJSON files
+analysis_buffers.to_file('./12_city_analysis_buffers.geojson', driver='GeoJSON')
+search_buffers.to_file('./12_city_search_buffers.geojson', driver='GeoJSON')
