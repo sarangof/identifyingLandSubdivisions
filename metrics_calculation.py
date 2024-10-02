@@ -2,7 +2,7 @@
 from shapely.ops import nearest_points
 import geopandas as gpd
 import pyproj
-from shapely.geometry import Polygon, LineString, Point, MultiPolygon, GeometryCollection
+from shapely.geometry import Polygon, LineString, Point, MultiPolygon, MultiLineString, GeometryCollection
 from shapely.ops import transform, polygonize, unary_union
 from scipy.optimize import fminbound, minimize
 import matplotlib.pyplot as plt
@@ -55,8 +55,24 @@ def calculate_area_geodesic(rectangle):
 
 # Function to calculate the shortest distance to roads
 def calculate_minimum_distance_to_roads(building, road_union):
-    nearest_geom = nearest_points(building.exterior, road_union)[1] #distance to closest road, given the input order
-    return building.exterior.distance(nearest_geom)
+    if isinstance(building, Polygon):
+        # If it's a single Polygon, calculate distance directly
+        nearest_geom = nearest_points(building.exterior, road_union)[1]
+        return building.exterior.distance(nearest_geom)
+    
+    elif isinstance(building, MultiPolygon):
+        # If it's a MultiPolygon, iterate over each polygon and calculate the minimum distance
+        min_distance = float('inf')
+        for poly in building.geoms:  # Use .geoms to access the individual Polygons
+            nearest_geom = nearest_points(poly.exterior, road_union)[1]
+            distance = poly.exterior.distance(nearest_geom)
+            if distance < min_distance:
+                min_distance = distance
+        return min_distance
+    
+    else:
+        raise TypeError("Unsupported geometry type: {}".format(type(building)))
+
 
 # Function to calculate the angle between two vectors
 def calculate_angle(vector1, vector2):
@@ -66,9 +82,25 @@ def calculate_angle(vector1, vector2):
         angle += 360
     return angle
 
+
+def extract_coords(geometry):
+    if isinstance(geometry, (LineString, Polygon)):
+        # If it's a single geometry, return its coordinates
+        return list(geometry.coords)
+    elif isinstance(geometry, (MultiLineString, MultiPolygon)):
+        # If it's a multi-part geometry, iterate through the sub-geometries
+        coords = []
+        for part in geometry.geoms:  # Use .geoms to access each part of the MultiLineString/MultiPolygon
+            coords.extend(list(part.coords))
+        return coords
+    else:
+        raise TypeError(f"Unsupported geometry type: {type(geometry)}")
+
+
+
 def calculate_sequential_angles(intersections, roads):
     records = []  # List to store angle records
-    
+
     # Iterate through each intersection
     for _, intersection in intersections.iterrows():
         intersection_id = intersection['osmid']
@@ -79,7 +111,8 @@ def calculate_sequential_angles(intersections, roads):
         vectors = []
         
         for _, road in connected_roads.iterrows():
-            coords = list(road.geometry.coords)
+            #coords = list(road.geometry.coords)
+            coords = extract_coords(road.geometry)
             
             # Determine the vector for the road segment away from the intersection
             if road['u'] == intersection_id:
@@ -119,7 +152,7 @@ def get_blocks(road_union, roads):
     blocks_gdf = gpd.GeoDataFrame(geometry=blocks, crs=roads.crs)
     # Filter out very small polygons if necessary
     blocks_gdf = blocks_gdf[blocks_gdf.area > 9]
-    blocks_gdf['area'] = blocks_gdf.area
+    blocks_gdf.loc[:,'area'] = blocks_gdf.area
     #blocks_gdf.to_file("blocks_tile1.gpkg", driver="GPKG")
     return blocks_gdf.sort_values('area')
 
@@ -314,7 +347,9 @@ def metric_7_average_block_width(blocks_clipped, rectangle_projected, rectangle_
 
     for block_id, block in blocks_clipped.iterrows():
         optimal_point, max_radius = get_largest_inscribed_circle(block)
-        block_within_rectangle = (gpd.GeoSeries(block.geometry).intersection(gpd.GeoSeries(rectangle_projected.geometry)))
+        block_copy = gpd.GeoSeries(block.copy().geometry).set_crs(blocks_clipped.crs)
+        rectangle_geom = gpd.GeoSeries(rectangle_projected.geometry)
+        block_within_rectangle = (block_copy.intersection(rectangle_geom))
         block_area_within_rectangle = block_within_rectangle.area.sum()
         block_weight = block_area_within_rectangle / rectangle_area
         weighted_width = block_weight*max_radius
@@ -369,8 +404,15 @@ def metric_8_two_row_blocks(blocks_clipped, buildings, utm_proj_rectangle, row_e
         buildings_area_all = buildings_in_block.area.sum()
         buildings_inside_buffer_area = buildings.intersection(internal_buffer).area.sum()
         internal_buffers.append(internal_buffer)
-        blocks_clipped.loc[block_id,'share_of_buildings_inside_buffer_intersection'] = buildings_inside_buffer_area/buildings_intersecting_buffer_area
-        blocks_clipped.loc[block_id,'share_of_buildings_inside_buffer_all'] = buildings_inside_buffer_area/buildings_area_all
+        if buildings_intersecting_buffer_area > 0:
+            blocks_clipped.loc[block_id,'share_of_buildings_inside_buffer_intersection'] = buildings_inside_buffer_area/buildings_intersecting_buffer_area
+        else:
+            blocks_clipped.loc[block_id,'share_of_buildings_inside_buffer_intersection'] = np.nan
+        
+        if buildings_area_all > 0:
+            blocks_clipped.loc[block_id,'share_of_buildings_inside_buffer_all'] = buildings_inside_buffer_area/buildings_area_all
+        else:
+            blocks_clipped.loc[block_id,'share_of_buildings_inside_buffer_all'] = np.nan
         #if union_area > internal_buffer_area:
         #    blocks_clipped.loc[block_id,'buildings_outside_buffer'] = True
         #elif union_area <= internal_buffer_area:
@@ -433,7 +475,7 @@ def metric_9_tortuosity_index(rectangle_id, roads_clipped, intersections, rectan
     rectangle_bounds = rectangle_projected_gdf.bounds
     width = rectangle_bounds['maxx'] - rectangle_bounds['minx']
     height = rectangle_bounds['maxy'] - rectangle_bounds['miny']
-    rectangle_hypotenuse = math.sqrt(width**2 + height**2)
+    rectangle_hypotenuse = math.sqrt(width.iloc[0]**2 + height.iloc[0]**2)
     distance_threshold = 0.75 * rectangle_hypotenuse  # 75% of the hypotenuse
 
     inflection_points_gdf = get_inflection_points(roads_clipped, angular_threshold)
