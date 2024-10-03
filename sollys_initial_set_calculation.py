@@ -5,6 +5,10 @@ from metric_plots import *
 import fiona
 from pyproj import CRS
 from shapely.geometry import box
+import cProfile
+import pstats
+from io import StringIO
+
 
 rectangles = gpd.read_file('./data/rectangles.geojson')
 
@@ -75,6 +79,8 @@ for rectangle_id, rectangle in rectangles.iterrows():
     bounding_box_geom = box(*bounding_box)
     buildings_clipped = buildings[buildings.geometry.intersects(bounding_box_geom)]
 
+    rectangle_area = calculate_area_geodesic(rectangle)
+
     if not roads.empty:
         blocks = get_blocks(road_union, roads)
     else:
@@ -88,7 +94,7 @@ for rectangle_id, rectangle in rectangles.iterrows():
         blocks_clipped = gpd.GeoDataFrame([])
     #blocks_clipped = blocks.clip(list(rectangle_projected.geometry.bounds))
 
-    rectangle_area = calculate_area_geodesic(rectangle)
+
     if (not roads_clipped.empty) and (not buildings_clipped.empty):
         # Metric 1 -- share of buildings closer than 10 ms from the road
         m1, buildings_clipped = metric_1_distance_less_than_10m(buildings_clipped, road_union, utm_proj_rectangle)
