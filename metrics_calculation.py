@@ -12,8 +12,8 @@ import numpy as np
 import pandas as pd
 import osmnx as ox
 import networkx as nx
-import json
 from shapely.geometry import mapping, Polygon
+from scipy.spatial import cKDTree
 
 # DEFINE USEFUL FUNCTIONS
 
@@ -98,7 +98,7 @@ def extract_coords(geometry):
 
 
 
-def calculate_sequential_angles(intersections, roads):
+def calculate_sequential_angles_option_A(intersections, roads):
     records = []  # List to store angle records
 
     # Iterate through each intersection
@@ -143,6 +143,70 @@ def calculate_sequential_angles(intersections, roads):
     df_angles = pd.DataFrame(records)
     
     return df_angles
+
+
+
+def calculate_sequential_angles(intersections, roads):
+    records = []  # List to store angle records
+
+    # Convert to numpy arrays for faster processing
+    intersection_ids = intersections['osmid'].values
+    intersection_geometries = intersections.geometry.values
+    road_u = roads['u'].values
+    road_v = roads['v'].values
+    road_geometries = roads.geometry.values
+
+    # Iterate over each intersection
+    for idx, intersection_id in enumerate(intersection_ids):
+        intersection_point = intersection_geometries[idx]
+        
+        # Get all roads connected to the intersection
+        mask_connected_roads = (road_u == intersection_id) | (road_v == intersection_id)
+        connected_roads = road_geometries[mask_connected_roads]
+        
+        vectors = []
+
+        # Create vectors for each road segment
+        for road_geometry, u, v in zip(connected_roads, road_u[mask_connected_roads], road_v[mask_connected_roads]):
+            coords = extract_coords(road_geometry)
+            
+            # Determine the vector for the road segment away from the intersection
+            if u == intersection_id:
+                vector = np.array([coords[1][0] - coords[0][0], coords[1][1] - coords[0][1]])
+            else:
+                vector = np.array([coords[-2][0] - coords[-1][0], coords[-2][1] - coords[-1][1]])
+
+            vectors.append((vector, u, v))
+
+        # Convert to numpy array for faster angle calculations
+        vectors = np.array(vectors, dtype=object)
+        
+        # Sort vectors based on their angle relative to the x-axis using arctan2
+        vectors = sorted(vectors, key=lambda v: np.arctan2(v[0][1], v[0][0]))
+
+        # Calculate the sequential angles between each pair of vectors
+        num_vectors = len(vectors)
+        for i in range(num_vectors):
+            vector1 = vectors[i][0]
+            vector2 = vectors[(i + 1) % num_vectors][0]  # Next vector, looping back to the start
+
+            # Directly calculate the angle between the two vectors
+            angle = calculate_angle(vector1, vector2)
+            
+            record = {
+                'Intersection ID': intersection_id,
+                'Segment 1': (vectors[i][1], vectors[i][2]),
+                'Segment 2': (vectors[(i + 1) % num_vectors][1], vectors[(i + 1) % num_vectors][2]),
+                'Angle': angle
+            }
+            records.append(record)
+
+    # Convert the records into a DataFrame
+    df_angles = pd.DataFrame(records)
+    
+    return df_angles
+
+
 
 # Block polygons
 
@@ -216,11 +280,13 @@ def get_largest_inscribed_circle(block):
     centroid = polygon.geometry.centroid
 
     if not polygon.geometry.contains(centroid):
+    #if not polygon.geometry.iloc[0].contains(centroid).values[0]:
         # If centroid is outside, find an interior point as an alternative starting point
         interior_point = polygon.geometry.representative_point()  # A guaranteed point inside the polygon
         initial_guess = [interior_point.x, interior_point.y]
     else:
         initial_guess = [centroid.x, centroid.y]
+        #initial_guess = [centroid.x[0], centroid.y[0]]
 
     # Calculate negative radius to maximize
     def negative_radius(point_coords):
@@ -299,7 +365,7 @@ def get_inflection_points(roads,threshold):
 def metric_1_distance_less_than_10m(buildings, road_union, utm_proj_rectangle):
     # Apply the distance calculation to each building
     #buildings.loc[:,'distance_to_road'] = buildings['geometry'].apply(lambda x: x.centroid).apply(calculate_minimum_distance_to_roads, 
-    #                                                                                              road_union = road_union)
+    
     buildings_geometry_copy = buildings['geometry'].copy()
     buildings.loc[:,'distance_to_road'] = buildings_geometry_copy.apply(lambda x: calculate_minimum_distance_to_roads(x, road_union))
 
@@ -333,17 +399,35 @@ def metric_5_4way_intersections(intersections, rectangle_area):
 
 #6 Average building footprint orientation of the tile
 def metric_6_deviation_of_building_azimuth(buildings_clipped, n_orientation_groups):
-    buildings_clipped.loc[:,'azimuth'] = buildings_clipped['geometry'].apply(lambda x: calculate_azimuth(longest_segment(x)) % 90.)
-    cutoff_angles = [(x*90./(2*n_orientation_groups)) for x in range(0,(2*n_orientation_groups)+1)]
-    labels = [1] + [i for i in range(2, n_orientation_groups+1) for _ in (0, 1)] + [1]
-    buildings_clipped.loc[:,'azimuth_group'] = pd.DataFrame(pd.cut(buildings_clipped.azimuth.values.reshape(-1,),bins=cutoff_angles,labels=labels,ordered=False))[0].values
-    mean_azimuth = buildings_clipped['azimuth'].mean()
-    m6 = np.std(np.abs(buildings_clipped['azimuth'] - mean_azimuth))
+    # Step 1: Calculate azimuth for each building
+    buildings_clipped.loc[:, 'azimuth'] = buildings_clipped['geometry'].apply(lambda x: calculate_azimuth(longest_segment(x)) % 90.)
+
+    # Step 2: Create spatial index for the buildings
+    buildings_clipped['centroid'] = buildings_clipped.geometry.centroid
+    centroids = np.array(list(zip(buildings_clipped['centroid'].x, buildings_clipped['centroid'].y)))
+
+    # Use cKDTree for fast nearest neighbor search
+    tree = cKDTree(centroids)
+    distances, indices = tree.query(centroids, k=2)  # k=2 to get the nearest neighbor excluding itself
+
+    # Step 3: Calculate azimuth difference with the nearest neighbor
+    #buildings_clipped['closest_azimuth'] = buildings_clipped.loc[indices[:, 1], 'azimuth'].values
+    buildings_clipped.loc[:,'closest_azimuth'] = buildings_clipped.iloc[indices[:, 1]]['azimuth'].values
+    buildings_clipped.loc[:,'azimuth_diff'] = np.abs(buildings_clipped['azimuth'] - buildings_clipped['closest_azimuth'])
+
+    # Step 4: Group buildings into orientation groups
+    cutoff_angles = [(x * 90. / (2 * n_orientation_groups)) for x in range(0, (2 * n_orientation_groups) + 1)]
+    labels = [1] + [i for i in range(2, n_orientation_groups + 1) for _ in (0, 1)] + [1]
+    buildings_clipped['azimuth_group'] = pd.cut(buildings_clipped['azimuth'], bins=cutoff_angles, labels=labels, ordered=False)
+
+    # Step 5: Calculate the standard deviation of azimuth differences
+    m6 = np.median(buildings_clipped['azimuth_diff'])
+    
     return m6, buildings_clipped
 
 #7 Average block width
 def metric_7_average_block_width(blocks_clipped, rectangle_projected, rectangle_area):
-
+#blocks_clipped, rectangle_projected_arg, rectangle_area
     blocks_within_rectangle = []
     radius_avg = []
 
@@ -359,6 +443,12 @@ def metric_7_average_block_width(blocks_clipped, rectangle_projected, rectangle_
         blocks_within_rectangle.append(block_within_rectangle)
         radius_avg.append(max_radius)
 
+    # blocks_clipped['optimal_point'], blocks_clipped['max_radius'] = zip(*blocks_clipped['geometry'].apply(lambda geom: get_largest_inscribed_circle(gpd.GeoSeries(geom))))
+    # blocks_within_rectangle = blocks_clipped.intersection(rectangle_projected)
+    # block_areas_within_rectangle = blocks_within_rectangle.area
+    # block_weights = block_areas_within_rectangle / rectangle_area
+    # blocks_clipped['weighted_width'] = block_weights * blocks_clipped['max_radius']
+
     rectangle_projected_gdf = gpd.GeoSeries(rectangle_projected)
     #rectangle_projected_gdf = rectangle_projected_gdf.set_crs(blocks_clipped.crs, allow_override=True)
     #rectangle_projected_gdf = rectangle_projected_gdf.reset_index(drop=True)
@@ -370,9 +460,18 @@ def metric_7_average_block_width(blocks_clipped, rectangle_projected, rectangle_
 
 
     if left_over_blocks.area.sum() > 0.0:
+
+        # THIS CAN REPLACE THE LOOP -- OJO, NEED TO
+        # left_over_blocks['optimal_point'], left_over_blocks['max_radius'] = zip(*left_over_blocks['geometry'].apply(lambda geom: get_largest_inscribed_circle(geom)))
+        # left_over_blocks_within_rectangle = left_over_blocks.intersection(rectangle_projected)
+        # left_over_blocks['block_weight'] = left_over_blocks_within_rectangle.area / rectangle_area
+        # left_over_blocks['weighted_width'] = left_over_blocks['block_weight'] * left_over_blocks['max_radius']
+
         for block_id, leftover_block in left_over_blocks.iterrows():
+            print(block_id)
+            #leftover_block = gpd.GeoDataFrame([{'geometry': leftover_block}], crs=blocks_clipped.crs.to_epsg())
             optimal_point, max_radius = get_largest_inscribed_circle(leftover_block)
-            block_within_rectangle = (gpd.GeoSeries(leftover_block.geometry).intersection(gpd.GeoSeries(rectangle_projected.geometry)))
+            block_within_rectangle = (gpd.GeoSeries(leftover_block.geometry).intersection(gpd.GeoSeries(rectangle_projected)))
             block_area_within_rectangle = block_within_rectangle.area.sum()
             block_weight = block_area_within_rectangle / rectangle_area
             weighted_width = block_weight*max_radius
@@ -381,7 +480,6 @@ def metric_7_average_block_width(blocks_clipped, rectangle_projected, rectangle_
         blocks_clipped = pd.concat([blocks_clipped,left_over_blocks])
     else:
         m7 = blocks_clipped['weighted_width'].sum()
-
     return m7, blocks_clipped
 
 #8 Two row blocks
@@ -428,6 +526,7 @@ def metric_8_two_row_blocks(blocks_clipped, buildings, utm_proj_rectangle, row_e
 
 
 def visualize_tortuosity(rectangle_id, angular_threshold, tortuosity_tolerance, roads_clipped, all_road_vertices, mst, distance_comparison):
+
     fig, ax = plt.subplots(figsize=(10, 8))
 
     # Step 1: Plot the roads
@@ -596,7 +695,6 @@ def metric_9_tortuosity_index(rectangle_id, roads_clipped, intersections, rectan
     else:
         m9 = np.nan
 
-    
     return m9, all_road_vertices
 
 #10 Average angle between road segments
