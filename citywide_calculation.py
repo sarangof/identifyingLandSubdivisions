@@ -8,6 +8,8 @@ import numpy as np
 from shapely.geometry import Polygon, Point, box
 from geopy.distance import geodesic
 from pyproj import CRS
+import dask
+from dask import delayed, compute
 
 
 def create_square_from_coords(coord_pair, grid_size):
@@ -74,7 +76,8 @@ city_grid = gpd.read_file('Belo Horizonte_200m_grid.geojson')
 metrics_pilot = []
 #rectangles = city_grids[city_grids.city_name==city_name]['lower_left_coordinates'][0]
 rectangles = city_grid['geometry']
-Overture_data_all = gpd.read_file('./output_data/12 cities/Overture_buildings_{city_name}.geojson')
+Overture_data_all = gpd.read_file(f'./output_data/12 cities/Overture_building_{city_name}.parquet')
+print("Overture file read")
 #Overture_data_all = gpd.read_file(f"./output_data/12 cities/Overture_building_{city_name}.geojson")
 
 Overture_data_all['confidence'] = Overture_data_all.sources.apply(lambda x: json.loads(x)[0]['confidence'])
@@ -83,52 +86,39 @@ Overture_data = Overture_data_all.set_geometry('geometry')[Overture_data_all.dat
 
 OSM_intersections_all = gpd.read_file(f"./output_data/12 cities/{city_name}_osm_intersections.gpkg")
 OSM_roads_all = gpd.read_file(f"./output_data/12 cities/{city_name}_osm_roads.gpkg")
+print("OSM files read")
 cell_id = 0
 
 
 utm_proj_city = get_utm_proj(float(OSM_roads_all.iloc[0].geometry.centroid.x), float(OSM_roads_all.iloc[0].geometry.centroid.y))
 project = pyproj.Transformer.from_crs(pyproj.CRS('EPSG:4326'), utm_proj_city, always_xy=True).transform  
-OSM_roads_all_projected = gpd.GeoSeries(OSM_roads_all.geometry.apply(lambda x: transform(project,x))).set_crs(utm_proj_city,allow_override=True)
+OSM_roads_all_projected = OSM_roads_all.to_crs(epsg=CRS.from_proj4(utm_proj_city).to_epsg())
+OSM_intersections_all_projected = OSM_intersections_all.to_crs(epsg=CRS.from_proj4(utm_proj_city).to_epsg())
 
 blocks_all  = get_blocks(OSM_roads_all_projected.unary_union, OSM_roads_all_projected)
 Overture_data_all_projected = Overture_data_all.to_crs(epsg=CRS.from_proj4(utm_proj_city).to_epsg())
+buildings = Overture_data_all_projected
 
-#rectangles_sample = rectangles.sample(10)
-for cell in rectangles:
-    #iter(rectangles['lower_left_coordinates'][0])
-    # Read needed files: rectangle, buildings, street
+rectangles_projected = rectangles.to_crs(epsg=CRS.from_proj4(utm_proj_city).to_epsg())
+print("All preparations done. Ready to calculate metrics on grid.")
+
+def process_cell(cell_id, rectangle_projected):
+for rectangle_projected in rectangles_projected:
+    #for cell in rectangles_projected:
+    #global buildings
 
     print(f"cell_id: {cell_id}")
     #coord_pair = cell
     #rectangle = gpd.GeoDataFrame(geometry=[create_square_from_coords(coord_pair, grid_size)],crs='EPSG:4326')
-    rectangle = cell
-    utm_proj_rectangle = rectangles.crs#rectangle.crs
-    rectangle_centroid = rectangle.centroid#rectangle.geometry.centroid
-    utm_proj_rectangle = get_utm_proj(float(rectangle_centroid.x), float(rectangle_centroid.y))
-    project = pyproj.Transformer.from_crs(pyproj.CRS('EPSG:4326'), utm_proj_rectangle, always_xy=True).transform  
 
-    def project_geometry(geometry):
-        if isinstance(geometry, Polygon):  
-            return transform(project, geometry)
-        else:
-            return geometry  
 
-    rectangle_projected = gpd.GeoSeries(rectangle).apply(project_geometry).set_crs(utm_proj_rectangle)
-
-    #try:
-        #OSM_buildings = OSM_buildings_all.clip(rectangle)
-    buildings_OSM = []#OSM_buildings[(OSM_buildings.building=='yes')].to_crs(utm_proj_rectangle)
     OSM_buildings_bool = False
-        #buildings_OSM = buildings_OSM.set_geometry('geometry')
-        #OSM_buildings_bool = True
-    #except fiona.errors.DriverError:
-    #    OSM_buildings = gpd.GeoDataFrame([])
-    #    buildings_OSM = gpd.GeoDataFrame([])
-    #    OSM_buildings_bool = False
+
+    bounding_box = rectangle_projected.bounds
+    bounding_box_geom = box(*bounding_box)
 
     try:
-        #roads_window = OSM_roads_all.clip(rectangle).to_crs(utm_proj_rectangle) #need to expand 
-        roads_clipped = OSM_roads_all.to_crs(utm_proj_rectangle).clip(list(rectangle_projected.geometry.bounds.values[0])) 
+        roads_clipped = OSM_roads_all_projected[OSM_roads_all_projected.geometry.intersects(bounding_box_geom)]
         if roads_clipped.geometry.notnull().any():
             road_union = roads_clipped.unary_union
         else:
@@ -143,44 +133,42 @@ for cell in rectangles:
 
 
     try:
-        OSM_intersections = OSM_intersections_all.to_crs(utm_proj_rectangle).clip(list(rectangle_projected.geometry.bounds.values[0]))
-        #OSM_intersections_window = OSM_intersections.clip(list(rectangle_projected.geometry.bounds.values[0]))
+        OSM_intersections = OSM_intersections_all_projected[OSM_intersections_all_projected.geometry.intersects(bounding_box_geom)]#OSM_intersections_all_projected.clip(list(rectangle_projected.geometry.bounds.values[0]))
         OSM_intersections_bool = True
     except fiona.errors.DriverError:
         OSM_intersections = gpd.GeoDataFrame([])
-        #OSM_intersections_window = gpd.GeoDataFrame([])
         OSM_intersections_bool = False
 
     
-    Overture_data = Overture_data_all_projected[Overture_data_all_projected.geometry.intersects(rectangle_projected[0])]
-    if not Overture_data.empty:
-        Overture_buildings_bool = True
-    else:
-        Overture_buildings_bool = False
+    #Overture_data = Overture_data_all_projected[Overture_data_all_projected.geometry.intersects(rectangle_projected[0])]
+    #if not Overture_data.empty:
+    #    Overture_buildings_bool = True
+    #else:
+    #    Overture_buildings_bool = False
 
-    buildings = Overture_data.to_crs(utm_proj_rectangle)#gpd.GeoDataFrame(pd.concat([buildings_OSM, Overture_data], axis=0, ignore_index=True, join='outer')).drop_duplicates('geometry').to_crs(utm_proj_rectangle).dropna(how='all')
+    
     if not buildings.empty:
-        buildings_clipped = buildings[buildings.geometry.intersects(rectangle_projected[0])]#buildings[buildings.geometry.intersects(rectangle_projected['geometry'])]
+        buildings_clipped = buildings[buildings.geometry.intersects(bounding_box_geom)]#buildings[buildings.geometry.intersects(rectangle_projected[0])]#buildings[buildings.geometry.intersects(rectangle_projected['geometry'])]
     else:
         buildings_clipped = gpd.GeoDataFrame([])
 
-    blocks_clipped = blocks_all[blocks_all.geometry.intersects(rectangle_projected[0])]
+    blocks_clipped = blocks_all[blocks_all.geometry.intersects(bounding_box_geom)]
+    
     
     if not blocks_clipped.empty:
         blocks_bool = True
     else:
         blocks_bool = False
-    #blocks_clipped = blocks.clip(list(rectangle_projected.geometry.bounds))
 
     geod = Geod(ellps="WGS84")
-    rectangle_area, _ = geod.geometry_area_perimeter(rectangle)
-    #rectangle_area = calculate_area_geodesic(gpd.GeoSeries(rectangle))
-    if (not roads_clipped.empty) and (not buildings.empty):
+    rectangle_area, _ = geod.geometry_area_perimeter(rectangles.iloc[cell_id])
+
+    if (not roads_clipped.empty) and (not buildings_clipped.empty):
         # Metric 1 -- share of buildings closer than 10 ms from the road
-        m1, buildings = metric_1_distance_less_than_10m(buildings, road_union, utm_proj_rectangle)
+        m1, buildings_clipped = metric_1_distance_less_than_10m(buildings_clipped, road_union, utm_proj_city)
         
         # Metric 2 -- average distance to roads
-        m2 = metric_2_average_distance_to_roads(buildings)
+        m2 = metric_2_average_distance_to_roads(buildings_clipped)
         #plot_distance_to_roads(buildings_clipped, roads_clipped, rectangle_projected, cell_id)
     else:
         m1, m2 = np.nan, np.nan
@@ -188,7 +176,7 @@ for cell in rectangles:
 
     if (not roads_clipped.empty):
         # Metric 3 -- road density
-        m3 = metric_3_road_density(rectangle_area,roads_clipped)
+        m3 = metric_3_road_density(rectangle_area, roads_clipped)
     else:
         m3 = np.nan
 
@@ -205,7 +193,7 @@ for cell in rectangles:
     # Metric 6 -- building azimuth
     if not buildings_clipped.empty:
         n_orientation_groups = 4
-        m6, buildings_clipped = metric_6_deviation_of_building_azimuth(buildings, n_orientation_groups)
+        m6, buildings_clipped = metric_6_deviation_of_building_azimuth(buildings_clipped, n_orientation_groups)
         #plot_azimuth(buildings_clipped, roads_clipped, rectangle_projected, rectangle_id, n_orientation_groups)
     else:
         m6 = np.nan
@@ -215,7 +203,7 @@ for cell in rectangles:
     if not blocks_clipped.empty:
         m7, blocks_clipped = metric_7_average_block_width(blocks_clipped, rectangle_projected, rectangle_area)
 
-        minx, miny, maxx, maxy = rectangle_projected.geometry.bounds.iloc[0]
+        minx, miny, maxx, maxy = rectangle_projected.bounds
         rectangle_box = box(minx, miny, maxx, maxy)
         blocks_clipped_within_rectangle = blocks_clipped.clip(rectangle_box)
 
@@ -223,7 +211,7 @@ for cell in rectangles:
         share_tiled_by_blocks = area_tiled_by_blocks/rectangle_area
 
         #m7=np.nan
-        m8, internal_buffers = metric_8_two_row_blocks(blocks_clipped, buildings, utm_proj_rectangle, row_epsilon=row_epsilon)
+        m8, internal_buffers = metric_8_two_row_blocks(blocks_clipped, buildings_clipped, utm_proj_city, row_epsilon=row_epsilon)
         #plot_largest_inscribed_circle(rectangle_id, rectangle_projected,  blocks_clipped, roads_clipped)
         #plot_two_row_blocks(rectangle_id, rectangle_projected, blocks_clipped, internal_buffers, buildings_clipped, roads_clipped, row_epsilon=0.01)
         #plot_two_row_blocks(rectangle_id, rectangle_projected, blocks_clipped, internal_buffers, buildings_clipped, roads_clipped, row_epsilon=0.1)
@@ -237,7 +225,7 @@ for cell in rectangles:
         # Metric 9 -- tortuosity index
         m9, all_road_vertices = metric_9_tortuosity_index(city_name, roads_clipped, OSM_intersections, rectangle_projected, angular_threshold=30, tortuosity_tolerance=5)
                                                         
-        # Metric 20 -- average angle between road segments
+        # Metric 10 -- average angle between road segments
         m10 = metric_10_average_angle_between_road_segments(OSM_intersections, roads_clipped) #OJO, ROADS EXPANDED
         #plot_inflection_points(rectangle_id, rectangle_projected, all_road_vertices, roads_clipped)
     else:
@@ -259,7 +247,8 @@ for cell in rectangles:
         building_density = np.nan
         built_share = np.nan
 
-    metrics_pilot.append({'index':cell_id,
+    print(f"One round of metrics done for cell_id: {cell_id}")
+    result = {'index':cell_id,
                         'metric_1':m1,
                         'metric_2':m2,
                         'metric_3':m3,
@@ -273,7 +262,6 @@ for cell in rectangles:
                         'OSM_buildings_available':OSM_buildings_bool,
                         'OSM_intersections_available':OSM_intersections_bool,
                         'OSM_roads_available':OSM_roads_bool,
-                        'Overture_buildings_available':Overture_buildings_bool,
                         'rectangle_area': rectangle_area,
                         'building_area':building_area,
                         'building_density':building_density,
@@ -282,10 +270,35 @@ for cell in rectangles:
                         'road_length':road_length,
                         'n_intersections':len(OSM_intersections.drop_duplicates('osmid')),
                         'n_buildings':n_buildings
-                        })
+                        }
     cell_id += 1
+    return result
 
-metrics_pilot = pd.DataFrame(metrics_pilot)
-result = pd.merge(rectangles,metrics_pilot,how='left',left_index=True,right_index=True)
-gpd.GeoDataFrame(result,geometry=result.geometry)
-#save
+# Use delayed to parallelize the processing
+delayed_results = [delayed(process_cell)(cell_id, cell) for cell_id, cell in enumerate(rectangles_projected)]
+
+# Process in batches
+batch_size = 1000
+n_batches = len(delayed_results) // batch_size + 1
+all_results = []
+
+for batch_num in range(n_batches):
+    print(batch_num)
+    batch_results = delayed_results[batch_num * batch_size: (batch_num + 1) * batch_size]
+    computed_batch = compute(*batch_results)  # This will execute the batch in parallel
+    batch_df = pd.DataFrame(computed_batch)
+    
+    # Save each batch as a CSV to avoid memory overflow
+    batch_df.to_csv(f'metrics_batch_{batch_num}.csv', index=False)
+    
+    all_results.append(batch_df)
+
+# Combine all batch results after processing
+final_metrics_pilot = pd.concat(all_results, ignore_index=True)
+
+# Merge with rectangles to get the final output
+result = pd.merge(rectangles, final_metrics_pilot, how='left', left_index=True, right_index=True)
+final_geo_df = gpd.GeoDataFrame(result, geometry=result.geometry)
+
+# Save the final result to a file
+final_geo_df.to_file('Belo_Horizonte_200_m.geojson', driver='GeoJSON')

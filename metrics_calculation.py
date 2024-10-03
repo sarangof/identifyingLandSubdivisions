@@ -300,7 +300,9 @@ def metric_1_distance_less_than_10m(buildings, road_union, utm_proj_rectangle):
     # Apply the distance calculation to each building
     #buildings.loc[:,'distance_to_road'] = buildings['geometry'].apply(lambda x: x.centroid).apply(calculate_minimum_distance_to_roads, 
     #                                                                                              road_union = road_union)
-    buildings.loc[:,'distance_to_road'] = buildings['geometry'].apply(lambda x: calculate_minimum_distance_to_roads(x, road_union))
+    buildings_geometry_copy = buildings['geometry'].copy()
+    buildings.loc[:,'distance_to_road'] = buildings_geometry_copy.apply(lambda x: calculate_minimum_distance_to_roads(x, road_union))
+
     m1 = 1.*((sum(buildings['distance_to_road']<=10))/len(buildings))
     return m1, gpd.GeoDataFrame(buildings)
 
@@ -348,8 +350,8 @@ def metric_7_average_block_width(blocks_clipped, rectangle_projected, rectangle_
     for block_id, block in blocks_clipped.iterrows():
         optimal_point, max_radius = get_largest_inscribed_circle(block)
         block_copy = gpd.GeoSeries(block.copy().geometry).set_crs(blocks_clipped.crs)
-        rectangle_geom = gpd.GeoSeries(rectangle_projected.geometry)
-        block_within_rectangle = (block_copy.intersection(rectangle_geom))
+        #rectangle_geom = gpd.GeoSeries(rectangle_projected.geometry)
+        block_within_rectangle = (block_copy.intersection(rectangle_projected))
         block_area_within_rectangle = block_within_rectangle.area.sum()
         block_weight = block_area_within_rectangle / rectangle_area
         weighted_width = block_weight*max_radius
@@ -357,9 +359,9 @@ def metric_7_average_block_width(blocks_clipped, rectangle_projected, rectangle_
         blocks_within_rectangle.append(block_within_rectangle)
         radius_avg.append(max_radius)
 
-    rectangle_projected_gdf = gpd.GeoSeries(rectangle_projected.geometry)
-    rectangle_projected_gdf = rectangle_projected_gdf.set_crs(blocks_clipped.crs, allow_override=True)
-    rectangle_projected_gdf = rectangle_projected_gdf.reset_index(drop=True)
+    rectangle_projected_gdf = gpd.GeoSeries(rectangle_projected)
+    #rectangle_projected_gdf = rectangle_projected_gdf.set_crs(blocks_clipped.crs, allow_override=True)
+    #rectangle_projected_gdf = rectangle_projected_gdf.reset_index(drop=True)
     blocks_clipped = blocks_clipped.reset_index(drop=True)
     blocks_union = blocks_clipped.unary_union
     left_over_blocks = gpd.GeoDataFrame(geometry=gpd.GeoDataFrame(geometry=rectangle_projected_gdf).difference(blocks_union).geometry)
@@ -471,7 +473,7 @@ def visualize_tortuosity(rectangle_id, angular_threshold, tortuosity_tolerance, 
 def metric_9_tortuosity_index(rectangle_id, roads_clipped, intersections, rectangle_projected, angular_threshold, tortuosity_tolerance):
 
     # Calculate hypotenuse of the rectangle
-    rectangle_projected_gdf = gpd.GeoSeries(rectangle_projected.geometry)
+    rectangle_projected_gdf = gpd.GeoSeries(rectangle_projected)
     rectangle_bounds = rectangle_projected_gdf.bounds
     width = rectangle_bounds['maxx'] - rectangle_bounds['minx']
     height = rectangle_bounds['maxy'] - rectangle_bounds['miny']
