@@ -3,6 +3,8 @@ from create_rectangles import *
 #from gather_data_pilot import *
 from metric_plots import *
 import fiona
+from pyproj import CRS
+from shapely.geometry import box
 
 rectangles = gpd.read_file('./data/rectangles.geojson')
 
@@ -17,15 +19,11 @@ for rectangle_id, rectangle in rectangles.iterrows():
     print(f"rectangle_id: {rectangle_id}")
     rectangle_centroid = rectangle.geometry.centroid
     utm_proj_rectangle = get_utm_proj(float(rectangle_centroid.x), float(rectangle_centroid.y))
-    project = pyproj.Transformer.from_crs(pyproj.CRS('EPSG:4326'), utm_proj_rectangle, always_xy=True).transform  
+    
+    geometry = gpd.GeoSeries(rectangle['geometry'])
 
-    def project_geometry(geometry):
-        if isinstance(geometry, Polygon):  
-            return transform(project, geometry)
-        else:
-            return geometry  
-        
-    rectangle_projected = rectangle.apply(project_geometry) 
+    rectangle_projected = gpd.GeoDataFrame({'geometry': geometry}, crs="EPSG:4326").to_crs(epsg=CRS.from_proj4(utm_proj_rectangle).to_epsg())
+    #rectangle_projected = rectangle.to_crs(epsg=CRS.from_proj4(utm_proj_rectangle).to_epsg())#rectangle.apply(project_geometry) 
 
     try:
         OSM_buildings = gpd.read_file(f"./output_data/OSM_buildings_{rectangle_id}.gpkg")
@@ -40,7 +38,7 @@ for rectangle_id, rectangle in rectangles.iterrows():
     try:
         OSM_roads = gpd.read_file(f"./output_data/OSM_roads_{rectangle_id}.gpkg")
         roads = OSM_roads.to_crs(utm_proj_rectangle)
-        roads_clipped = roads.clip(list(rectangle_projected.geometry.bounds))
+        roads_clipped = roads.clip(list(rectangle_projected.geometry.bounds.values[0]))
         road_union = roads.unary_union # Create a unary union of the road geometries to simplify distance calculation
         OSM_roads_bool = True
     except fiona.errors.DriverError:
@@ -52,7 +50,7 @@ for rectangle_id, rectangle in rectangles.iterrows():
 
     try:
         OSM_intersections = gpd.read_file(f"./output_data/OSM_intersections_{rectangle_id}.gpkg").to_crs(utm_proj_rectangle)
-        OSM_intersections_clipped = OSM_intersections.clip(list(rectangle_projected.geometry.bounds))
+        OSM_intersections_clipped = OSM_intersections.clip(list(rectangle_projected.geometry.bounds.values[0]))
         OSM_intersections_bool = True
     except fiona.errors.DriverError:
         OSM_intersections = gpd.GeoDataFrame([])
@@ -71,7 +69,11 @@ for rectangle_id, rectangle in rectangles.iterrows():
         Overture_buildings_bool = False
 
     buildings = gpd.GeoDataFrame(pd.concat([buildings_OSM, Overture_data], axis=0, ignore_index=True, join='outer')).drop_duplicates('geometry').to_crs(utm_proj_rectangle).dropna(how='all')
-    buildings_clipped = buildings[buildings.geometry.intersects(rectangle_projected['geometry'])]
+    #buildings_clipped = buildings[buildings.geometry.intersects(rectangle_projected['geometry'])]
+
+    bounding_box = rectangle_projected.bounds.values[0]
+    bounding_box_geom = box(*bounding_box)
+    buildings_clipped = buildings[buildings.geometry.intersects(bounding_box_geom)]
 
     if not roads.empty:
         blocks = get_blocks(road_union, roads)
@@ -79,12 +81,15 @@ for rectangle_id, rectangle in rectangles.iterrows():
         blocks = gpd.GeoDataFrame([])
     if not blocks.empty:
         blocks_clipped = blocks[blocks.geometry.intersects(rectangle_projected['geometry'])]
+        blocks_clipped_within_rectangle = blocks_clipped.clip(bounding_box_geom)
+        area_tiled_by_blocks = blocks_clipped_within_rectangle.area.sum()
+        share_tiled_by_blocks = area_tiled_by_blocks/rectangle_area
     else:
         blocks_clipped = gpd.GeoDataFrame([])
     #blocks_clipped = blocks.clip(list(rectangle_projected.geometry.bounds))
 
     rectangle_area = calculate_area_geodesic(rectangle)
-    if not roads_clipped.empty:
+    if (not roads_clipped.empty) and (not buildings_clipped.empty):
         # Metric 1 -- share of buildings closer than 10 ms from the road
         m1, buildings_clipped = metric_1_distance_less_than_10m(buildings_clipped, road_union, utm_proj_rectangle)
         
@@ -118,10 +123,11 @@ for rectangle_id, rectangle in rectangles.iterrows():
     # Metric 7 -- average block width
     # Metric 8 -- two-row blocks
     if not blocks_clipped.empty:
-        m7, blocks_clipped = metric_7_average_block_width(blocks_clipped, rectangle_projected, rectangle_area)
+        rectangle_projected_arg = rectangle_projected.geometry
+        m7, blocks_clipped = metric_7_average_block_width(blocks_clipped, rectangle_projected_arg, rectangle_area)
         #m7=np.nan
         m8, internal_buffers = metric_8_two_row_blocks(blocks_clipped, buildings_clipped, utm_proj_rectangle, row_epsilon=row_epsilon)
-        plot_largest_inscribed_circle(rectangle_id, rectangle_projected,  blocks_clipped, roads)
+        #plot_largest_inscribed_circle(rectangle_id, rectangle_projected,  blocks_clipped, roads)
         #plot_two_row_blocks(rectangle_id, rectangle_projected, blocks_clipped, internal_buffers, buildings_clipped, roads, row_epsilon=0.01)
         #plot_two_row_blocks(rectangle_id, rectangle_projected, blocks_clipped, internal_buffers, buildings_clipped, roads, row_epsilon=0.1)
         #plot_two_row_blocks(rectangle_id, rectangle_projected, blocks_clipped, internal_buffers, buildings_clipped, roads, row_epsilon=0.001)
@@ -131,7 +137,8 @@ for rectangle_id, rectangle in rectangles.iterrows():
     
     if (not roads_clipped.empty) and (not OSM_intersections_clipped.empty):
         # Metric 9 -- tortuosity index
-        m9, all_road_vertices = metric_9_tortuosity_index(rectangle_id, roads_clipped, OSM_intersections_clipped, rectangle_projected, angular_threshold=30, tortuosity_tolerance=5)
+        rectangle_projected_arg = rectangle_projected.geometry
+        m9, all_road_vertices = metric_9_tortuosity_index(rectangle_id, roads_clipped, OSM_intersections_clipped, rectangle_projected_arg, angular_threshold=30, tortuosity_tolerance=5)
                                                         
         # Metric 20 -- average angle between road segments
         m10 = metric_10_average_angle_between_road_segments(OSM_intersections, roads)
@@ -147,6 +154,8 @@ for rectangle_id, rectangle in rectangles.iterrows():
     if not buildings_clipped.empty:
         n_buildings = len(buildings_clipped)
         building_area = buildings_clipped.area.sum()
+        building_density = n_buildings/rectangle_area
+        built_share = building_area/rectangle_area
     else:
         n_buildings = np.nan
 
@@ -167,6 +176,9 @@ for rectangle_id, rectangle in rectangles.iterrows():
                         'Overture_buildings_available':Overture_buildings_bool,
                         'rectangle_area': rectangle_area,
                         'building_area':building_area,
+                        'building_density':building_density,
+                        'share_tiled_by_blocks': share_tiled_by_blocks,
+                        'built_share':built_share,
                         'road_length':road_length,
                         'n_intersections':len(OSM_intersections_clipped.drop_duplicates('osmid')),
                         'n_buildings':n_buildings
