@@ -74,6 +74,24 @@ def calculate_minimum_distance_to_roads(building, road_union):
         raise TypeError("Unsupported geometry type: {}".format(type(building)))
 
 
+def calculate_minimum_distance_to_roads_option_B(building, road_union):
+    # Handle Polygon and MultiPolygon cases more efficiently
+    def get_minimum_distance(polygon_exterior, road_union):
+        nearest_geom = nearest_points(polygon_exterior, road_union)[1]
+        return polygon_exterior.distance(nearest_geom)
+
+    if isinstance(building, Polygon):
+        # For a single Polygon, calculate distance directly
+        return get_minimum_distance(building.exterior, road_union)
+
+    elif isinstance(building, MultiPolygon):
+        # For MultiPolygon, iterate over polygons but track the minimum in one loop
+        return min(get_minimum_distance(poly.exterior, road_union) for poly in building.geoms)
+
+    else:
+        raise TypeError(f"Unsupported geometry type: {type(building)}")
+
+
 # Function to calculate the angle between two vectors
 def calculate_angle(vector1, vector2):
     angle = np.arctan2(vector2[1], vector2[0]) - np.arctan2(vector1[1], vector1[0])
@@ -220,7 +238,7 @@ def get_blocks(road_union, roads):
     #blocks_gdf.to_file("blocks_tile1.gpkg", driver="GPKG")
     return blocks_gdf.sort_values('area')
 
-def longest_segment(geometry):
+def longest_segment_option_A(geometry):
     # Flatten geometry by extracting all Polygon components from MultiPolygon or Polygon
     if isinstance(geometry, Polygon):
         polygons = [geometry]  # Treat single Polygon as a list with one element
@@ -251,6 +269,32 @@ def longest_segment(geometry):
                 longest_segment = segment
     
     return longest_segment
+
+def longest_segment(geometry):
+    # Handle both Polygon and MultiPolygon
+    polygons = geometry.geoms if isinstance(geometry, MultiPolygon) else [geometry]
+
+    max_length = 0
+    longest_segment = None
+    
+    # Iterate over each Polygon in the geometry
+    for polygon in polygons:
+        exterior_coords = polygon.exterior.coords
+        
+        # Use a more efficient calculation to avoid creating LineString for every segment
+        for i in range(len(exterior_coords) - 1):
+            # Directly calculate the segment length using coordinates
+            x1, y1 = exterior_coords[i]
+            x2, y2 = exterior_coords[i+1]
+            segment_length = ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5  # Euclidean distance
+            
+            # Update the longest segment if the current one is longer
+            if segment_length > max_length:
+                max_length = segment_length
+                longest_segment = ((x1, y1), (x2, y2))  # Store as a tuple of coordinates
+
+    # Return the longest segment as a LineString (shapely object) for consistency
+    return LineString(longest_segment)
 
 def calculate_azimuth(segment):
     # Extract start and end points of the segment
@@ -367,7 +411,7 @@ def metric_1_distance_less_than_10m(buildings, road_union, utm_proj_rectangle):
     #buildings.loc[:,'distance_to_road'] = buildings['geometry'].apply(lambda x: x.centroid).apply(calculate_minimum_distance_to_roads, 
     
     buildings_geometry_copy = buildings['geometry'].copy()
-    buildings.loc[:,'distance_to_road'] = buildings_geometry_copy.apply(lambda x: calculate_minimum_distance_to_roads(x, road_union))
+    buildings.loc[:,'distance_to_road'] = buildings_geometry_copy.apply(lambda x: calculate_minimum_distance_to_roads_option_B(x, road_union))
 
     m1 = 1.*((sum(buildings['distance_to_road']<=10))/len(buildings))
     return m1, gpd.GeoDataFrame(buildings)
@@ -468,7 +512,7 @@ def metric_7_average_block_width(blocks_clipped, rectangle_projected, rectangle_
         # left_over_blocks['weighted_width'] = left_over_blocks['block_weight'] * left_over_blocks['max_radius']
 
         for block_id, leftover_block in left_over_blocks.iterrows():
-            print(block_id)
+            #print(block_id)
             #leftover_block = gpd.GeoDataFrame([{'geometry': leftover_block}], crs=blocks_clipped.crs.to_epsg())
             optimal_point, max_radius = get_largest_inscribed_circle(leftover_block)
             block_within_rectangle = (gpd.GeoSeries(leftover_block.geometry).intersection(gpd.GeoSeries(rectangle_projected)))
@@ -525,47 +569,108 @@ def metric_8_two_row_blocks(blocks_clipped, buildings, utm_proj_rectangle, row_e
     return m8, internal_buffers
 
 
-def visualize_tortuosity(rectangle_id, angular_threshold, tortuosity_tolerance, roads_clipped, all_road_vertices, mst, distance_comparison):
 
-    fig, ax = plt.subplots(figsize=(10, 8))
+def visualize_tortuosity_comparison(roads_clipped, n_samples=5):
+    fig, ax = plt.subplots(figsize=(10, 10))
+    
+    # Sample a few roads for visualization (you can adjust this)
+    sampled_roads = roads_clipped.sample(n=n_samples)
+    
+    for idx, road in sampled_roads.iterrows():
+        geometry = road.geometry
+        
+        if isinstance(geometry, LineString):
+            coords = list(geometry.coords)
+            start_point = Point(coords[0])
+            end_point = Point(coords[-1])
 
-    # Step 1: Plot the roads
-    roads_clipped.plot(ax=ax, color='blue', linewidth=0.8, label='Clipped Roads')
+            # Plot actual road
+            xs, ys = geometry.xy
+            ax.plot(xs, ys, color='blue', label='Road Segment' if idx == 0 else "")
 
-    # Step 2: Plot all the road vertices (intersections, inflection points, boundary intersections)
-    all_road_vertices.plot(ax=ax, marker='o', color='green', markersize=5, label='All Road Vertices')
+            # Plot straight line (Euclidean distance)
+            straight_line = LineString([start_point, end_point])
+            xs_straight, ys_straight = straight_line.xy
+            ax.plot(xs_straight, ys_straight, color='red', linestyle='--', label='Straight Line' if idx == 0 else "")
 
-    # Step 3: Visualize the MST edges
-    for edge in mst.edges(data=True):
-        i, j, data = edge
-        if i < len(all_road_vertices) and j < len(all_road_vertices):  # Ensure valid indices
-            point_A = all_road_vertices.iloc[i].geometry
-            point_B = all_road_vertices.iloc[j].geometry
-            # Plot the MST edge in black dashed lines
-            plt.plot([point_A.x, point_B.x], [point_A.y, point_B.y], 'k--', linewidth=1, label='MST Connection' if i == 0 else "")
+            # Add annotations for distances
+            ax.annotate(f"Road: {geometry.length:.2f}", (xs[0], ys[0]), fontsize=10, color='blue')
+            ax.annotate(f"Straight: {start_point.distance(end_point):.2f}", (xs_straight[0], ys_straight[0]), fontsize=10, color='red')
 
-    # Step 4: Plot the Euclidean and Road Network distances from the distance_comparison
-    for i in range(len(distance_comparison)):
-        point_A = distance_comparison['Point_A'].iloc[i]
-        point_B = distance_comparison['Point_B'].iloc[i]
+        elif isinstance(geometry, MultiLineString):
+            # Handle each line separately
+            for line in geometry.geoms:
+                coords = list(line.coords)
+                start_point = Point(coords[0])
+                end_point = Point(coords[-1])
 
-        # Plot Euclidean Distance (Red Line)
-        plt.plot([point_A.x, point_B.x], [point_A.y, point_B.y], color='red', linestyle='-', linewidth=1, label='Euclidean Distance' if i == 0 else "")
+                # Plot actual road
+                xs, ys = line.xy
+                ax.plot(xs, ys, color='blue')
 
-        # Plot Road Network Distance (Black Line)
-        nearest_A = nearest_points(roads_clipped.unary_union, point_A)[0]
-        nearest_B = nearest_points(roads_clipped.unary_union, point_B)[0]
-        plt.plot([nearest_A.x, nearest_B.x], [nearest_A.y, nearest_B.y], color='black', linestyle='-', linewidth=1, label='Road Network Distance' if i == 0 else "")
+                # Plot straight line (Euclidean distance)
+                straight_line = LineString([start_point, end_point])
+                xs_straight, ys_straight = straight_line.xy
+                ax.plot(xs_straight, ys_straight, color='red', linestyle='--')
 
-    # Add legend and titles
-    plt.legend()
-    plt.title('Tortuosity Visualization: Roads, MST, and Distances')
-    plt.xlabel('X Coordinates')
-    plt.ylabel('Y Coordinates')
+                # Add annotations for distances
+                ax.annotate(f"Road: {line.length:.2f}", (xs[0], ys[0]), fontsize=10, color='blue')
+                ax.annotate(f"Straight: {start_point.distance(end_point):.2f}", (xs_straight[0], ys_straight[0]), fontsize=10, color='red')
 
-    # Show the plot
-    plt.savefig(f'pilot_plots/plot_two_row_blocks_{rectangle_id}_angular_threshold_{str(angular_threshold)}_tolerance_{str(tortuosity_tolerance)}.png', dpi=500, bbox_inches='tight')
+    # Set the axis limits and labels
+    ax.set_xlabel("Longitude")
+    ax.set_ylabel("Latitude")
+    ax.set_title("Road Segment vs Straight Line Comparison")
+    ax.legend()
+    
+    plt.show()
 
+
+def calculate_tortuosity(geometry):
+    road_lengths = []
+    euclidean_distances = []
+
+    # If the geometry is a MultiLineString, handle each LineString separately
+    if isinstance(geometry, MultiLineString):
+        for line in geometry.geoms:
+            coords = list(line.coords)
+            road_length = line.length
+            euclidean_distance = Point(coords[0]).distance(Point(coords[-1]))
+            if euclidean_distance > 0:
+                road_lengths.append(road_length)
+                euclidean_distances.append(euclidean_distance)
+    elif isinstance(geometry, LineString):
+        coords = list(geometry.coords)
+        road_length = geometry.length
+        euclidean_distance = Point(coords[0]).distance(Point(coords[-1]))
+        if euclidean_distance > 0:
+            road_lengths.append(road_length)
+            euclidean_distances.append(euclidean_distance)
+
+    if len(road_lengths) == 0:
+        return np.nan  # No valid road segments
+
+    # Calculate tortuosity index for each road segment (length/Euclidean)
+    tortuosity_index = np.array(euclidean_distances) / np.array(road_lengths)
+    if len(tortuosity_index) > 0:
+        return euclidean_distances,road_lengths
+    else:
+        np.nan, np.nan
+
+
+
+def metric_9_tortuosity_index_option_B(roads_clipped):
+ 
+    # Apply the function to the entire geometry column in roads_clipped
+    euclidean_distances,road_lengths = zip(*roads_clipped.geometry.apply(calculate_tortuosity))
+    
+    #roads_clipped['tortuosity_index'] = zip(*roads_clipped.geometry.apply(calculate_tortuosity))
+
+    # Calculate the overall mean tortuosity index for the study section
+    m9 = np.sum(np.hstack(euclidean_distances)) / np.sum(np.hstack(road_lengths))#roads_clipped['tortuosity_index'].mean()
+    #visualize_tortuosity_comparison(roads_clipped,len(roads_clipped))
+    #print(f'Metric 9: {str(m9)}')
+    return m9
 
  
 #9 Tortuosity index
@@ -691,7 +796,7 @@ def metric_9_tortuosity_index(rectangle_id, roads_clipped, intersections, rectan
         # Calculate tortuosity index (mean ratio)
         m9 = (distance_comparison['Euclidean_Distance'] / distance_comparison['Road_Network_Distance']).mean()
         #visualize_tortuosity(rectangle_id, angular_threshold, tortuosity_tolerance, roads_clipped, all_road_vertices, mst, distance_comparison)
-        print(m9)
+        #print(m9)
     else:
         m9 = np.nan
 

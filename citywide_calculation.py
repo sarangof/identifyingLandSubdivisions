@@ -9,6 +9,7 @@ from shapely.geometry import Polygon, Point, box
 from geopy.distance import geodesic
 from pyproj import CRS
 import dask
+import json
 from dask import delayed, compute
 
 
@@ -62,7 +63,7 @@ def grid_cities(analysis_buffers, grid_size=100):
 
 
 # Define important parameters for this run
-grid_size = 200
+grid_size = 100
 row_epsilon = 0.01
 city_name = 'Belo Horizonte'
 
@@ -71,12 +72,16 @@ city_name = 'Belo Horizonte'
 
 
 
-city_grid = gpd.read_file('Belo Horizonte_200m_grid.geojson')
+#city_grid = gpd.read_file(f'Belo Horizonte_{str(grid_size)}m_grid.geojson')
+city_grid = gpd.read_parquet(f'Belo Horizonte_{str(grid_size)}m_grid.parquet')
 
 metrics_pilot = []
 #rectangles = city_grids[city_grids.city_name==city_name]['lower_left_coordinates'][0]
 rectangles = city_grid['geometry']
-Overture_data_all = gpd.read_file(f'./output_data/12 cities/Overture_building_{city_name}.parquet')
+#Overture_data_all = gpd.read_file(f'./output_data/12 cities/Overture_building_{city_name}.parquet')
+#Overture_data_all = gpd.read_file(f'./output_data/12 cities/Overture_building_{city_name}.geojson')
+#Overture_data_all.to_parquet(f'./output_data/12 cities/Overture_building_{city_name}.parquet')
+Overture_data_all = gpd.read_parquet(f'./output_data/12 cities/Overture_building_{city_name}.parquet')
 print("Overture file read")
 #Overture_data_all = gpd.read_file(f"./output_data/12 cities/Overture_building_{city_name}.geojson")
 
@@ -98,15 +103,13 @@ OSM_intersections_all_projected = OSM_intersections_all.to_crs(epsg=CRS.from_pro
 blocks_all  = get_blocks(OSM_roads_all_projected.unary_union, OSM_roads_all_projected)
 Overture_data_all_projected = Overture_data_all.to_crs(epsg=CRS.from_proj4(utm_proj_city).to_epsg())
 buildings = Overture_data_all_projected
+road_union = OSM_roads_all_projected.unary_union
 
 rectangles_projected = rectangles.to_crs(epsg=CRS.from_proj4(utm_proj_city).to_epsg())
 print("All preparations done. Ready to calculate metrics on grid.")
 
 def process_cell(cell_id, rectangle_projected):
-for rectangle_projected in rectangles_projected:
-    #for cell in rectangles_projected:
     #global buildings
-
     print(f"cell_id: {cell_id}")
     #coord_pair = cell
     #rectangle = gpd.GeoDataFrame(geometry=[create_square_from_coords(coord_pair, grid_size)],crs='EPSG:4326')
@@ -119,16 +122,10 @@ for rectangle_projected in rectangles_projected:
 
     try:
         roads_clipped = OSM_roads_all_projected[OSM_roads_all_projected.geometry.intersects(bounding_box_geom)]
-        if roads_clipped.geometry.notnull().any():
-            road_union = roads_clipped.unary_union
-        else:
-            road_union = None  # Or handle this case differently if needed
-
         OSM_roads_bool = True
     except fiona.errors.DriverError:
         roads_clipped = gpd.GeoDataFrame([])
         OSM_roads_all = gpd.GeoDataFrame([])
-        road_union = gpd.GeoDataFrame([])
         OSM_roads_bool = False
 
 
@@ -139,22 +136,22 @@ for rectangle_projected in rectangles_projected:
         OSM_intersections = gpd.GeoDataFrame([])
         OSM_intersections_bool = False
 
-    
+
     #Overture_data = Overture_data_all_projected[Overture_data_all_projected.geometry.intersects(rectangle_projected[0])]
     #if not Overture_data.empty:
     #    Overture_buildings_bool = True
     #else:
     #    Overture_buildings_bool = False
 
-    
+
     if not buildings.empty:
         buildings_clipped = buildings[buildings.geometry.intersects(bounding_box_geom)]#buildings[buildings.geometry.intersects(rectangle_projected[0])]#buildings[buildings.geometry.intersects(rectangle_projected['geometry'])]
     else:
         buildings_clipped = gpd.GeoDataFrame([])
 
     blocks_clipped = blocks_all[blocks_all.geometry.intersects(bounding_box_geom)]
-    
-    
+
+
     if not blocks_clipped.empty:
         blocks_bool = True
     else:
@@ -163,7 +160,7 @@ for rectangle_projected in rectangles_projected:
     geod = Geod(ellps="WGS84")
     rectangle_area, _ = geod.geometry_area_perimeter(rectangles.iloc[cell_id])
 
-    if (not roads_clipped.empty) and (not buildings_clipped.empty):
+    if (not buildings_clipped.empty):
         # Metric 1 -- share of buildings closer than 10 ms from the road
         m1, buildings_clipped = metric_1_distance_less_than_10m(buildings_clipped, road_union, utm_proj_city)
         
@@ -191,9 +188,11 @@ for rectangle_projected in rectangles_projected:
         m4, m5 = np.nan, np.nan
 
     # Metric 6 -- building azimuth
-    if not buildings_clipped.empty:
+    if (not buildings_clipped.empty) and (len(buildings_clipped)>5):
         n_orientation_groups = 4
         m6, buildings_clipped = metric_6_deviation_of_building_azimuth(buildings_clipped, n_orientation_groups)
+        print(f'cell_id:{str(cell_id)}')
+        print(f'm6:{str(m6)}')
         #plot_azimuth(buildings_clipped, roads_clipped, rectangle_projected, rectangle_id, n_orientation_groups)
     else:
         m6 = np.nan
@@ -211,13 +210,17 @@ for rectangle_projected in rectangles_projected:
         share_tiled_by_blocks = area_tiled_by_blocks/rectangle_area
 
         #m7=np.nan
-        m8, internal_buffers = metric_8_two_row_blocks(blocks_clipped, buildings_clipped, utm_proj_city, row_epsilon=row_epsilon)
-        #plot_largest_inscribed_circle(rectangle_id, rectangle_projected,  blocks_clipped, roads_clipped)
-        #plot_two_row_blocks(rectangle_id, rectangle_projected, blocks_clipped, internal_buffers, buildings_clipped, roads_clipped, row_epsilon=0.01)
-        #plot_two_row_blocks(rectangle_id, rectangle_projected, blocks_clipped, internal_buffers, buildings_clipped, roads_clipped, row_epsilon=0.1)
-        #plot_two_row_blocks(rectangle_id, rectangle_projected, blocks_clipped, internal_buffers, buildings_clipped, roads_clipped, row_epsilon=0.001)
+        if not buildings_clipped.empty:
+            m8, internal_buffers = metric_8_two_row_blocks(blocks_clipped, buildings_clipped, utm_proj_city, row_epsilon=row_epsilon)
+            #plot_largest_inscribed_circle(rectangle_id, rectangle_projected,  blocks_clipped, roads_clipped)
+            #plot_two_row_blocks(rectangle_id, rectangle_projected, blocks_clipped, internal_buffers, buildings_clipped, roads_clipped, row_epsilon=0.01)
+            #plot_two_row_blocks(rectangle_id, rectangle_projected, blocks_clipped, internal_buffers, buildings_clipped, roads_clipped, row_epsilon=0.1)
+            #plot_two_row_blocks(rectangle_id, rectangle_projected, blocks_clipped, internal_buffers, buildings_clipped, roads_clipped, row_epsilon=0.001)
+        else:
+            m8 = np.nan
     else:
-        m7, m8 = np.nan, np.nan
+        m7 = np.nan
+        m8 = np.nan
         share_tiled_by_blocks = np.nan
 
     
@@ -237,8 +240,8 @@ for rectangle_projected in rectangles_projected:
         road_length = np.nan
 
     if not buildings.empty:
-        n_buildings = len(buildings)
-        building_area = buildings.area.sum()
+        n_buildings = len(buildings_clipped)
+        building_area = buildings_clipped.area.sum()
         building_density = n_buildings/rectangle_area
         built_share = building_area/rectangle_area
     else:
@@ -289,7 +292,7 @@ for batch_num in range(n_batches):
     batch_df = pd.DataFrame(computed_batch)
     
     # Save each batch as a CSV to avoid memory overflow
-    batch_df.to_csv(f'metrics_batch_{batch_num}.csv', index=False)
+    batch_df.to_csv(f'metrics_batch_{batch_num}_{city_name}_{str(grid_size)}m.csv', index=False)
     
     all_results.append(batch_df)
 
@@ -300,5 +303,25 @@ final_metrics_pilot = pd.concat(all_results, ignore_index=True)
 result = pd.merge(rectangles, final_metrics_pilot, how='left', left_index=True, right_index=True)
 final_geo_df = gpd.GeoDataFrame(result, geometry=result.geometry)
 
+all_metrics_columns = ['metric_1','metric_2','metric_3','metric_4','metric_5','metric_6','metric_7','metric_8','metric_9','metric_10']
+final_geo_df[all_metrics_columns]
+metrics_with_magnitude = ['metric_2','metric_3','metric_5','metric_6','metric_7','metric_10']
+scalar_metrics = ['metric_2','metric_3','metric_5','metric_6','metric_7','metric_10']
+not_inverted_metrics = ['metric_2','metric_6','metric_7','metric_8']
+
+final_geo_df[['metric_2_original', 'metric_3_original', 'metric_5_original', 'metric_6_original', 'metric_7_original', 'metric_10_original']] = final_geo_df[['metric_2', 'metric_3', 'metric_5', 'metric_6', 'metric_7', 'metric_10']].copy()
+
+final_geo_df.loc[:,['metric_2', 'metric_3', 'metric_5', 'metric_6', 'metric_7', 'metric_10']] = (
+    final_geo_df[['metric_2', 'metric_3', 'metric_5', 'metric_6', 'metric_7', 'metric_10']]
+    .apply(lambda x: (x - x.min()) / (x.max() - x.min()), axis=0)
+)
+
+metrics_to_invert = [col for col in all_metrics_columns if col not in not_inverted_metrics]
+
+final_geo_df[metrics_to_invert] = final_geo_df[metrics_to_invert].apply(lambda x: 1 - x, axis=0)
+
+final_geo_df['irregularity_index'] = final_geo_df[all_metrics_columns].mean(axis=1)
+
+
 # Save the final result to a file
-final_geo_df.to_file('Belo_Horizonte_200_m.geojson', driver='GeoJSON')
+final_geo_df.to_file(f'Belo_Horizonte_{str(grid_size)}_m.geojson', driver='GeoJSON')
