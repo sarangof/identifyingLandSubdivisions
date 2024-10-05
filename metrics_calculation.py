@@ -14,6 +14,7 @@ import osmnx as ox
 import networkx as nx
 from shapely.geometry import mapping, Polygon
 from scipy.spatial import cKDTree
+from scipy.stats import t, sem
 
 # DEFINE USEFUL FUNCTIONS
 
@@ -441,8 +442,40 @@ def metric_5_4way_intersections(intersections, rectangle_area):
     m5 = (1000.**2)*(len(intersections[(intersections.street_count >= 3)])/rectangle_area)
     return m5
 
+
+def plot_building_azimuths(buildings_clipped, save_path):
+    fig, ax = plt.subplots(figsize=(20, 16))
+
+    # Plot each building colored by its azimuth
+    buildings_clipped.plot(ax=ax, column='azimuth', cmap='viridis', legend=True, legend_kwds={'label': "Azimuth"})
+
+    # Plot building ID, closest building ID, azimuth, and closest building azimuth over each building
+    for idx, row in buildings_clipped.iterrows():
+        centroid = row['centroid']
+        building_id = idx
+        closest_id = row['closest_building_id']
+        azimuth = row['azimuth']
+        closest_azimuth = row['closest_azimuth']
+
+        # Display building ID and closest building ID (in red) with a background box
+        ax.text(centroid.x, centroid.y, f"ID: {building_id}\nClosest: {closest_id}", color='red', fontsize=3,
+                ha='center') #, bbox=dict(facecolor='white', edgecolor='none', alpha=0.6)
+
+        # Display azimuth and closest building azimuth (in blue) with a background box
+        ax.text(centroid.x, centroid.y - 5, f"A: {azimuth:.2f}\nCA: {closest_azimuth:.2f}",
+                color='blue', fontsize=3, ha='center') #, bbox=dict(facecolor='white', edgecolor='none', alpha=0.6)
+
+    plt.title('Building IDs, Closest IDs, and Azimuths')
+    plt.xlabel('Longitude')
+    plt.ylabel('Latitude')
+
+    # Save the figure in high resolution if a path is provided
+    plt.savefig(save_path, dpi=400, bbox_inches='tight')  # Save with high DPI (300) and tight layout
+
+    #plt.show()
+
 #6 Average building footprint orientation of the tile
-def metric_6_deviation_of_building_azimuth(buildings_clipped, n_orientation_groups):
+def metric_6_deviation_of_building_azimuth(buildings_clipped, n_orientation_groups,rectangle_id):
     # Step 1: Calculate azimuth for each building
     buildings_clipped.loc[:, 'azimuth'] = buildings_clipped['geometry'].apply(lambda x: calculate_azimuth(longest_segment(x)) % 90.)
 
@@ -455,9 +488,11 @@ def metric_6_deviation_of_building_azimuth(buildings_clipped, n_orientation_grou
     distances, indices = tree.query(centroids, k=2)  # k=2 to get the nearest neighbor excluding itself
 
     # Step 3: Calculate azimuth difference with the nearest neighbor
-    #buildings_clipped['closest_azimuth'] = buildings_clipped.loc[indices[:, 1], 'azimuth'].values
-    buildings_clipped.loc[:,'closest_azimuth'] = buildings_clipped.iloc[indices[:, 1]]['azimuth'].values
-    buildings_clipped.loc[:,'azimuth_diff'] = np.abs(buildings_clipped['azimuth'] - buildings_clipped['closest_azimuth'])
+    buildings_clipped.loc[indices[:, 0],'closest_azimuth'] = buildings_clipped.iloc[indices[:, 1]]['azimuth'].values
+    buildings_clipped.loc[indices[:, 0],'azimuth_diff'] = np.abs(buildings_clipped['azimuth'] - buildings_clipped['closest_azimuth'])
+
+    # Store the ID of the closest building for plotting purposes
+    buildings_clipped.loc[indices[:, 0],'closest_building_id'] = indices[:, 1]
 
     # Step 4: Group buildings into orientation groups
     cutoff_angles = [(x * 90. / (2 * n_orientation_groups)) for x in range(0, (2 * n_orientation_groups) + 1)]
@@ -465,7 +500,11 @@ def metric_6_deviation_of_building_azimuth(buildings_clipped, n_orientation_grou
     buildings_clipped['azimuth_group'] = pd.cut(buildings_clipped['azimuth'], bins=cutoff_angles, labels=labels, ordered=False)
 
     # Step 5: Calculate the standard deviation of azimuth differences
-    m6 = np.median(buildings_clipped['azimuth_diff'])
+    lb, ub = t.interval(1 - 0.05, df=len(buildings_clipped)-1, loc=np.mean(buildings_clipped['azimuth_diff']), scale=sem(buildings_clipped['azimuth_diff']))
+    m6 = np.std(buildings_clipped['azimuth_diff']) #ub-lb 
+
+    # Step 6: Call the plot function to visualize the results
+    #plot_building_azimuths(buildings_clipped,save_path=f"./{str(rectangle_id)}_azimuth_plot_tags.png")
     
     return m6, buildings_clipped
 
