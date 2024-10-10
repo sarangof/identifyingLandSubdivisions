@@ -15,6 +15,7 @@ import networkx as nx
 from shapely.geometry import mapping, Polygon
 from scipy.spatial import cKDTree
 from scipy.stats import t, sem
+from shapely.strtree import STRtree
 
 # DEFINE USEFUL FUNCTIONS
 
@@ -319,7 +320,6 @@ def calculate_azimuth(segment):
 
 # Get largest circle inscribed in block
 def get_largest_inscribed_circle(block):
-
     polygon = block
     # Initial guess: the centroid of the polygon
     centroid = polygon.geometry.centroid
@@ -347,6 +347,40 @@ def get_largest_inscribed_circle(block):
     max_radius = -result.fun  # Negative of the minimized value
     #print(f"Largest circle center: {optimal_point}")
     #print(f"Maximum radius: {max_radius}")
+    return optimal_point, max_radius
+
+def get_largest_inscribed_circle_option_B(polygon):
+    # Precompute the polygon's boundary as a MultiPoint for fast spatial indexing
+    boundary_points = np.array(polygon.geometry.boundary.coords)
+    boundary_tree = STRtree([Point(p) for p in boundary_points])  # Spatial index using STRtree
+    
+    # Initial guess: the centroid of the polygon
+    centroid = polygon.geometry.centroid
+
+    if not polygon.geometry.contains(centroid):
+        # If centroid is outside, find an interior point as an alternative starting point
+        interior_point = polygon.geometry.representative_point()  # A guaranteed point inside the polygon
+        initial_guess = [interior_point.x, interior_point.y]
+    else:
+        initial_guess = [centroid.x, centroid.y]
+
+    # Calculate negative radius to maximize, using spatial index for fast distance calculation
+    def negative_radius(point_coords):
+        point = Point(point_coords)
+        if polygon.geometry.contains(point):
+            # Find the closest boundary point using the spatial index
+            nearest_boundary_point = boundary_tree.nearest(point)
+            return -point.distance(nearest_boundary_point)
+        else:
+            return np.inf  # Outside the polygon, so invalid
+    
+    # Optimization to find the largest inscribed circle
+    result = minimize(negative_radius, initial_guess, method='Nelder-Mead')
+    
+    # Get the maximum inscribed circle
+    optimal_point = Point(result.x)
+    max_radius = -result.fun  # Negative of the minimized value
+    
     return optimal_point, max_radius
 
 def objective_function(radius, block, target_area):
@@ -456,9 +490,10 @@ def plot_building_azimuths(buildings_clipped, save_path):
         closest_id = row['closest_building_id']
         azimuth = row['azimuth']
         closest_azimuth = row['closest_azimuth']
+        azimuth_diff = row['azimuth_diff']
 
         # Display building ID and closest building ID (in red) with a background box
-        ax.text(centroid.x, centroid.y, f"ID: {building_id}\nClosest: {closest_id}", color='red', fontsize=3,
+        ax.text(centroid.x, centroid.y, f"ID: {int(building_id)}\nClosest: {int(closest_id)}\nDiff: {azimuth_diff:.2f}", color='red', fontsize=3,
                 ha='center') #, bbox=dict(facecolor='white', edgecolor='none', alpha=0.6)
 
         # Display azimuth and closest building azimuth (in blue) with a background box
@@ -474,10 +509,22 @@ def plot_building_azimuths(buildings_clipped, save_path):
 
     #plt.show()
 
+def calculate_azimuth_diff(x,y):
+    comp_list = [np.abs(y-x)]
+    if ((x > 45) & (y > 45)):
+        comp_list.append(np.abs((y-90) - (x - 90)))
+    elif ((x > 45) & (y <= 45)):
+        comp_list.append(np.abs(y - (x - 90)))
+    elif ((x <= 45) & (y > 45)):
+        comp_list.append(np.abs((y-90) - x))
+    elif ((x <= 45) & (y <= 45)):
+        comp_list.append(np.abs(y - x))
+    return min(comp_list)
+
 #6 Average building footprint orientation of the tile
 def metric_6_deviation_of_building_azimuth(buildings_clipped, n_orientation_groups,rectangle_id):
     # Step 1: Calculate azimuth for each building
-    buildings_clipped.loc[:, 'azimuth'] = buildings_clipped['geometry'].apply(lambda x: calculate_azimuth(longest_segment(x)) % 90.)
+    buildings_clipped.loc[:, 'azimuth'] = buildings_clipped['geometry'].apply(lambda x: calculate_azimuth(longest_segment(x))  % 90. )
 
     # Step 2: Create spatial index for the buildings
     buildings_clipped['centroid'] = buildings_clipped.geometry.centroid
@@ -489,7 +536,11 @@ def metric_6_deviation_of_building_azimuth(buildings_clipped, n_orientation_grou
 
     # Step 3: Calculate azimuth difference with the nearest neighbor
     buildings_clipped.loc[indices[:, 0],'closest_azimuth'] = buildings_clipped.iloc[indices[:, 1]]['azimuth'].values
-    buildings_clipped.loc[indices[:, 0],'azimuth_diff'] = np.abs(buildings_clipped['azimuth'] - buildings_clipped['closest_azimuth'])
+
+
+    buildings_clipped.loc[indices[:, 0],'azimuth_diff'] = buildings_clipped[['azimuth', 'closest_azimuth']].apply(
+        lambda row: calculate_azimuth_diff(row['azimuth'], row['closest_azimuth']), axis=1
+        )
 
     # Store the ID of the closest building for plotting purposes
     buildings_clipped.loc[indices[:, 0],'closest_building_id'] = indices[:, 1]
@@ -501,10 +552,10 @@ def metric_6_deviation_of_building_azimuth(buildings_clipped, n_orientation_grou
 
     # Step 5: Calculate the standard deviation of azimuth differences
     lb, ub = t.interval(1 - 0.05, df=len(buildings_clipped)-1, loc=np.mean(buildings_clipped['azimuth_diff']), scale=sem(buildings_clipped['azimuth_diff']))
-    m6 = np.std(buildings_clipped['azimuth_diff']) #ub-lb 
+    m6 = np.std(buildings_clipped['azimuth_diff'])#ub-lb #np.std(buildings_clipped['azimuth_diff']) #ub-lb  #np.std(buildings_clipped['azimuth_diff']) # 
 
     # Step 6: Call the plot function to visualize the results
-    #plot_building_azimuths(buildings_clipped,save_path=f"./{str(rectangle_id)}_azimuth_plot_tags.png")
+    plot_building_azimuths(buildings_clipped,save_path=f"./{str(rectangle_id)}_azimuth_plot_NEW_.png")
     
     return m6, buildings_clipped
 
