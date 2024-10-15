@@ -41,7 +41,7 @@ for rectangle_id, rectangle in rectangles.iterrows():
         OSM_buildings_bool = False
 
     try:
-        OSM_roads = gpd.read_file(f"./output_data/OSM_roads_{rectangle_id}.gpkg")
+        OSM_roads = gpd.read_file(f"./output_data/OSM_roads_{rectangle_id}.gpkg").drop_duplicates(subset='geometry')
         roads = OSM_roads.to_crs(utm_proj_rectangle)
         roads_clipped = roads.clip(list(rectangle_projected.geometry.bounds.values[0]))
         road_union = roads.unary_union # Create a unary union of the road geometries to simplify distance calculation
@@ -129,9 +129,13 @@ for rectangle_id, rectangle in rectangles.iterrows():
     if not buildings_clipped.empty:
         n_orientation_groups = 4
         m6, buildings_clipped = metric_6_deviation_of_building_azimuth(buildings_clipped, n_orientation_groups, rectangle_id)
+        #m6_A, m6_B, m6_C, m6_D, m6_E, 
+        #m6_B, buildings_clipped = metric_6_homogeneity_of_building_azimuth(buildings_clipped, n_orientation_groups, rectangle_id)
+        #m6_B = np.nan
         #plot_azimuth(buildings_clipped, roads, rectangle_projected, rectangle_id, n_orientation_groups)
     else:
         m6 = np.nan
+        m6_A, m6_B, m6_C, m6_D, m6_E = np.nan, np.nan, np.nan, np.nan, np.nan
 
     # Metric 7 -- average block width
     # Metric 8 -- two-row blocks
@@ -139,7 +143,9 @@ for rectangle_id, rectangle in rectangles.iterrows():
         rectangle_projected_arg = rectangle_projected.geometry
         m7, blocks_clipped = metric_7_average_block_width(blocks_clipped, rectangle_projected_arg, rectangle_area)
         #m7=np.nan
-        m8, internal_buffers = metric_8_two_row_blocks(blocks_clipped, buildings_clipped, utm_proj_rectangle, row_epsilon=row_epsilon)
+        m8_A, internal_buffers = metric_8_two_row_blocks_old(blocks_clipped, buildings_clipped, utm_proj_rectangle, row_epsilon=row_epsilon)
+        m8_B, internal_buffers = metric_8_two_row_blocks(blocks_clipped, buildings_clipped, utm_proj_rectangle, row_epsilon=row_epsilon)
+        m8_C, internal_buffers = metric_8_share_of_intersecting_buildings(blocks_clipped, buildings_clipped, utm_proj_rectangle, row_epsilon=row_epsilon)
         #plot_largest_inscribed_circle(rectangle_id, rectangle_projected,  blocks_clipped, roads)
         #plot_two_row_blocks(rectangle_id, rectangle_projected, blocks_clipped, internal_buffers, buildings_clipped, roads, row_epsilon=0.01)
         #plot_two_row_blocks(rectangle_id, rectangle_projected, blocks_clipped, internal_buffers, buildings_clipped, roads, row_epsilon=0.1)
@@ -172,8 +178,9 @@ for rectangle_id, rectangle in rectangles.iterrows():
     if not buildings_clipped.empty:
         n_buildings = len(buildings_clipped)
         building_area = buildings_clipped.area.sum()
-        building_density = n_buildings/rectangle_area
+        building_density = (1000.*1000*n_buildings)/rectangle_area
         built_share = building_area/rectangle_area
+        average_building_area = building_area / n_buildings 
     else:
         n_buildings = np.nan
 
@@ -184,8 +191,15 @@ for rectangle_id, rectangle in rectangles.iterrows():
                         'metric_4':m4,
                         'metric_5':m5,
                         'metric_6':m6,
+                        # 'metric_6_A':m6_A,
+                        # 'metric_6_B':m6_B,
+                        # 'metric_6_C':m6_C,
+                        # 'metric_6_D':m6_D,
+                        # 'metric_6_E':m6_E,
                         'metric_7':m7,
-                        'metric_8':m8,
+                        'metric_8_A':m8_A,
+                        'metric_8_B':m8_B,
+                        'metric_8_C':m8_C,
                         'metric_9':m9,
                         'metric_10':m10,
                         'OSM_buildings_available':OSM_buildings_bool,
@@ -195,6 +209,7 @@ for rectangle_id, rectangle in rectangles.iterrows():
                         'rectangle_area': rectangle_area,
                         'building_area':building_area,
                         'building_density':building_density,
+                        'average_building_area':average_building_area,
                         'share_tiled_by_blocks': share_tiled_by_blocks,
                         'built_share':built_share,
                         'road_length':road_length,
@@ -204,30 +219,29 @@ for rectangle_id, rectangle in rectangles.iterrows():
 
 metrics_pilot = pd.DataFrame(metrics_pilot)
 final_geo_df = gpd.GeoDataFrame(pd.merge(rectangles, metrics_pilot, how='left', left_on='n', right_on='index'), geometry=rectangles.geometry)
+# all_metrics_columns = ['metric_1','metric_2','metric_3','metric_4','metric_5','metric_6','metric_7','metric_8','metric_9','metric_10']
+# metrics_with_magnitude = ['metric_2','metric_3','metric_5','metric_6','metric_7','metric_10']
+# not_inverted_metrics = ['metric_2','metric_6','metric_7','metric_8']
 
+# # Save original values before transformations
+# metrics_original_names = [col+'_original' for col in all_metrics_columns]
+# final_geo_df[metrics_original_names] = final_geo_df[all_metrics_columns].copy()
 
-all_metrics_columns = ['metric_1','metric_2','metric_3','metric_4','metric_5','metric_6','metric_7','metric_8','metric_9','metric_10']
-final_geo_df[all_metrics_columns]
-metrics_with_magnitude = ['metric_2','metric_3','metric_5','metric_6','metric_7','metric_10']
-#scalar_metrics = ['metric_2','metric_3','metric_5','metric_6','metric_7','metric_10']
-not_inverted_metrics = ['metric_2','metric_6','metric_7','metric_8']
+# # Center at zero and maximize information
+# final_geo_df.loc[:,all_metrics_columns] = (
+#     final_geo_df[all_metrics_columns]
+#     .apply(lambda x: (x - x.mean()) / (x.std()), axis=0)
+# )
 
-final_geo_df[['metric_2_original', 'metric_3_original', 'metric_5_original', 'metric_6_original', 'metric_7_original', 'metric_10_original']] = final_geo_df[['metric_2', 'metric_3', 'metric_5', 'metric_6', 'metric_7', 'metric_10']].copy()
+# # Convert metrics to a range between 0 and 1
+# final_geo_df.loc[:,all_metrics_columns] = (
+#     final_geo_df[all_metrics_columns]
+#     .apply(lambda x: (x - x.min()) / (x.max()-x.min()), axis=0)
+# )
 
-final_geo_df.loc[:,all_metrics_columns] = (
-    final_geo_df[all_metrics_columns]
-    .apply(lambda x: (x - x.mean()) / (x.std()), axis=0)
-)
+# # Invert metrics with directions that are opposite to the index meaning
+# metrics_to_invert = [col for col in all_metrics_columns if col not in not_inverted_metrics]
+# metrics_to_invert_names = [col+'_invert' for col in all_metrics_columns if col not in not_inverted_metrics]
+# final_geo_df[metrics_to_invert_names] = final_geo_df[metrics_to_invert].apply(lambda x: 1-x, axis=0)
 
-final_geo_df.loc[:,all_metrics_columns] = (
-    final_geo_df[all_metrics_columns]
-    .apply(lambda x: (x - x.min()) / (x.max()-x.min()), axis=0)
-)
-
-metrics_to_invert = [col for col in all_metrics_columns if col not in not_inverted_metrics]
-metrics_to_invert_names = [col+'_invert' for col in all_metrics_columns if col not in not_inverted_metrics]
-
-
-final_geo_df[metrics_to_invert_names] = final_geo_df[metrics_to_invert].apply(lambda x: 1-x, axis=0)
-
-final_geo_df['irregularity_index'] = final_geo_df[all_metrics_columns].mean(axis=1)
+# final_geo_df['irregularity_index'] = final_geo_df[all_metrics_columns].mean(axis=1)

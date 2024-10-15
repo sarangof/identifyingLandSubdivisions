@@ -16,6 +16,7 @@ from shapely.geometry import mapping, Polygon
 from scipy.spatial import cKDTree
 from scipy.stats import t, sem
 from shapely.strtree import STRtree
+import os
 
 # DEFINE USEFUL FUNCTIONS
 
@@ -481,7 +482,7 @@ def plot_building_azimuths(buildings_clipped, save_path):
     fig, ax = plt.subplots(figsize=(20, 16))
 
     # Plot each building colored by its azimuth
-    buildings_clipped.plot(ax=ax, column='azimuth', cmap='viridis', legend=True, legend_kwds={'label': "Azimuth"})
+    buildings_clipped.plot(ax=ax, column='azimuth', cmap='viridis', legend=True, legend_kwds={'label': "Azimuth group"})
 
     # Plot building ID, closest building ID, azimuth, and closest building azimuth over each building
     for idx, row in buildings_clipped.iterrows():
@@ -509,6 +510,53 @@ def plot_building_azimuths(buildings_clipped, save_path):
 
     #plt.show()
 
+
+
+def save_azimuth_histograms(buildings_clipped, file_name ,output_dir='histogram_plots'):
+    """
+    Creates and saves two histograms: one for azimuths and another for the difference in azimuths.
+    
+    Parameters:
+    buildings_clipped (GeoDataFrame): A GeoDataFrame with a column 'azimuth' for building orientations.
+    output_dir (str): Directory to save the plots. Default is 'plots'.
+    """
+    # Extract azimuth values from the buildings_clipped GeoDataFrame
+    azimuths = buildings_clipped['azimuth'].dropna().values
+    
+    # Compute azimuth differences between consecutive buildings
+    azimuth_diffs = buildings_clipped['azimuth_diff'].dropna().values
+    
+    # Ensure output directory exists
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Set plot styles for aesthetics
+    #plt.style.use('seaborn-darkgrid')
+
+    # Plot 1: Histogram of Azimuths
+    plt.figure(figsize=(10, 6))
+    plt.hist(azimuths, bins=30, color='skyblue', edgecolor='black', alpha=0.7)
+    plt.title('Distribution of Building Azimuths', fontsize=16)
+    plt.xlabel('Azimuth (degrees)', fontsize=14)
+    plt.ylabel('Frequency', fontsize=14)
+    plt.xlim(0, 90) 
+    plt.grid(True)
+    plt.savefig(os.path.join(output_dir, file_name), dpi=300)
+    plt.close()
+
+    # Plot 2: Histogram of Azimuth Differences
+    plt.figure(figsize=(10, 6))
+    plt.hist(azimuth_diffs, bins=30, color='lightcoral', edgecolor='black', alpha=0.7)
+    plt.title('Distribution of Azimuth Differences', fontsize=16)
+    plt.xlabel('Azimuth Difference (degrees)', fontsize=14)
+    plt.ylabel('Frequency', fontsize=14)
+    plt.xlim(0, 45)
+    plt.grid(True)
+    plt.savefig(os.path.join(output_dir, 'diff_'+file_name), dpi=300)
+    plt.close()
+
+    print(f'Histograms saved in {output_dir}/')
+
+
 def calculate_azimuth_diff(x,y):
     comp_list = [np.abs(y-x)]
     if ((x > 45) & (y > 45)):
@@ -520,6 +568,95 @@ def calculate_azimuth_diff(x,y):
     elif ((x <= 45) & (y <= 45)):
         comp_list.append(np.abs(y - x))
     return min(comp_list)
+
+
+# Function to calculate the variogram
+def calculate_variogram(buildings_clipped, centroids, azimuths, n_lags=20):
+    tree = cKDTree(centroids)
+    distances, indices = tree.query(centroids, k=len(centroids))
+
+    azimuth_diffs = np.zeros_like(distances)
+
+    for i, row in enumerate(indices):
+        for j, idx in enumerate(row):
+            if i != idx:  # Skip the same building
+                azimuth_diffs[i, j] = calculate_azimuth_diff(azimuths[i], azimuths[idx])
+
+    max_dist = np.max(distances)
+    bin_edges = np.linspace(0, max_dist, num=n_lags + 1)
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+    binned_variances = np.zeros(n_lags)
+
+    for i in range(n_lags):
+        mask = (distances >= bin_edges[i]) & (distances < bin_edges[i + 1])
+        azimuth_diffs_in_bin = azimuth_diffs[mask]
+        if len(azimuth_diffs_in_bin) > 0:
+            binned_variances[i] = np.var(azimuth_diffs_in_bin)
+
+    return bin_centers, binned_variances
+
+# Function to calculate the Regularity Index
+def calculate_regularities(bin_centers, binned_variances):
+    sill = np.max(binned_variances)
+    sill_threshold = 0.95 * sill
+    range_idx = np.argmax(binned_variances >= sill_threshold)
+    range_ = bin_centers[range_idx] if range_idx < len(bin_centers) else np.max(bin_centers)
+    regularity_index = range_ / sill
+
+    return sill, range_, regularity_index
+
+# Main function (your existing function modified to integrate variogram and Regularity Index)
+def metric_6_homogeneity_of_building_azimuth(buildings_clipped, n_orientation_groups, rectangle_id):
+    # Step 1: Calculate azimuth for each building
+    buildings_clipped.loc[:, 'azimuth'] = buildings_clipped['geometry'].apply(lambda x: calculate_azimuth(longest_segment(x)) % 90.)
+
+    # Step 2: Create spatial index for the buildings
+    buildings_clipped['centroid'] = buildings_clipped.geometry.centroid
+    centroids = np.array(list(zip(buildings_clipped['centroid'].x, buildings_clipped['centroid'].y)))
+
+    # Use cKDTree for fast nearest neighbor search
+    tree = cKDTree(centroids)
+    distances, indices = tree.query(centroids, k=2)
+
+    # Step 3: Calculate azimuth difference with the nearest neighbor
+    buildings_clipped.loc[indices[:, 0], 'closest_azimuth'] = buildings_clipped.iloc[indices[:, 1]]['azimuth'].values
+
+    buildings_clipped.loc[indices[:, 0], 'azimuth_diff'] = buildings_clipped[['azimuth', 'closest_azimuth']].apply(
+        lambda row: calculate_azimuth_diff(row['azimuth'], row['closest_azimuth']), axis=1
+    )
+
+    # Store the ID of the closest building for plotting purposes
+    buildings_clipped.loc[indices[:, 0], 'closest_building_id'] = indices[:, 1]
+
+    # Step 4: Group buildings into orientation groups
+    cutoff_angles = [(x * 90. / (2 * n_orientation_groups)) for x in range(0, (2 * n_orientation_groups) + 1)]
+    labels = [1] + [i for i in range(2, n_orientation_groups + 1) for _ in (0, 1)] + [1]
+    buildings_clipped['azimuth_group'] = pd.cut(buildings_clipped['azimuth'], bins=cutoff_angles, labels=labels, ordered=False)
+
+    # Step 5: Calculate the variogram
+    azimuths = buildings_clipped['azimuth'].values
+    bin_centers, binned_variances = calculate_variogram(buildings_clipped, centroids, azimuths, n_lags=10)
+
+    # Plot the variogram
+    plt.plot(bin_centers, binned_variances, marker='o')
+    plt.xlabel('Distance between buildings')
+    plt.ylabel('Variance of azimuth differences')
+    plt.title('Directional Variogram of Azimuth Differences')
+    plt.grid(True)
+    plt.show()
+
+    # Step 6: Calculate the Regularity Index
+    sill, range_, regularity_index = calculate_regularities(bin_centers, binned_variances)
+
+    # Step 7: Output Regularity Index and store it for further analysis
+    print(f"Sill: {sill}")
+    print(f"Range: {range_}")
+    print(f"Regularity Index: {regularity_index}")
+
+    # Step 8: Call the plot function to visualize the results (existing part of your code)
+    plot_building_azimuths(buildings_clipped, save_path=f"./{str(rectangle_id)}_azimuth_plot_NEW_.png")
+
+    return regularity_index, buildings_clipped
 
 #6 Average building footprint orientation of the tile
 def metric_6_deviation_of_building_azimuth(buildings_clipped, n_orientation_groups,rectangle_id):
@@ -555,8 +692,19 @@ def metric_6_deviation_of_building_azimuth(buildings_clipped, n_orientation_grou
     m6 = np.std(buildings_clipped['azimuth_diff'])#ub-lb #np.std(buildings_clipped['azimuth_diff']) #ub-lb  #np.std(buildings_clipped['azimuth_diff']) # 
 
     # Step 6: Call the plot function to visualize the results
-    plot_building_azimuths(buildings_clipped,save_path=f"./{str(rectangle_id)}_azimuth_plot_NEW_.png")
-    
+    #plot_building_azimuths(buildings_clipped,save_path=f"./{str(rectangle_id)}_azimuth_plot_NEW_.png")
+    #save_azimuth_histograms(buildings_clipped, f"{str(rectangle_id)}_histogram.png",output_dir='histogram_plots')
+
+
+    m6_A = np.std(buildings_clipped['azimuth_diff'])
+    lb, ub = t.interval(1 - 0.05, df=len(buildings_clipped)-1, loc=np.mean(buildings_clipped['azimuth_diff']), scale=sem(buildings_clipped['azimuth_diff']))
+    m6_B = ub - lb
+    lb, ub = t.interval(1 - 0.05, df=len(buildings_clipped)-1, loc=np.mean(buildings_clipped['azimuth']), scale=sem(buildings_clipped['azimuth']))
+    m6_C = ub - lb
+    m6_D = np.std(buildings_clipped['azimuth'])
+    m6_E = np.median(np.abs(buildings_clipped['azimuth_diff'] - buildings_clipped['azimuth_diff'].median()))
+
+    # m6_A, m6_B, m6_C, m6_D, m6_E, 
     return m6, buildings_clipped
 
 #7 Average block width
@@ -617,8 +765,7 @@ def metric_7_average_block_width(blocks_clipped, rectangle_projected, rectangle_
     return m7, blocks_clipped
 
 #8 Two row blocks
-def metric_8_two_row_blocks(blocks_clipped, buildings, utm_proj_rectangle, row_epsilon):
-
+def metric_8_two_row_blocks_old(blocks_clipped, buildings_clipped, utm_proj_rectangle, row_epsilon):
     internal_buffers = []
     for block_id, block in blocks_clipped.iterrows():
         block_area = block.area
@@ -626,7 +773,7 @@ def metric_8_two_row_blocks(blocks_clipped, buildings, utm_proj_rectangle, row_e
         target_area = block_area*(1.-row_epsilon)  # Set your target area
         internal_buffer = get_internal_buffer_with_target_area(block, target_area)
         #print(type(internal_buffer))
-        buildings_in_block = buildings.clip(block.geometry)
+        buildings_in_block = buildings_clipped.clip(block.geometry)
         buildings_for_union = unary_union(buildings_in_block.geometry)
         result_union = internal_buffer.union(buildings_for_union)
         union_area = result_union.area
@@ -636,7 +783,7 @@ def metric_8_two_row_blocks(blocks_clipped, buildings, utm_proj_rectangle, row_e
         buildings_intersecting_buffer = buildings_in_block[buildings_in_block.geometry.intersects(internal_buffer)]
         buildings_intersecting_buffer_area = buildings_intersecting_buffer.area.sum()
         buildings_area_all = buildings_in_block.area.sum()
-        buildings_inside_buffer_area = buildings.intersection(internal_buffer).area.sum()
+        buildings_inside_buffer_area = buildings_clipped.intersection(internal_buffer).area.sum()
         internal_buffers.append(internal_buffer)
         if buildings_intersecting_buffer_area > 0:
             blocks_clipped.loc[block_id,'share_of_buildings_inside_buffer_intersection'] = buildings_inside_buffer_area/buildings_intersecting_buffer_area
@@ -655,7 +802,52 @@ def metric_8_two_row_blocks(blocks_clipped, buildings, utm_proj_rectangle, row_e
     internal_buffers = gpd.GeoDataFrame(geometry=internal_buffers).set_crs(utm_proj_rectangle)
     #m8 = blocks_clipped.share_of_buildings_inside_buffer_intersection.mean()
     m8 = blocks_clipped.share_of_buildings_inside_buffer_all.mean()
+    return m8, internal_buffers
 
+def metric_8_share_of_intersecting_buildings(blocks_clipped, buildings_clipped, utm_proj_rectangle, row_epsilon):
+    internal_buffers = []
+    share_of_intersecting_buildings = []
+    for block_id, block in blocks_clipped.iterrows():
+        block_area = block.area
+        target_area = block_area*(1.-row_epsilon) 
+        internal_buffer = get_internal_buffer_with_target_area(block, target_area)
+        buildings_in_block = buildings_clipped[buildings_clipped.geometry.intersects(block.geometry)]
+        internal_buffer = block.geometry.difference(internal_buffer)
+        buildings_intersecting_buffer = buildings_in_block[buildings_in_block.geometry.intersects(internal_buffer)]
+        if len(buildings_in_block)>0:
+            share_of_intersecting_buildings.append(len(buildings_intersecting_buffer) / len(buildings_in_block))
+    internal_buffers = gpd.GeoDataFrame(geometry=internal_buffers).set_crs(utm_proj_rectangle)
+    m8 = np.mean(share_of_intersecting_buildings)
+    return m8, internal_buffers
+
+def metric_8_two_row_blocks(blocks_clipped, buildings_clipped, utm_proj_rectangle, row_epsilon):
+    internal_buffers = []
+    buildings_inside_buffer_area_cum = []
+    buildings_intersecting_buffer_area_cum = []
+    buildings_area_all_cum = []
+    block_areas_comparison = []
+    for block_id, block in blocks_clipped.iterrows():
+        block_area = block.area
+        target_area = block_area*(1.-row_epsilon)  
+        internal_buffer = get_internal_buffer_with_target_area(block, target_area)
+        buildings_in_block = buildings_clipped.clip(block.geometry)
+        buildings_for_union = unary_union(buildings_in_block.geometry)
+        internal_buffer = block.geometry.difference(internal_buffer)
+        buildings_intersecting_buffer = buildings_in_block[buildings_in_block.geometry.intersects(internal_buffer)]
+        buildings_intersecting_buffer_area = buildings_intersecting_buffer.area.sum()
+        buildings_area_all = buildings_in_block.area.sum()
+        buildings_inside_buffer_area = buildings_clipped.intersection(internal_buffer).area.sum()
+        internal_buffers.append(internal_buffer)
+        if (buildings_area_all > 0) and (block.area > 0):
+            buildings_area_all_cum.append(buildings_area_all)
+            block_areas_comparison.append(block.area)
+            buildings_inside_buffer_area_cum.append(buildings_inside_buffer_area)
+            buildings_intersecting_buffer_area_cum.append(buildings_intersecting_buffer_area)
+
+            
+    internal_buffers = gpd.GeoDataFrame(geometry=internal_buffers).set_crs(utm_proj_rectangle)
+    m8 = np.dot(block_areas_comparison,[i / j for i, j in zip(buildings_inside_buffer_area_cum, buildings_area_all_cum)])/buildings_clipped.area.sum()
+    #m8 = np.sum([i / j for i, j in zip(buildings_inside_buffer_area_cum, buildings_area_all_cum)])
     return m8, internal_buffers
 
 
@@ -894,7 +1086,7 @@ def metric_9_tortuosity_index(rectangle_id, roads_clipped, intersections, rectan
 
 #10 Average angle between road segments
 def metric_10_average_angle_between_road_segments(intersections, roads):
-    df_angles = calculate_sequential_angles(intersections, roads)
+    df_angles = calculate_sequential_angles_option_A(intersections, roads)
     intersection_angles_df = intersections[['osmid','street_count']].set_index('osmid').merge(df_angles.set_index('Intersection ID'),left_index=True,right_index=True,how='outer')
     # In 3-way intersections, include only the smallest angle in the tile average. 
     df_3_way = intersection_angles_df[(intersection_angles_df.street_count==3)]
