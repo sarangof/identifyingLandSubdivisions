@@ -8,3 +8,4 @@
 .gpkg-wal
 __pycache__
 rectangles_generation.py
+/cache
