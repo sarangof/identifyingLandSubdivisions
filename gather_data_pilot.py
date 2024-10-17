@@ -9,8 +9,8 @@ import os
 
 
 # Create output directory if it does not exist
-if not os.path.exists('./output_data'):
-    os.makedirs('./output_data')
+if not os.path.exists('../data/output_data'):
+    os.makedirs('../data//output_data')
 
 # DEFINE LOADING FUNCTIONS
 

@@ -7,3 +7,4 @@
 .svg
 .gpkg-wal
 __pycache__
+rectangles_generation.py

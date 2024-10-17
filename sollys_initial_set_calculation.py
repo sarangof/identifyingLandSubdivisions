@@ -10,7 +10,7 @@ import cProfile
 import pstats
 from io import StringIO
 
-
+sources_path = '../data/output_data'
 rectangles = gpd.read_file('./data/rectangles.geojson')
 blocks_clipped_empty = 0 
 metrics_pilot = []
@@ -31,7 +31,7 @@ for rectangle_id, rectangle in rectangles.iterrows():
     #rectangle_projected = rectangle.to_crs(epsg=CRS.from_proj4(utm_proj_rectangle).to_epsg())#rectangle.apply(project_geometry) 
 
     try:
-        OSM_buildings = gpd.read_file(f"./output_data/OSM_buildings_{rectangle_id}.gpkg")
+        OSM_buildings = gpd.read_file(f"{sources_path}/OSM_buildings_{rectangle_id}.gpkg")
         buildings_OSM = OSM_buildings[(OSM_buildings.building=='yes')].to_crs(utm_proj_rectangle)
         buildings_OSM = buildings_OSM.set_geometry('geometry')
         OSM_buildings_bool = True
@@ -41,7 +41,7 @@ for rectangle_id, rectangle in rectangles.iterrows():
         OSM_buildings_bool = False
 
     try:
-        OSM_roads = gpd.read_file(f"./output_data/OSM_roads_{rectangle_id}.gpkg").drop_duplicates(subset='geometry')
+        OSM_roads = gpd.read_file(f"{sources_path}/OSM_roads_{rectangle_id}.gpkg").drop_duplicates(subset='geometry')
         roads = OSM_roads.to_crs(utm_proj_rectangle)
         roads_clipped = roads.clip(list(rectangle_projected.geometry.bounds.values[0]))
         road_union = roads.unary_union # Create a unary union of the road geometries to simplify distance calculation
@@ -54,7 +54,7 @@ for rectangle_id, rectangle in rectangles.iterrows():
         OSM_roads_bool = False
 
     try:
-        OSM_intersections = gpd.read_file(f"./output_data/OSM_intersections_{rectangle_id}.gpkg").to_crs(utm_proj_rectangle)
+        OSM_intersections = gpd.read_file(f"{sources_path}/OSM_intersections_{rectangle_id}.gpkg").to_crs(utm_proj_rectangle)
         OSM_intersections_clipped = OSM_intersections.clip(list(rectangle_projected.geometry.bounds.values[0]))
         OSM_intersections_bool = True
     except fiona.errors.DriverError:
@@ -63,7 +63,7 @@ for rectangle_id, rectangle in rectangles.iterrows():
         OSM_intersections_bool = False
 
     try:
-        Overture_data = gpd.read_file(f"./output_data/Overture_building_{rectangle_id}.geojson").to_crs(utm_proj_rectangle)#.clip(rectangle['geometry'])
+        Overture_data = gpd.read_file(f"{sources_path}/Overture_building_{rectangle_id}.geojson").to_crs(utm_proj_rectangle)#.clip(rectangle['geometry'])
         if not Overture_data.empty:
             Overture_data['confidence'] = Overture_data.sources.apply(lambda x: json.loads(x)[0]['confidence'])
             Overture_data['dataset'] = Overture_data.sources.apply(lambda x: json.loads(x)[0]['dataset'])
