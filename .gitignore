@@ -1,5 +1,9 @@
 .geojson
 .csv
+.xlsx
+.DS_Store
 .gpkg
 .gpkg-shm
+.svg
 .gpkg-wal
+__pycache__
