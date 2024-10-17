@@ -9,6 +9,11 @@ import os
 import pyproj
 from shapely.ops import transform
 
+sources_path = '../data/input'
+buildings_path = f'{sources_path}/buildings'
+roads_path = f'{sources_path}/roads'
+urban_extents_path = f'{sources_path}/urban_extents'
+
 def remove_duplicate_roads(osm_roads):
     osm_roads_reset = osm_roads.reset_index()
     osm_roads_reset['sorted_pair'] = osm_roads_reset.apply(lambda row: tuple(sorted([row['u'], row['v']])), axis=1)
