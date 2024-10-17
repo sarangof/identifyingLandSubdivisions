@@ -10,7 +10,21 @@ import cProfile
 import pstats
 from io import StringIO
 
-sources_path = '../data/output_data'
+"""
+This script iterates through all study areas in the initial pilot, reads data
+on roads, intersections and buildings, and performs metric calculations on each 
+study area, returning an excel file with metrics values and a column with 
+the irrregularity index.
+"""
+
+main_path = '../data/pilot'
+input_path = f'{main_path}/input'
+buildings_path = f'{input_path}/buildings'
+roads_path = f'{input_path}/roads'
+intersections_path = f'{input_path}/intersections'
+urban_extents_path = f'{input_path}/urban_extents'
+output_path = f'{main_path}/input'
+
 rectangles = gpd.read_file('./data/rectangles.geojson')
 blocks_clipped_empty = 0 
 metrics_pilot = []

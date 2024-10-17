@@ -9,10 +9,20 @@ import os
 import pyproj
 from shapely.ops import transform
 
+"""
+This script collects and saves buildings, roads and intersections information 
+for all the cities provided in analysis_buffers, search_buffers and city_boundaries
+"""
+
 sources_path = '../data/input'
 buildings_path = f'{sources_path}/buildings'
 roads_path = f'{sources_path}/roads'
+intersections_path = f'{sources_path}/intersections'
 urban_extents_path = f'{sources_path}/urban_extents'
+
+analysis_buffers = gpd.read_file(f'{urban_extents_path}/12 city analysis buffers.geojson')
+search_buffers = gpd.read_file(f'{urban_extents_path}/12 city search buffers.geojson')
+city_boundaries = gpd.read_file(f'{urban_extents_path}/12 city boundaries.shp')
 
 def remove_duplicate_roads(osm_roads):
     osm_roads_reset = osm_roads.reset_index()
@@ -37,12 +47,6 @@ def get_utm_proj(lon, lat):
     utm_zone = get_utm_zone(lon)
     is_northern = lat >= 0  # Determine if the zone is in the northern hemisphere
     return f"+proj=utm +zone={utm_zone} +{'north' if is_northern else 'south'} +ellps=WGS84 +datum=WGS84 +units=m +no_defs"
-
-
-
-analysis_buffers = gpd.read_file('12 city analysis buffers.geojson')
-search_buffers = gpd.read_file('12 city search buffers.geojson')
-city_boundaries = gpd.read_file('12 city boundaries.shp')
 
 
 # Gather OSM roads and intersections data for the borders.
@@ -97,8 +101,6 @@ for _, city in analysis_buffers.iterrows():
             print(f"Error saving Overture file: {e}")
     else:
         print(f"Skipping save for Overture ID: {city_name}")
-
-
 
 for _, city in analysis_buffers.iterrows():
     city_name = city['city_name']
