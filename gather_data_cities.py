@@ -10,7 +10,7 @@ import pyproj
 from shapely.ops import transform
 
 """
-This script collects and saves buildings, roads and intersections information 
+This script collects and saves data on buildings, roads and intersections information 
 for all the cities provided in analysis_buffers, search_buffers and city_boundaries
 """
 

@@ -7,10 +7,19 @@ import pandas as pd
 import dask.dataframe as dd
 import os
 
+main_path = '../data/pilot'
+input_path = f'{main_path}/input'
+buildings_path = f'{input_path}/buildings'
+roads_path = f'{input_path}/roads'
+intersections_path = f'{input_path}/intersections'
+urban_extents_path = f'{input_path}/urban_extents'
+output_path = f'{main_path}/output'
 
 # Create output directory if it does not exist
-if not os.path.exists('../data/output_data'):
-    os.makedirs('../data//output_data')
+#if not os.path.exists('../data/output_data'):
+#    os.makedirs('../data//output_data')
+
+
 
 # DEFINE LOADING FUNCTIONS
 
@@ -39,10 +48,11 @@ def overturemaps_command(bbox_str, request_type: str):
 #@delayed
 def overturemaps_save(overture_file, request_type: str, id: int):
     if overture_file is not None:
-        output_path = f'./output_data/Overture_{request_type}_{id}.geojson'
-        print(f"Saving Overture file to {output_path}")
+        print(buildings_path)
+        file_name_path = f'{buildings_path}/Overture_building_{id}.geojson'
+        print(f"Saving Overture file to {file_name_path}")
         try:
-            overture_file.to_file(output_path)
+            overture_file.to_file(file_name_path)
             return output_path
         except Exception as e:
             print(f"Error saving Overture file: {e}")
@@ -79,13 +89,16 @@ def osmnx_save(osm_files, id: int):
     if osm_files is not None:
         for file_type, file in osm_files.items():
             try:
-                output_path = f"./output_data/{file_type}_{id}.gpkg"
+                output_name = f"{file_type}_{id}.gpkg"
                 print(f"Saving OSM file to {output_path}")
                 if file_type =='OSM_roads':
                     file = remove_duplicate_roads(file)
-                    file.drop(columns=['osmid','reversed']).to_file(output_path, driver="GPKG")    
+                    file.drop(columns=['osmid','reversed']).to_file(f'{roads_path}/{output_name}', driver="GPKG")    
                 else:
-                    file.to_file(output_path, driver="GPKG")    
+                    if file_type =='OSM_buildings':
+                        file.to_file(f'{buildings_path}/{output_name}', driver="GPKG")    
+                    else:
+                        file.to_file(f'{intersections_path}/{output_name}', driver="GPKG")    
             except Exception as e:
                 print(f"Error saving OSM file: {e}")
         return True
@@ -109,7 +122,7 @@ def make_requests(partition):
             
             if overture_file is not None:
                 print("About to trigger overturemaps save")
-                save_result = overturemaps_save(overture_file, request_type, index + 1)
+                save_result = overturemaps_save(overture_file,request_type, index + 1)
                 results.append(save_result)
         except Exception as e:
             print(f"Overture error: {e}")
@@ -134,7 +147,7 @@ def make_requests(partition):
 
 def run_all():
     # Load rectangles file
-    rectangles = gpd.read_file('data/rectangles.geojson')
+    rectangles = gpd.read_file(f'{output_path}/rectangles/rectangles.geojson')
     
     # Prepare DataFrame for Dask
     rectangles[['minx', 'miny', 'maxx', 'maxy']] = rectangles.bounds

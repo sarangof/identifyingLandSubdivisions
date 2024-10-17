@@ -4,6 +4,10 @@ import re
 from shapely.geometry import Point, Polygon
 from geopy.distance import geodesic
 
+main_path = '../data/pilot'
+input_path = f'{main_path}/input'
+output_path = f'{main_path}/output'
+
 # Convert DMS to float.
 def dms_to_dd(dms_str):
     dms_str = str(dms_str).strip()
@@ -60,7 +64,7 @@ def create_expanded_rectangle_wgs84_geodesic(point, target_width, target_height,
     return xmin, ymin, xmax, ymax
 
 # Load the CSV file into a pandas DataFrame
-source_coordinates = pd.read_csv('data/pilot_coordinates.csv', sep=';', encoding='ISO-8859-1')
+source_coordinates = pd.read_csv(f'{input_path}/pilot_coordinates.csv', sep=';', encoding='ISO-8859-1')
 source_coordinates['latitude_dd'] = source_coordinates['Lat'].apply(dms_to_dd) # Convert DMS to decimal degrees
 source_coordinates['longitude_dd'] = source_coordinates['Lon'].apply(dms_to_dd)
 geometry = [Point(xy) for xy in zip(source_coordinates['longitude_dd'], source_coordinates['latitude_dd'])]
@@ -72,4 +76,4 @@ rectangles['geometry'] = rectangles['geometry'].apply(lambda point: create_recta
 rectangles[['minx_expanded','miny_expanded','maxx_expanded','maxy_expanded']] = pd.Series(geometry).apply(lambda point: create_expanded_rectangle_wgs84_geodesic(point, target_width, target_height, expansion_factor=3)).apply(pd.Series)
 rectangles[['minx', 'miny', 'maxx', 'maxy']] = rectangles.bounds 
 # Save the result to a GeoJSON file
-rectangles.to_file('./data/rectangles.geojson', driver='GeoJSON')
+rectangles.to_file(f'{output_path}/rectangles/rectangles.geojson', driver='GeoJSON')
