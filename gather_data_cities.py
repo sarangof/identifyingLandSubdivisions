@@ -14,16 +14,21 @@ This script collects and saves data on buildings, roads and intersections inform
 for all the cities provided in analysis_buffers, search_buffers and city_boundaries
 """
 
-sources_path = '../data/input'
-buildings_path = f'{sources_path}/buildings'
-roads_path = f'{sources_path}/roads'
-intersections_path = f'{sources_path}/intersections'
-urban_extents_path = f'{sources_path}/urban_extents'
+# Define paths
+main_path = '../data'
+input_path = f'{main_path}/input'
+buildings_path = f'{input_path}/buildings'
+roads_path = f'{input_path}/roads'
+intersections_path = f'{input_path}/intersections'
+urban_extents_path = f'{input_path}/urban_extents'
+output_path = f'{main_path}/output'
 
+# Read files 
 analysis_buffers = gpd.read_file(f'{urban_extents_path}/12 city analysis buffers.geojson')
 search_buffers = gpd.read_file(f'{urban_extents_path}/12 city search buffers.geojson')
 city_boundaries = gpd.read_file(f'{urban_extents_path}/12 city boundaries.shp')
 
+# Useful auxiliary functions
 def remove_duplicate_roads(osm_roads):
     osm_roads_reset = osm_roads.reset_index()
     osm_roads_reset['sorted_pair'] = osm_roads_reset.apply(lambda row: tuple(sorted([row['u'], row['v']])), axis=1)
@@ -48,10 +53,10 @@ def get_utm_proj(lon, lat):
     is_northern = lat >= 0  # Determine if the zone is in the northern hemisphere
     return f"+proj=utm +zone={utm_zone} +{'north' if is_northern else 'south'} +ellps=WGS84 +datum=WGS84 +units=m +no_defs"
 
-
 # Gather OSM roads and intersections data for the borders.
 for _, city in analysis_buffers.iterrows():
     city_name = city['city_name']
+
     print(city_name)
     utm_proj_city = get_utm_proj(float(city.geometry.centroid.x), float(city.geometry.centroid.y))
     
@@ -84,6 +89,7 @@ for _, city in analysis_buffers.iterrows():
         "--type=" + request_type
     ]
     result = subprocess.run(command, capture_output=True, text=True)
+
     if result.returncode == 0:
         geoparquet_data = result.stdout
         try:
@@ -102,6 +108,7 @@ for _, city in analysis_buffers.iterrows():
     else:
         print(f"Skipping save for Overture ID: {city_name}")
 
+# Iterate through the analysis buffers
 for _, city in analysis_buffers.iterrows():
     city_name = city['city_name']
     print(city_name)
@@ -146,13 +153,6 @@ for _, city in analysis_buffers.iterrows():
     else:
         print(f"Skipping save for Overture ID: {city_name}")
     
-
-# Create output directory if it does not exist
-if not os.path.exists('./output_data'):
-    os.makedirs('./output_data')
-
-# DEFINE LOADING FUNCTIONS
-
 #@delayed
 def overturemaps_command(bbox_str, request_type: str):
     print(f"Running Overture command with bbox_str={bbox_str} and request_type={request_type}")

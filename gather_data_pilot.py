@@ -19,8 +19,6 @@ output_path = f'{main_path}/output'
 #if not os.path.exists('../data/output_data'):
 #    os.makedirs('../data//output_data')
 
-
-
 # DEFINE LOADING FUNCTIONS
 
 #@delayed
