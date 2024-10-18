@@ -1,5 +1,7 @@
 .geojson
 .csv
+.tif
+.tiff
 .xlsx
 .DS_Store
 .gpkg
