@@ -689,7 +689,7 @@ def metric_6_deviation_of_building_azimuth(buildings_clipped, n_orientation_grou
 
     # Step 5: Calculate the standard deviation of azimuth differences
     lb, ub = t.interval(1 - 0.05, df=len(buildings_clipped)-1, loc=np.mean(buildings_clipped['azimuth_diff']), scale=sem(buildings_clipped['azimuth_diff']))
-    m6 = np.std(buildings_clipped['azimuth_diff'])#ub-lb #np.std(buildings_clipped['azimuth_diff']) #ub-lb  #np.std(buildings_clipped['azimuth_diff']) # 
+    m6 = np.std(buildings_clipped['azimuth'])#ub-lb #np.std(buildings_clipped['azimuth_diff']) #ub-lb  #np.std(buildings_clipped['azimuth_diff']) # 
 
     # Step 6: Call the plot function to visualize the results
     #plot_building_azimuths(buildings_clipped,save_path=f"./{str(rectangle_id)}_azimuth_plot_NEW_.png")
@@ -757,9 +757,10 @@ def metric_7_average_block_width(blocks_clipped, rectangle_projected, rectangle_
             block_area_within_rectangle = block_within_rectangle.area.sum()
             block_weight = block_area_within_rectangle / rectangle_area
             weighted_width = block_weight*max_radius
-            left_over_blocks.loc[block_id,'weighted_width'] = weighted_width
+            left_over_blocks.loc[block_id,'weighted_width'] = weighted_width 
+            left_over_blocks.loc[block_id,'area'] = leftover_block.geometry.area
         m7 = blocks_clipped['weighted_width'].sum() + left_over_blocks['weighted_width'].sum()
-        blocks_clipped = pd.concat([blocks_clipped,left_over_blocks])
+        blocks_clipped = pd.concat([blocks_clipped,left_over_blocks]).reset_index()
     else:
         m7 = blocks_clipped['weighted_width'].sum()
     return m7, blocks_clipped
@@ -804,50 +805,69 @@ def metric_8_two_row_blocks_old(blocks_clipped, buildings_clipped, utm_proj_rect
     m8 = blocks_clipped.share_of_buildings_inside_buffer_all.mean()
     return m8, internal_buffers
 
-def metric_8_share_of_intersecting_buildings(blocks_clipped, buildings_clipped, utm_proj_rectangle, row_epsilon):
-    internal_buffers = []
-    share_of_intersecting_buildings = []
-    for block_id, block in blocks_clipped.iterrows():
-        block_area = block.area
-        target_area = block_area*(1.-row_epsilon) 
-        internal_buffer = get_internal_buffer_with_target_area(block, target_area)
-        buildings_in_block = buildings_clipped[buildings_clipped.geometry.intersects(block.geometry)]
-        internal_buffer = block.geometry.difference(internal_buffer)
-        buildings_intersecting_buffer = buildings_in_block[buildings_in_block.geometry.intersects(internal_buffer)]
-        if len(buildings_in_block)>0:
-            share_of_intersecting_buildings.append(len(buildings_intersecting_buffer) / len(buildings_in_block))
-    internal_buffers = gpd.GeoDataFrame(geometry=internal_buffers).set_crs(utm_proj_rectangle)
-    m8 = np.mean(share_of_intersecting_buildings)
-    return m8, internal_buffers
 
 def metric_8_two_row_blocks(blocks_clipped, buildings_clipped, utm_proj_rectangle, row_epsilon):
     internal_buffers = []
-    buildings_inside_buffer_area_cum = []
-    buildings_intersecting_buffer_area_cum = []
-    buildings_area_all_cum = []
-    block_areas_comparison = []
     for block_id, block in blocks_clipped.iterrows():
         block_area = block.area
-        target_area = block_area*(1.-row_epsilon)  
+        #optimal_point, max_radius = get_largest_inscribed_circle(block)
+        target_area = block_area*(1.-row_epsilon)  # Set your target area
         internal_buffer = get_internal_buffer_with_target_area(block, target_area)
+        #print(type(internal_buffer))
         buildings_in_block = buildings_clipped.clip(block.geometry)
         buildings_for_union = unary_union(buildings_in_block.geometry)
+        result_union = internal_buffer.union(buildings_for_union)
+        union_area = result_union.area
+        internal_buffer_area = internal_buffer.area  
+
         internal_buffer = block.geometry.difference(internal_buffer)
         buildings_intersecting_buffer = buildings_in_block[buildings_in_block.geometry.intersects(internal_buffer)]
         buildings_intersecting_buffer_area = buildings_intersecting_buffer.area.sum()
         buildings_area_all = buildings_in_block.area.sum()
         buildings_inside_buffer_area = buildings_clipped.intersection(internal_buffer).area.sum()
         internal_buffers.append(internal_buffer)
-        if (buildings_area_all > 0) and (block.area > 0):
-            buildings_area_all_cum.append(buildings_area_all)
-            block_areas_comparison.append(block.area)
-            buildings_inside_buffer_area_cum.append(buildings_inside_buffer_area)
-            buildings_intersecting_buffer_area_cum.append(buildings_intersecting_buffer_area)
-
-            
+        if buildings_intersecting_buffer_area > 0:
+            blocks_clipped.loc[block_id,'share_of_buildings_inside_buffer_intersection'] = buildings_inside_buffer_area/buildings_intersecting_buffer_area
+        else:
+            blocks_clipped.loc[block_id,'share_of_buildings_inside_buffer_intersection'] = np.nan
+        
+        if buildings_area_all > 0:
+            blocks_clipped.loc[block_id,'share_of_buildings_inside_buffer_all'] = buildings_inside_buffer_area/buildings_area_all
+        else:
+            blocks_clipped.loc[block_id,'share_of_buildings_inside_buffer_all'] = np.nan
+        #if union_area > internal_buffer_area:
+        #    blocks_clipped.loc[block_id,'buildings_outside_buffer'] = True
+        #elif union_area <= internal_buffer_area:
+        #    blocks_clipped.loc[block_id,'buildings_outside_buffer'] = False
+        #m8 = blocks_clipped['buildings_outside_buffer'].mean()
     internal_buffers = gpd.GeoDataFrame(geometry=internal_buffers).set_crs(utm_proj_rectangle)
-    m8 = np.dot(block_areas_comparison,[i / j for i, j in zip(buildings_inside_buffer_area_cum, buildings_area_all_cum)])/buildings_clipped.area.sum()
-    #m8 = np.sum([i / j for i, j in zip(buildings_inside_buffer_area_cum, buildings_area_all_cum)])
+    #m8 = blocks_clipped.share_of_buildings_inside_buffer_intersection.mean()
+    m8 = blocks_clipped.share_of_buildings_inside_buffer_intersection.mean()
+    return m8, internal_buffers
+
+
+def metric_8_share_of_intersecting_buildings(blocks_clipped, buildings_clipped, utm_proj_rectangle, row_epsilon):
+    internal_buffers = []
+    share_of_intersecting_buildings = []
+    buildings_intersecting_buffer_all = []
+    for block_id, block in blocks_clipped.iterrows():
+        print(block_id)
+        block_area = block.area
+        target_area = block_area*(1.-row_epsilon) 
+        internal_buffer = get_internal_buffer_with_target_area(block, target_area)
+        internal_buffer = block.geometry.difference(internal_buffer)
+        buildings_in_block = buildings_clipped[buildings_clipped.geometry.intersects(block.geometry)]
+        buildings_intersecting_buffer = buildings_in_block[buildings_in_block.geometry.intersects(internal_buffer)]
+        if len(buildings_in_block)>0:
+            share_of_intersecting_buildings.append(len(buildings_intersecting_buffer) / len(buildings_in_block))
+        internal_buffers.append(internal_buffer)
+        #print(buildings_intersecting_buffer.geometry)
+        if not buildings_intersecting_buffer.geometry.empty:
+            print(buildings_intersecting_buffer.geometry)
+            buildings_intersecting_buffer_all.append(buildings_intersecting_buffer.geometry.values)
+    internal_buffers = gpd.GeoDataFrame(geometry=internal_buffers).set_crs(utm_proj_rectangle)
+    #buildings_intersecting_buffer_all = gpd.GeoDataFrame(geometry=buildings_intersecting_buffer_all).set_crs(utm_proj_rectangle)
+    m8 = np.mean(share_of_intersecting_buildings)
     return m8, internal_buffers
 
 
