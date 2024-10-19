@@ -162,13 +162,13 @@ for rectangle_id, rectangle in rectangles.iterrows():
         rectangle_projected_arg = rectangle_projected.geometry
         m7, blocks_clipped = metric_7_average_block_width(blocks_clipped, rectangle_projected_arg, rectangle_area)
         #m7=np.nan
+        #plot_largest_inscribed_circle(rectangle_id, rectangle_projected,  blocks_clipped, roads)
         m8_A, internal_buffers = metric_8_two_row_blocks_old(blocks_clipped, buildings_clipped, utm_proj_rectangle, row_epsilon=row_epsilon)
         m8_B, internal_buffers = metric_8_two_row_blocks(blocks_clipped, buildings_clipped, utm_proj_rectangle, row_epsilon=row_epsilon)
         m8_C, internal_buffers = metric_8_share_of_intersecting_buildings(blocks_clipped, buildings_clipped, utm_proj_rectangle, row_epsilon=row_epsilon)
-        #plot_largest_inscribed_circle(rectangle_id, rectangle_projected,  blocks_clipped, roads)
-        #plot_two_row_blocks(rectangle_id, rectangle_projected, blocks_clipped, internal_buffers, buildings_clipped, roads, row_epsilon=0.01)
-        #plot_two_row_blocks(rectangle_id, rectangle_projected, blocks_clipped, internal_buffers, buildings_clipped, roads, row_epsilon=0.1)
-        #plot_two_row_blocks(rectangle_id, rectangle_projected, blocks_clipped, internal_buffers, buildings_clipped, roads, row_epsilon=0.001)
+        m8 = m8_A
+        
+        #plot_two_row_blocks(rectangle_id, rectangle_projected, blocks_clipped, internal_buffers, buildings_clipped, roads, row_epsilon)
     else:
         print("Blocks_clipped is empty")
         m7, m8 = np.nan, np.nan
@@ -206,6 +206,7 @@ for rectangle_id, rectangle in rectangles.iterrows():
                         'metric_8_A':m8_A,
                         'metric_8_B':m8_B,
                         'metric_8_C':m8_C,
+                        'metric_8':m8,
                         'metric_9':m9,
                         'metric_10':m10,
                         'OSM_buildings_available':OSM_buildings_bool,
@@ -225,33 +226,33 @@ for rectangle_id, rectangle in rectangles.iterrows():
 
 metrics_pilot = pd.DataFrame(metrics_pilot)
 final_geo_df = gpd.GeoDataFrame(pd.merge(rectangles, metrics_pilot, how='left', left_on='n', right_on='index'), geometry=rectangles.geometry)
-# all_metrics_columns = ['metric_1','metric_2','metric_3','metric_4','metric_5','metric_6','metric_7','metric_8','metric_9','metric_10']
-# metrics_with_magnitude = ['metric_2','metric_3','metric_5','metric_6','metric_7','metric_10']
-# not_inverted_metrics = ['metric_2','metric_6','metric_7','metric_8']
+all_metrics_columns = ['metric_1','metric_2','metric_3','metric_4','metric_5','metric_6','metric_7','metric_8','metric_9','metric_10']
+metrics_with_magnitude = ['metric_2','metric_3','metric_5','metric_6','metric_7','metric_10']
+not_inverted_metrics = ['metric_2','metric_6','metric_7','metric_8']
 
-# # Save original values before transformations
-# metrics_original_names = [col+'_original' for col in all_metrics_columns]
-# final_geo_df[metrics_original_names] = final_geo_df[all_metrics_columns].copy()
+# Save original values before transformations
+metrics_original_names = [col+'_original' for col in all_metrics_columns]
+final_geo_df[metrics_original_names] = final_geo_df[all_metrics_columns].copy()
 
-# # Center at zero and maximize information
-# final_geo_df.loc[:,all_metrics_columns] = (
-#     final_geo_df[all_metrics_columns]
-#     .apply(lambda x: (x - x.mean()) / (x.std()), axis=0)
-# )
+# Center at zero and maximize information
+final_geo_df.loc[:,all_metrics_columns] = (
+    final_geo_df[all_metrics_columns]
+    .apply(lambda x: (x - x.mean()) / (x.std()), axis=0)
+)
 
-# # Convert metrics to a range between 0 and 1
-# final_geo_df.loc[:,all_metrics_columns] = (
-#     final_geo_df[all_metrics_columns]
-#     .apply(lambda x: (x - x.min()) / (x.max()-x.min()), axis=0)
-# )
+# Convert metrics to a range between 0 and 1
+final_geo_df.loc[:,all_metrics_columns] = (
+    final_geo_df[all_metrics_columns]
+    .apply(lambda x: (x - x.min()) / (x.max()-x.min()), axis=0)
+)
 
-# # Invert metrics with directions that are opposite to the index meaning
-# metrics_to_invert = [col for col in all_metrics_columns if col not in not_inverted_metrics]
-# metrics_to_invert_names = [col+'_invert' for col in all_metrics_columns if col not in not_inverted_metrics]
-# final_geo_df[metrics_to_invert_names] = final_geo_df[metrics_to_invert].apply(lambda x: 1-x, axis=0)
+# Invert metrics with directions that are opposite to the index meaning
+metrics_to_invert = [col for col in all_metrics_columns if col not in not_inverted_metrics]
+metrics_to_invert_names = [col+'_invert' for col in all_metrics_columns if col not in not_inverted_metrics]
+final_geo_df[metrics_to_invert_names] = final_geo_df[metrics_to_invert].apply(lambda x: 1-x, axis=0)
 
-# # Calculate equal-weights irregularity index
-# final_geo_df['irregularity_index'] = final_geo_df[all_metrics_columns].mean(axis=1)
+# Calculate equal-weights irregularity index
+final_geo_df['irregularity_index'] = final_geo_df[all_metrics_columns].mean(axis=1)
 
 # Save output file
 cols_to_save = [col for col in final_geo_df.columns if col!='geometry']
