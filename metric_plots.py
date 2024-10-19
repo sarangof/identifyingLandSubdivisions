@@ -4,6 +4,7 @@ from metrics_calculation import get_largest_inscribed_circle
 from shapely.geometry import Polygon, MultiPolygon
 import matplotlib as mpl
 import matplotlib.patches as mpatches
+import geopandas as gpd
 
 def plot_distance_to_roads(buildings_clipped, roads, rectangle_projected, rectangle_id):
     fig, ax = plt.subplots(1, 1, figsize=(10, 10))
@@ -61,6 +62,7 @@ def plot_inflection_points(rectangle_id, rectangle_projected, all_road_vertices,
     plt.tight_layout()
     plt.savefig(f'pilot_plots/intersections_and_inflection_points_plot_{rectangle_id}.png', dpi=500, bbox_inches='tight')
 
+
 def plot_largest_inscribed_circle(rectangle_id, rectangle_projected, blocks_clipped, roads):
     
     fig, ax = plt.subplots(1, 1, figsize=(10, 10))
@@ -70,7 +72,7 @@ def plot_largest_inscribed_circle(rectangle_id, rectangle_projected, blocks_clip
     blocks_clipped_plot = blocks_clipped.plot(column='weighted_width', zorder=2, ax=ax, alpha=0.5, cmap='Greys', ec='gray', linewidth=1, label='Block width')
 
     # Plot the study area rectangle
-    x, y = rectangle_projected.geometry.exterior.xy
+    x, y = rectangle_projected.geometry.exterior.iloc[0].xy
     ax.fill(x, y, linewidth=1.5, zorder=3, fc='none', ec='black', label='Study area')
 
     # Plot circles and their centers
@@ -80,6 +82,16 @@ def plot_largest_inscribed_circle(rectangle_id, rectangle_projected, blocks_clip
         x, y = circle.exterior.xy
         ax.plot(x, y, color='red', zorder=4, linewidth=2)  # Draw the circle
         ax.plot(optimal_point.x, optimal_point.y, 'ro', linewidth=2, zorder=5)
+
+        # Annotate the radius next to the circle center
+        ax.annotate(f'{max_radius:.2f}', 
+                    (optimal_point.x, optimal_point.y), 
+                    textcoords="offset points", 
+                    xytext=(5, 5), 
+                    ha='center', 
+                    fontsize=8, 
+                    color='blue', 
+                    zorder=6)
 
     # Add manual colorbar
     norm = mpl.colors.Normalize(vmin=blocks_clipped['weighted_width'].min(), vmax=blocks_clipped['weighted_width'].max())
@@ -92,6 +104,7 @@ def plot_largest_inscribed_circle(rectangle_id, rectangle_projected, blocks_clip
     plt.tight_layout()
     plt.savefig(f'pilot_plots/plot_block_width_{rectangle_id}.png', dpi=500, bbox_inches='tight')
 
+
 def plot_two_row_blocks(rectangle_id, rectangle_projected, blocks_clipped, internal_buffers, buildings_clipped, roads, row_epsilon):
     fig, ax = plt.subplots()
     roads.plot(ax=ax, color='gray', linewidth=0.5, zorder=1)
@@ -99,7 +112,7 @@ def plot_two_row_blocks(rectangle_id, rectangle_projected, blocks_clipped, inter
     x, y = rectangle_projected.geometry.exterior.iloc[0].xy
     ax.fill(x, y, linewidth=1, fc='none', ec='lightseagreen', zorder=3, label='Study area')
     buildings_clipped.plot(ax=ax, ec='black', fc='pink', zorder=4, linewidth=0.3, legend=True, label='Buildings')
-    gpd.GeoDataFrame(geometry=internal_buffers).plot(ax=ax, ec='black', fc='yellow', zorder=5, alpha=0.7,  linewidth=0.2, legend=True, label='Internal buffer')
+    internal_buffers.plot(ax=ax, ec='black', fc='yellow', zorder=5, alpha=0.7,  linewidth=0.2, legend=True, label='Internal buffer')
     plt.gca().set_aspect('equal', adjustable='box')
     plt.legend()
     plt.savefig(f'pilot_plots/plot_two_row_blocks_{rectangle_id}_epsilon_{str(row_epsilon)}.png', dpi=500, bbox_inches='tight')
