@@ -474,7 +474,7 @@ def metric_4_share_3_and_4way_intersections(intersections):
 
 #5 Density of intersections
 def metric_5_4way_intersections(intersections, rectangle_area):
-    m5 = (1000.**2)*(len(intersections[(intersections.street_count >= 3)])/rectangle_area)
+    m5 = (1000.**2)*(len(intersections[(intersections.street_count == 4)])/rectangle_area) #(1000.**2)*(len(intersections[(intersections.street_count >= 3)])/rectangle_area)
     return m5
 
 
@@ -605,7 +605,7 @@ def calculate_regularities(bin_centers, binned_variances):
 
     return sill, range_, regularity_index
 
-# Main function (your existing function modified to integrate variogram and Regularity Index)
+# Main function ( existing function modified to integrate variogram and Regularity Index)
 def metric_6_homogeneity_of_building_azimuth(buildings_clipped, n_orientation_groups, rectangle_id):
     # Step 1: Calculate azimuth for each building
     buildings_clipped.loc[:, 'azimuth'] = buildings_clipped['geometry'].apply(lambda x: calculate_azimuth(longest_segment(x)) % 90.)
