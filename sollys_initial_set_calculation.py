@@ -227,8 +227,6 @@ for rectangle_id, rectangle in rectangles.iterrows():
 metrics_pilot = pd.DataFrame(metrics_pilot)
 final_geo_df = gpd.GeoDataFrame(pd.merge(rectangles, metrics_pilot, how='left', left_on='n', right_on='index'), geometry=rectangles.geometry)
 all_metrics_columns = ['metric_1','metric_2','metric_3','metric_4','metric_5','metric_6','metric_7','metric_8','metric_9','metric_10']
-metrics_with_magnitude = ['metric_2','metric_3','metric_5','metric_6','metric_7','metric_10']
-not_inverted_metrics = ['metric_2','metric_6','metric_7','metric_8']
 
 # Save original values before transformations
 metrics_original_names = [col+'_original' for col in all_metrics_columns]
@@ -247,9 +245,11 @@ final_geo_df.loc[:,all_metrics_columns] = (
 )
 
 # Invert metrics with directions that are opposite to the index meaning
+not_inverted_metrics = ['metric_2','metric_6','metric_7','metric_8']
 metrics_to_invert = [col for col in all_metrics_columns if col not in not_inverted_metrics]
-metrics_to_invert_names = [col+'_invert' for col in all_metrics_columns if col not in not_inverted_metrics]
-final_geo_df[metrics_to_invert_names] = final_geo_df[metrics_to_invert].apply(lambda x: 1-x, axis=0)
+metrics_to_invert_names = [col+'_before_invert' for col in all_metrics_columns if col not in not_inverted_metrics]
+final_geo_df[metrics_to_invert_names] = final_geo_df[metrics_to_invert].copy()
+final_geo_df[metrics_to_invert] = final_geo_df[metrics_to_invert].apply(lambda x: 1-x, axis=0)
 
 # Calculate equal-weights irregularity index
 final_geo_df['irregularity_index'] = final_geo_df[all_metrics_columns].mean(axis=1)
