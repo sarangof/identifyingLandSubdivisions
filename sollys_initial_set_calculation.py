@@ -97,6 +97,7 @@ for rectangle_id, rectangle in rectangles.iterrows():
     bounding_box_geom = box(*bounding_box)
     try:
         buildings_clipped = buildings[buildings.geometry.intersects(bounding_box_geom)]
+        #buildings_clipped = buildings_clipped.reset_index()
         buildings_clipped = buildings_clipped[(buildings_clipped['confidence']>0.75)|buildings_clipped['confidence'].isna()].reset_index()
     except KeyError:
         continue
@@ -140,7 +141,8 @@ for rectangle_id, rectangle in rectangles.iterrows():
     # Metric 6 -- building azimuth
     if not buildings_clipped.empty:
         n_orientation_groups = 4
-        m6, buildings_clipped = metric_6_deviation_of_building_azimuth(buildings_clipped, n_orientation_groups, rectangle_id)
+        m6_A, buildings_clipped = metric_6_deviation_of_building_azimuth(buildings_clipped, n_orientation_groups, rectangle_id)
+        m6_B, buildings_clipped = metric_6_entropy_of_building_azimuth(buildings_clipped, rectangle_id, bin_width_degrees=3, plot=True)
         #m6_A, m6_B, m6_C, m6_D, m6_E, 
         #m6_B, buildings_clipped = metric_6_homogeneity_of_building_azimuth(buildings_clipped, n_orientation_groups, rectangle_id)
         #m6_B = np.nan
@@ -196,9 +198,9 @@ for rectangle_id, rectangle in rectangles.iterrows():
                         'metric_3':m3,
                         'metric_4':m4,
                         'metric_5':m5,
-                        'metric_6':m6,
-                        # 'metric_6_A':m6_A,
-                        # 'metric_6_B':m6_B,
+                        'metric_6':m6_B,
+                        'metric_6_A':m6_A,
+                        'metric_6_B':m6_B,
                         # 'metric_6_C':m6_C,
                         # 'metric_6_D':m6_D,
                         # 'metric_6_E':m6_E,
