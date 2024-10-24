@@ -14,11 +14,13 @@ import osmnx as ox
 import networkx as nx
 from shapely.geometry import mapping, Polygon
 from scipy.spatial import cKDTree
-from scipy.stats import t, sem
+from scipy.stats import t, sem, entropy
 from shapely.strtree import STRtree
 import os
 
 # DEFINE USEFUL FUNCTIONS
+
+plots_path = '../plots/pilot'
 
 def get_utm_zone(lon):
     return int((lon + 180) // 6) + 1
@@ -554,7 +556,7 @@ def save_azimuth_histograms(buildings_clipped, file_name ,output_dir='histogram_
     plt.savefig(os.path.join(output_dir, 'diff_'+file_name), dpi=300)
     plt.close()
 
-    print(f'Histograms saved in {output_dir}/')
+    #print(f'Histograms saved in {output_dir}/')
 
 
 def calculate_azimuth_diff(x,y):
@@ -569,94 +571,13 @@ def calculate_azimuth_diff(x,y):
         comp_list.append(np.abs(y - x))
     return min(comp_list)
 
-
-# Function to calculate the variogram
-def calculate_variogram(buildings_clipped, centroids, azimuths, n_lags=20):
-    tree = cKDTree(centroids)
-    distances, indices = tree.query(centroids, k=len(centroids))
-
-    azimuth_diffs = np.zeros_like(distances)
-
-    for i, row in enumerate(indices):
-        for j, idx in enumerate(row):
-            if i != idx:  # Skip the same building
-                azimuth_diffs[i, j] = calculate_azimuth_diff(azimuths[i], azimuths[idx])
-
-    max_dist = np.max(distances)
-    bin_edges = np.linspace(0, max_dist, num=n_lags + 1)
-    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-    binned_variances = np.zeros(n_lags)
-
-    for i in range(n_lags):
-        mask = (distances >= bin_edges[i]) & (distances < bin_edges[i + 1])
-        azimuth_diffs_in_bin = azimuth_diffs[mask]
-        if len(azimuth_diffs_in_bin) > 0:
-            binned_variances[i] = np.var(azimuth_diffs_in_bin)
-
-    return bin_centers, binned_variances
-
-# Function to calculate the Regularity Index
-def calculate_regularities(bin_centers, binned_variances):
-    sill = np.max(binned_variances)
-    sill_threshold = 0.95 * sill
-    range_idx = np.argmax(binned_variances >= sill_threshold)
-    range_ = bin_centers[range_idx] if range_idx < len(bin_centers) else np.max(bin_centers)
-    regularity_index = range_ / sill
-
-    return sill, range_, regularity_index
-
-# Main function ( existing function modified to integrate variogram and Regularity Index)
-def metric_6_homogeneity_of_building_azimuth(buildings_clipped, n_orientation_groups, rectangle_id):
-    # Step 1: Calculate azimuth for each building
-    buildings_clipped.loc[:, 'azimuth'] = buildings_clipped['geometry'].apply(lambda x: calculate_azimuth(longest_segment(x)) % 90.)
-
-    # Step 2: Create spatial index for the buildings
-    buildings_clipped['centroid'] = buildings_clipped.geometry.centroid
-    centroids = np.array(list(zip(buildings_clipped['centroid'].x, buildings_clipped['centroid'].y)))
-
-    # Use cKDTree for fast nearest neighbor search
-    tree = cKDTree(centroids)
-    distances, indices = tree.query(centroids, k=2)
-
-    # Step 3: Calculate azimuth difference with the nearest neighbor
-    buildings_clipped.loc[indices[:, 0], 'closest_azimuth'] = buildings_clipped.iloc[indices[:, 1]]['azimuth'].values
-
-    buildings_clipped.loc[indices[:, 0], 'azimuth_diff'] = buildings_clipped[['azimuth', 'closest_azimuth']].apply(
-        lambda row: calculate_azimuth_diff(row['azimuth'], row['closest_azimuth']), axis=1
-    )
-
-    # Store the ID of the closest building for plotting purposes
-    buildings_clipped.loc[indices[:, 0], 'closest_building_id'] = indices[:, 1]
-
-    # Step 4: Group buildings into orientation groups
-    cutoff_angles = [(x * 90. / (2 * n_orientation_groups)) for x in range(0, (2 * n_orientation_groups) + 1)]
-    labels = [1] + [i for i in range(2, n_orientation_groups + 1) for _ in (0, 1)] + [1]
-    buildings_clipped['azimuth_group'] = pd.cut(buildings_clipped['azimuth'], bins=cutoff_angles, labels=labels, ordered=False)
-
-    # Step 5: Calculate the variogram
-    azimuths = buildings_clipped['azimuth'].values
-    bin_centers, binned_variances = calculate_variogram(buildings_clipped, centroids, azimuths, n_lags=10)
-
-    # Plot the variogram
-    plt.plot(bin_centers, binned_variances, marker='o')
-    plt.xlabel('Distance between buildings')
-    plt.ylabel('Variance of azimuth differences')
-    plt.title('Directional Variogram of Azimuth Differences')
-    plt.grid(True)
-    plt.show()
-
-    # Step 6: Calculate the Regularity Index
-    sill, range_, regularity_index = calculate_regularities(bin_centers, binned_variances)
-
-    # Step 7: Output Regularity Index and store it for further analysis
-    print(f"Sill: {sill}")
-    print(f"Range: {range_}")
-    print(f"Regularity Index: {regularity_index}")
-
-    # Step 8: Call the plot function to visualize the results (existing part of your code)
-    plot_building_azimuths(buildings_clipped, save_path=f"./{str(rectangle_id)}_azimuth_plot_NEW_.png")
-
-    return regularity_index, buildings_clipped
+def calculate_azimuth_diff_no_mod(x,y):
+    diff = np.abs(y-x)
+    if diff >=45 :
+        true_angle = 90-diff
+    elif diff < 45:
+        true_angle = diff
+    return true_angle
 
 #6 Average building footprint orientation of the tile
 def metric_6_deviation_of_building_azimuth(buildings_clipped, n_orientation_groups,rectangle_id):
@@ -689,7 +610,7 @@ def metric_6_deviation_of_building_azimuth(buildings_clipped, n_orientation_grou
 
     # Step 5: Calculate the standard deviation of azimuth differences
     lb, ub = t.interval(1 - 0.05, df=len(buildings_clipped)-1, loc=np.mean(buildings_clipped['azimuth_diff']), scale=sem(buildings_clipped['azimuth_diff']))
-    m6 = np.std(buildings_clipped['azimuth'])#ub-lb #np.std(buildings_clipped['azimuth_diff']) #ub-lb  #np.std(buildings_clipped['azimuth_diff']) # 
+    m6 = np.mean(buildings_clipped['azimuth_diff'])#ub-lb #np.std(buildings_clipped['azimuth_diff']) #ub-lb  #np.std(buildings_clipped['azimuth_diff']) # 
 
     # Step 6: Call the plot function to visualize the results
     #plot_building_azimuths(buildings_clipped,save_path=f"./{str(rectangle_id)}_azimuth_plot_NEW_.png")
@@ -706,6 +627,102 @@ def metric_6_deviation_of_building_azimuth(buildings_clipped, n_orientation_grou
 
     # m6_A, m6_B, m6_C, m6_D, m6_E, 
     return m6, buildings_clipped
+
+
+#6 Average building footprint orientation of the tile
+def metric_6_deviation_of_building_azimuth_no_mod(buildings_clipped, n_orientation_groups,rectangle_id):
+    # Step 1: Calculate azimuth for each building
+    buildings_clipped.loc[:, 'azimuth'] = buildings_clipped['geometry'].apply(lambda x: calculate_azimuth(longest_segment(x)))
+
+    # Step 2: Create spatial index for the buildings
+    buildings_clipped['centroid'] = buildings_clipped.geometry.centroid
+    centroids = np.array(list(zip(buildings_clipped['centroid'].x, buildings_clipped['centroid'].y)))
+
+    # Use cKDTree for fast nearest neighbor search
+    tree = cKDTree(centroids)
+    distances, indices = tree.query(centroids, k=2)  # k=2 to get the nearest neighbor excluding itself
+
+    # Step 3: Calculate azimuth difference with the nearest neighbor
+    buildings_clipped.loc[indices[:, 0],'closest_azimuth'] = buildings_clipped.iloc[indices[:, 1]]['azimuth'].values
+
+
+    buildings_clipped.loc[indices[:, 0],'azimuth_diff'] = buildings_clipped[['azimuth', 'closest_azimuth']].apply(
+        lambda row: calculate_azimuth_diff_no_mod(row['azimuth'], row['closest_azimuth']), axis=1
+        )
+
+    # Store the ID of the closest building for plotting purposes
+    buildings_clipped.loc[indices[:, 0],'closest_building_id'] = indices[:, 1]
+
+    # Step 4: Group buildings into orientation groups
+    cutoff_angles = [(x * 90. / (2 * n_orientation_groups)) for x in range(0, (2 * n_orientation_groups) + 1)]
+    labels = [1] + [i for i in range(2, n_orientation_groups + 1) for _ in (0, 1)] + [1]
+    buildings_clipped['azimuth_group'] = pd.cut(buildings_clipped['azimuth'], bins=cutoff_angles, labels=labels, ordered=False)
+
+    # Step 5: Calculate the standard deviation of azimuth differences
+    m6 = np.mean(buildings_clipped['azimuth_diff'])#ub-lb #np.std(buildings_clipped['azimuth_diff']) #ub-lb  #np.std(buildings_clipped['azimuth_diff']) # 
+
+    # m6_A, m6_B, m6_C, m6_D, m6_E, 
+    return m6, buildings_clipped
+
+
+def metric_6_entropy_of_building_azimuth(buildings_clipped, rectangle_id, bin_width_degrees, plot=True):
+    """
+    Calculate the standardized KL divergence between the azimuth distribution
+    of buildings and a uniform distribution, with an option to plot the distributions.
+    
+    Parameters:
+    - buildings_clipped: DataFrame or GeoDataFrame with building geometries.
+                         It should contain azimuths (in degrees) for each building.
+    - bin_width_degrees: Width of the histogram bins in degrees (default is 10).
+    - plot: Whether to plot the two distributions (default is True).
+    
+    Returns:
+    - standardized_kl_divergence: KL divergence divided by log(n), where n is the number of bins.
+    """
+    # Extract azimuths (assuming they are in degrees)
+    azimuths = buildings_clipped['azimuth'].values
+
+    # Define the number of bins (e.g., 0-360 degrees, based on bin width)
+    num_bins = int(90 / bin_width_degrees)
+
+    # Create a histogram of azimuths (observed distribution P)
+    histogram, bin_edges = np.histogram(azimuths, bins=num_bins, range=(0, 90))
+    
+    # Normalize the histogram to make it a probability distribution P
+    P = histogram / histogram.sum()
+
+    # Create a uniform distribution Q with the same number of bins
+    Q = np.ones(num_bins) / num_bins
+
+    # Calculate the KL divergence
+    kl_divergence = entropy(P, Q)
+
+    # Standardize the KL divergence by dividing by log(n)
+    max_kl_divergence = np.log(num_bins)
+    standardized_kl_divergence = kl_divergence / max_kl_divergence
+
+    # Plot the two distributions if requested
+    if plot:
+        plt.figure(figsize=(10, 6))
+        bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2  # Get bin centers for plotting
+        
+        # Plot the observed distribution (P)
+        plt.bar(bin_centers, P, width=bin_width_degrees, alpha=0.6, label='Observed Azimuths (P)')
+        
+        # Plot the uniform distribution (Q)
+        plt.plot(bin_centers, Q, 'r--', linewidth=2, label='Uniform Distribution (Q)')
+
+        # Add plot details
+        plt.xlabel('Azimuth (degrees)')
+        plt.ylabel('Probability')
+        plt.title('Observed Azimuths vs. Uniform Distribution')
+        plt.legend(loc='upper right')
+        plt.grid(axis='y', linestyle='--', alpha=0.7)
+        #plt.show()
+        plt.savefig(f'{plots_path}/entropy_{str(bin_width_degrees)}-wide_bins_{rectangle_id}.png')
+
+    return standardized_kl_divergence, buildings_clipped
+
 
 #7 Average block width
 def metric_7_average_block_width(blocks_clipped, rectangle_projected, rectangle_area):
@@ -851,7 +868,6 @@ def metric_8_share_of_intersecting_buildings(blocks_clipped, buildings_clipped, 
     share_of_intersecting_buildings = []
     buildings_intersecting_buffer_all = []
     for block_id, block in blocks_clipped.iterrows():
-        print(block_id)
         block_area = block.area
         target_area = block_area*(1.-row_epsilon) 
         internal_buffer = get_internal_buffer_with_target_area(block, target_area)
@@ -863,7 +879,6 @@ def metric_8_share_of_intersecting_buildings(blocks_clipped, buildings_clipped, 
         internal_buffers.append(internal_buffer)
         #print(buildings_intersecting_buffer.geometry)
         if not buildings_intersecting_buffer.geometry.empty:
-            print(buildings_intersecting_buffer.geometry)
             buildings_intersecting_buffer_all.append(buildings_intersecting_buffer.geometry.values)
     internal_buffers = gpd.GeoDataFrame(geometry=internal_buffers).set_crs(utm_proj_rectangle)
     #buildings_intersecting_buffer_all = gpd.GeoDataFrame(geometry=buildings_intersecting_buffer_all).set_crs(utm_proj_rectangle)
