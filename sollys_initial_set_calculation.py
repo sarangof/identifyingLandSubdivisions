@@ -61,12 +61,14 @@ for rectangle_id, rectangle in rectangles.iterrows():
         OSM_roads = gpd.read_file(f"{roads_path}/OSM_roads_{rectangle_id}.gpkg").drop_duplicates(subset='geometry')
         roads = OSM_roads.to_crs(utm_proj_rectangle)
         roads_clipped = roads.clip(list(rectangle_projected.geometry.bounds.values[0]))
+        roads_intersection = roads[roads.geometry.intersects(bounding_box_geom)]
         road_union = roads.unary_union 
         OSM_roads_bool = True
     except fiona.errors.DriverError:
         OSM_roads = gpd.GeoDataFrame([])
         roads = gpd.GeoDataFrame([])
         roads_clipped = gpd.GeoDataFrame([])
+        roads_intersection = gpd.GeoDataFrame([]) 
         road_union = gpd.GeoDataFrame([])
         OSM_roads_bool = False
 
@@ -176,7 +178,7 @@ for rectangle_id, rectangle in rectangles.iterrows():
     if (not roads_clipped.empty):
         rectangle_projected_arg = rectangle_projected.geometry
         #m9, all_road_vertices = metric_9_tortuosity_index(rectangle_id, roads_clipped, OSM_intersections_clipped, rectangle_projected_arg, angular_threshold=30, tortuosity_tolerance=5)
-        m9 = metric_9_tortuosity_index(roads_clipped)
+        m9 = metric_9_tortuosity_index(roads_intersection)
         road_length = roads_clipped.length.sum()
     else:
         m9 = np.nan
