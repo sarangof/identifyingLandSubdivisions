@@ -121,7 +121,7 @@ for rectangle_id, rectangle in rectangles.iterrows():
 
     # Metrics 1, 2 and 3
     if (not roads_clipped.empty) and (not buildings_clipped.empty):
-        m1, buildings_clipped = metric_1_distance_less_than_10m(buildings_clipped, road_union, utm_proj_rectangle)
+        m1, buildings_clipped = metric_1_distance_less_than_20m(buildings_clipped, road_union, utm_proj_rectangle)
         m2 = metric_2_average_distance_to_roads(buildings_clipped)
         #plot_distance_to_roads(buildings_clipped, roads, rectangle_projected, rectangle_id)
         m3 = metric_3_road_density(rectangle_area,roads_clipped)
@@ -131,10 +131,10 @@ for rectangle_id, rectangle in rectangles.iterrows():
     # Metrics 4 and 5 
     if not OSM_intersections_clipped.empty:
         if ((4 in OSM_intersections_clipped['street_count'].values) or (3 in OSM_intersections_clipped['street_count'].values)):
-            m4 = metric_4_share_3_and_4way_intersections(OSM_intersections_clipped)
+            m4 = metric_4_share_4way_intersections(OSM_intersections_clipped)
         else:
             m4 = np.nan
-        m5 = metric_5_4way_intersections(OSM_intersections_clipped, rectangle_area)    
+        m5 = metric_5_intersection_density(OSM_intersections_clipped, rectangle_area)    
     else:
         m4, m5 = np.nan, np.nan
 
@@ -165,10 +165,7 @@ for rectangle_id, rectangle in rectangles.iterrows():
         m7, blocks_clipped = metric_7_average_block_width(blocks_clipped, rectangle_projected_arg, rectangle_area)
         #m7=np.nan
         #plot_largest_inscribed_circle(rectangle_id, rectangle_projected,  blocks_clipped, roads)
-        m8_A, internal_buffers = metric_8_two_row_blocks_old(blocks_clipped, buildings_clipped, utm_proj_rectangle, row_epsilon=row_epsilon)
-        m8_B, internal_buffers = metric_8_two_row_blocks(blocks_clipped, buildings_clipped, utm_proj_rectangle, row_epsilon=row_epsilon)
-        m8_C, internal_buffers = metric_8_share_of_intersecting_buildings(blocks_clipped, buildings_clipped, utm_proj_rectangle, row_epsilon=row_epsilon)
-        m8 = m8_A
+        m8, internal_buffers = metric_8_two_row_blocks(blocks_clipped, buildings, utm_proj_rectangle, row_epsilon=row_epsilon)
         
         #plot_two_row_blocks(rectangle_id, rectangle_projected, blocks_clipped, internal_buffers, buildings_clipped, roads, row_epsilon)
     else:
@@ -179,7 +176,7 @@ for rectangle_id, rectangle in rectangles.iterrows():
     if (not roads_clipped.empty):
         rectangle_projected_arg = rectangle_projected.geometry
         #m9, all_road_vertices = metric_9_tortuosity_index(rectangle_id, roads_clipped, OSM_intersections_clipped, rectangle_projected_arg, angular_threshold=30, tortuosity_tolerance=5)
-        m9 = metric_9_tortuosity_index_option_B(roads_clipped)
+        m9 = metric_9_tortuosity_index(roads_clipped)
         road_length = roads_clipped.length.sum()
     else:
         m9 = np.nan
@@ -205,9 +202,6 @@ for rectangle_id, rectangle in rectangles.iterrows():
                         # 'metric_6_D':m6_D,
                         # 'metric_6_E':m6_E,
                         'metric_7':m7,
-                        'metric_8_A':m8_A,
-                        'metric_8_B':m8_B,
-                        'metric_8_C':m8_C,
                         'metric_8':m8,
                         'metric_9':m9,
                         'metric_10':m10,

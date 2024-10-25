@@ -400,7 +400,7 @@ def get_internal_buffer_with_target_area(block, target_area, tolerance=1e-6):
     # Use fminbound to find the radius that minimizes the area difference
     optimal_radius = fminbound(objective_function, 0, max_radius, args=(block, target_area), xtol=tolerance)
     # Compute the internal buffer with the optimal radius
-    internal_buffer = block.geometry.difference(block.geometry.buffer(-optimal_radius))
+    internal_buffer = block.geometry.buffer(-optimal_radius)#block.geometry.difference(block.geometry.buffer(-optimal_radius))
     return internal_buffer
 
 # Inflection points
@@ -444,14 +444,14 @@ def get_inflection_points(roads,threshold):
     return inflection_gdf
 
 #1 Share of building footprints that are less than 10-meters away from the nearest road
-def metric_1_distance_less_than_10m(buildings, road_union, utm_proj_rectangle):
+def metric_1_distance_less_than_20m(buildings, road_union, utm_proj_rectangle):
     # Apply the distance calculation to each building
     #buildings.loc[:,'distance_to_road'] = buildings['geometry'].apply(lambda x: x.centroid).apply(calculate_minimum_distance_to_roads, 
     
     buildings_geometry_copy = buildings['geometry'].copy()
     buildings.loc[:,'distance_to_road'] = buildings_geometry_copy.apply(lambda x: calculate_minimum_distance_to_roads_option_B(x, road_union))
 
-    m1 = 1.*((sum(buildings['distance_to_road']<=10))/len(buildings))
+    m1 = 1.*((sum(buildings['distance_to_road']<=20))/len(buildings))
     return m1, gpd.GeoDataFrame(buildings)
 
 #2 Average distance of building footprint centroids to roads
@@ -468,15 +468,15 @@ def metric_3_road_density(rectangle_area,roads_clipped):
     return m3
 
 #4 Share of 3-way and 4-way intersections 
-def metric_4_share_3_and_4way_intersections(intersections):
-    n_intersections_3_and_4 = 1.*len(intersections[(intersections.street_count == 4)|(intersections.street_count == 3)])
+def metric_4_share_4way_intersections(intersections):
+    n_intersections_3_or_higher = 1.*len(intersections[(intersections.street_count >= 3)])
     n_4_way = 1.*len(intersections[(intersections.street_count == 4)])
-    m4 = (n_4_way / n_intersections_3_and_4)
+    m4 = (n_4_way / n_intersections_3_or_higher)
     return m4
 
 #5 Density of intersections
-def metric_5_4way_intersections(intersections, rectangle_area):
-    m5 = (1000.**2)*(len(intersections[(intersections.street_count == 4)])/rectangle_area) #(1000.**2)*(len(intersections[(intersections.street_count >= 3)])/rectangle_area)
+def metric_5_intersection_density(intersections, rectangle_area):
+    m5 = (1000.**2)*(len(intersections)/rectangle_area) #(1000.**2)*(len(intersections[(intersections.street_count >= 3)])/rectangle_area)
     return m5
 
 
@@ -782,110 +782,46 @@ def metric_7_average_block_width(blocks_clipped, rectangle_projected, rectangle_
         m7 = blocks_clipped['weighted_width'].sum()
     return m7, blocks_clipped
 
+
+def apply_internal_buffer(blocks_clipped, row_epsilon, tolerance=1e-6):
+    def process_block(row):
+        # Calculate the target area based on block area and row_epsilon
+        block_area = row.geometry.area
+        target_area = block_area * (1.0 - row_epsilon)
+
+        # Call the function for this specific block
+        internal_buffer = get_internal_buffer_with_target_area(row, target_area, tolerance)
+
+        return internal_buffer
+
+    # Apply the function to each row and store the results in a new column
+    blocks_clipped['internal_buffer'] = blocks_clipped.apply(process_block, axis=1)
+
+    return blocks_clipped
+
 #8 Two row blocks
-def metric_8_two_row_blocks_old(blocks_clipped, buildings_clipped, utm_proj_rectangle, row_epsilon):
-    internal_buffers = []
-    for block_id, block in blocks_clipped.iterrows():
-        block_area = block.area
-        #optimal_point, max_radius = get_largest_inscribed_circle(block)
-        target_area = block_area*(1.-row_epsilon)  # Set your target area
-        internal_buffer = get_internal_buffer_with_target_area(block, target_area)
-        #print(type(internal_buffer))
-        buildings_in_block = buildings_clipped.clip(block.geometry)
-        buildings_for_union = unary_union(buildings_in_block.geometry)
-        result_union = internal_buffer.union(buildings_for_union)
-        union_area = result_union.area
-        internal_buffer_area = internal_buffer.area  
+def metric_8_two_row_blocks(blocks_clipped, buildings, utm_proj_rectangle, row_epsilon):
+    
+    # Calculate share of buildings in blocks
+    buildings_in_blocks = buildings.clip(blocks_clipped.geometry)
+    buildings_in_blocks_area = buildings_in_blocks.area.sum()
+    blocks_area = blocks_clipped.area.sum()
+    building_to_block_share = buildings_in_blocks_area/blocks_area
 
-        internal_buffer = block.geometry.difference(internal_buffer)
-        buildings_intersecting_buffer = buildings_in_block[buildings_in_block.geometry.intersects(internal_buffer)]
-        buildings_intersecting_buffer_area = buildings_intersecting_buffer.area.sum()
-        buildings_area_all = buildings_in_block.area.sum()
-        buildings_inside_buffer_area = buildings_clipped.intersection(internal_buffer).area.sum()
-        internal_buffers.append(internal_buffer)
-        if buildings_intersecting_buffer_area > 0:
-            blocks_clipped.loc[block_id,'share_of_buildings_inside_buffer_intersection'] = buildings_inside_buffer_area/buildings_intersecting_buffer_area
-        else:
-            blocks_clipped.loc[block_id,'share_of_buildings_inside_buffer_intersection'] = np.nan
-        
-        if buildings_area_all > 0:
-            blocks_clipped.loc[block_id,'share_of_buildings_inside_buffer_all'] = buildings_inside_buffer_area/buildings_area_all
-        else:
-            blocks_clipped.loc[block_id,'share_of_buildings_inside_buffer_all'] = np.nan
-        #if union_area > internal_buffer_area:
-        #    blocks_clipped.loc[block_id,'buildings_outside_buffer'] = True
-        #elif union_area <= internal_buffer_area:
-        #    blocks_clipped.loc[block_id,'buildings_outside_buffer'] = False
-        #m8 = blocks_clipped['buildings_outside_buffer'].mean()
-    internal_buffers = gpd.GeoDataFrame(geometry=internal_buffers).set_crs(utm_proj_rectangle)
-    #m8 = blocks_clipped.share_of_buildings_inside_buffer_intersection.mean()
-    m8 = blocks_clipped.share_of_buildings_inside_buffer_all.mean()
+    # Calculate share of building footprints in internal buffer
+    blocks_clipped = apply_internal_buffer(blocks_clipped, row_epsilon)
+    internal_buffers = blocks_clipped.internal_buffer
+    buildings_in_buffers = buildings.clip(internal_buffers.geometry)
+    buildings_in_buffer_area = buildings_in_buffers.area.sum()
+    buffer_area = internal_buffers.area.sum()
+    building_to_buffer_share = buildings_in_buffer_area/buffer_area
+
+    #if building_to_block_share <= building_to_buffer_share:
+    #    m8 = 1
+    #else:
+    #    m8 = 1.-(building_to_buffer_share/building_to_block_share)
+    m8 = building_to_buffer_share/building_to_block_share 
     return m8, internal_buffers
-
-
-def metric_8_two_row_blocks(blocks_clipped, buildings_clipped, utm_proj_rectangle, row_epsilon):
-    internal_buffers = []
-    for block_id, block in blocks_clipped.iterrows():
-        block_area = block.area
-        #optimal_point, max_radius = get_largest_inscribed_circle(block)
-        target_area = block_area*(1.-row_epsilon)  # Set your target area
-        internal_buffer = get_internal_buffer_with_target_area(block, target_area)
-        #print(type(internal_buffer))
-        buildings_in_block = buildings_clipped.clip(block.geometry)
-        buildings_for_union = unary_union(buildings_in_block.geometry)
-        result_union = internal_buffer.union(buildings_for_union)
-        union_area = result_union.area
-        internal_buffer_area = internal_buffer.area  
-
-        internal_buffer = block.geometry.difference(internal_buffer)
-        buildings_intersecting_buffer = buildings_in_block[buildings_in_block.geometry.intersects(internal_buffer)]
-        buildings_intersecting_buffer_area = buildings_intersecting_buffer.area.sum()
-        buildings_area_all = buildings_in_block.area.sum()
-        buildings_inside_buffer_area = buildings_clipped.intersection(internal_buffer).area.sum()
-        internal_buffers.append(internal_buffer)
-        if buildings_intersecting_buffer_area > 0:
-            blocks_clipped.loc[block_id,'share_of_buildings_inside_buffer_intersection'] = buildings_inside_buffer_area/buildings_intersecting_buffer_area
-        else:
-            blocks_clipped.loc[block_id,'share_of_buildings_inside_buffer_intersection'] = np.nan
-        
-        if buildings_area_all > 0:
-            blocks_clipped.loc[block_id,'share_of_buildings_inside_buffer_all'] = buildings_inside_buffer_area/buildings_area_all
-        else:
-            blocks_clipped.loc[block_id,'share_of_buildings_inside_buffer_all'] = np.nan
-        #if union_area > internal_buffer_area:
-        #    blocks_clipped.loc[block_id,'buildings_outside_buffer'] = True
-        #elif union_area <= internal_buffer_area:
-        #    blocks_clipped.loc[block_id,'buildings_outside_buffer'] = False
-        #m8 = blocks_clipped['buildings_outside_buffer'].mean()
-    internal_buffers = gpd.GeoDataFrame(geometry=internal_buffers).set_crs(utm_proj_rectangle)
-    #m8 = blocks_clipped.share_of_buildings_inside_buffer_intersection.mean()
-    m8 = blocks_clipped.share_of_buildings_inside_buffer_intersection.mean()
-    return m8, internal_buffers
-
-
-def metric_8_share_of_intersecting_buildings(blocks_clipped, buildings_clipped, utm_proj_rectangle, row_epsilon):
-    internal_buffers = []
-    share_of_intersecting_buildings = []
-    buildings_intersecting_buffer_all = []
-    for block_id, block in blocks_clipped.iterrows():
-        block_area = block.area
-        target_area = block_area*(1.-row_epsilon) 
-        internal_buffer = get_internal_buffer_with_target_area(block, target_area)
-        internal_buffer = block.geometry.difference(internal_buffer)
-        buildings_in_block = buildings_clipped[buildings_clipped.geometry.intersects(block.geometry)]
-        buildings_intersecting_buffer = buildings_in_block[buildings_in_block.geometry.intersects(internal_buffer)]
-        if len(buildings_in_block)>0:
-            share_of_intersecting_buildings.append(len(buildings_intersecting_buffer) / len(buildings_in_block))
-        internal_buffers.append(internal_buffer)
-        #print(buildings_intersecting_buffer.geometry)
-        if not buildings_intersecting_buffer.geometry.empty:
-            buildings_intersecting_buffer_all.append(buildings_intersecting_buffer.geometry.values)
-    internal_buffers = gpd.GeoDataFrame(geometry=internal_buffers).set_crs(utm_proj_rectangle)
-    #buildings_intersecting_buffer_all = gpd.GeoDataFrame(geometry=buildings_intersecting_buffer_all).set_crs(utm_proj_rectangle)
-    m8 = np.mean(share_of_intersecting_buildings)
-    return m8, internal_buffers
-
-
 
 def visualize_tortuosity_comparison(roads_clipped, n_samples=5):
     fig, ax = plt.subplots(figsize=(10, 10))
@@ -975,8 +911,8 @@ def calculate_tortuosity(geometry):
         np.nan, np.nan
 
 
-
-def metric_9_tortuosity_index_option_B(roads_clipped):
+#9 Tortuosity index
+def metric_9_tortuosity_index(roads_clipped):
  
     # Apply the function to the entire geometry column in roads_clipped
     euclidean_distances,road_lengths = zip(*roads_clipped.geometry.apply(calculate_tortuosity))
@@ -988,136 +924,6 @@ def metric_9_tortuosity_index_option_B(roads_clipped):
     #visualize_tortuosity_comparison(roads_clipped,len(roads_clipped))
     #print(f'Metric 9: {str(m9)}')
     return m9
-
- 
-#9 Tortuosity index
-def metric_9_tortuosity_index(rectangle_id, roads_clipped, intersections, rectangle_projected, angular_threshold, tortuosity_tolerance):
-
-    # Calculate hypotenuse of the rectangle
-    rectangle_projected_gdf = gpd.GeoSeries(rectangle_projected)
-    rectangle_bounds = rectangle_projected_gdf.bounds
-    width = rectangle_bounds['maxx'] - rectangle_bounds['minx']
-    height = rectangle_bounds['maxy'] - rectangle_bounds['miny']
-    rectangle_hypotenuse = math.sqrt(width.iloc[0]**2 + height.iloc[0]**2)
-    distance_threshold = 0.75 * rectangle_hypotenuse  # 75% of the hypotenuse
-
-    inflection_points_gdf = get_inflection_points(roads_clipped, angular_threshold)
-
-    ### This part is about boundary vertices
-
-    rectangle_boundary = rectangle_projected_gdf.geometry.unary_union.boundary
-    roads_union = roads_clipped.geometry.unary_union
-    intersection_result = roads_union.intersection(rectangle_boundary)
-    boundary_intersection_points = []
-
-    if intersection_result.is_empty:
-        print("No intersections found.")
-    else:
-        # Handle MultiPoint
-        if intersection_result.geom_type == 'MultiPoint':
-            boundary_intersection_points.extend([point for point in intersection_result.geoms])
-        # Handle LineString or MultiLineString
-        elif intersection_result.geom_type in ['LineString', 'MultiLineString']:
-            for line in intersection_result.geoms:
-                boundary_intersection_points.extend([Point(coord) for coord in line.coords])
-
-    # Convert to GeoDataFrame
-    boundary_intersection_points_gdf = gpd.GeoDataFrame(geometry=boundary_intersection_points)
-    boundary_intersection_points_gdf['point_type'] = 'boundary intersection'
-
-    all_road_vertices = pd.concat([inflection_points_gdf, intersections, boundary_intersection_points_gdf], ignore_index=True)
-    all_road_vertices.point_type = all_road_vertices.point_type.fillna('inflection point')
-
-    # Handle intersections
-    all_road_vertices.loc[all_road_vertices.geometry.isin(intersections.geometry), 'point_type'] = 'intersection'
-    all_road_vertices = all_road_vertices.drop_duplicates(subset='geometry', keep='last')
-
-    if not all_road_vertices.empty:
-        all_road_vertices = all_road_vertices.set_geometry('geometry')
-        all_road_vertices.set_crs(roads_clipped.crs, inplace=True)
-
-        # Create a graph
-        G = nx.Graph()
-
-        # Add nodes
-        for idx, point in all_road_vertices.iterrows():
-            G.add_node(idx, geometry=point.geometry)
-
-        # Add edges based on proximity
-        for i in range(len(all_road_vertices)):
-            for j in range(i + 1, len(all_road_vertices)):
-                point_A = all_road_vertices.iloc[i].geometry
-                point_B = all_road_vertices.iloc[j].geometry
-                
-                # Find the nearest points on the road network for A and B
-                nearest_A = nearest_points(roads_clipped.unary_union, point_A)[0]
-                nearest_B = nearest_points(roads_clipped.unary_union, point_B)[0]
-
-                # Calculate road network distance
-                road_network_distance = roads_clipped.geometry.length.loc[
-                    roads_clipped.intersects(nearest_A.buffer(1e-6)) & roads_clipped.intersects(nearest_B.buffer(1e-6))
-                ].min()
-
-                # Handle NaN values
-                if np.isnan(road_network_distance):
-                    road_network_distance = 1e6  # Arbitrary large number
-
-                # Calculate Euclidean distance
-                euclidean_distance = point_A.distance(point_B)
-
-                # Apply the distance threshold for the road network
-                if euclidean_distance < distance_threshold:
-                    # Add edge to the graph
-                    G.add_edge(i, j, weight=road_network_distance)
-
-        # Find the minimum spanning tree
-        mst = nx.minimum_spanning_tree(G)
-        ordered_indices = list(nx.dfs_preorder_nodes(mst, source=0))  # Starting from the first point
-        ordered_vertices = all_road_vertices.iloc[ordered_indices].reset_index(drop=True)
-
-        # Initialize lists to store distances
-        euclidean_distances = []
-        road_network_distances = []
-        indices_to_keep = []
-
-        # Iterate through contiguous points
-        for i in range(len(ordered_vertices) - 1):
-            point_A = ordered_vertices.iloc[i].geometry
-            point_B = ordered_vertices.iloc[i + 1].geometry
-
-            # Calculate the straight-line Euclidean distance
-            euclidean_distance = point_A.distance(point_B)
-
-            # Find the nearest points on the road network for A and B
-            nearest_A = nearest_points(roads_clipped.unary_union, point_A)[0]
-            nearest_B = nearest_points(roads_clipped.unary_union, point_B)[0]
-
-            # Calculate road network distance
-            road_network_distance = roads_clipped.geometry.length.loc[
-                roads_clipped.intersects(nearest_A.buffer(1e-6)) & roads_clipped.intersects(nearest_B.buffer(1e-6))
-            ].min()
-
-            if road_network_distance > tortuosity_tolerance and euclidean_distance < distance_threshold:
-                euclidean_distances.append(euclidean_distance)
-                road_network_distances.append(road_network_distance)
-                indices_to_keep.append(i)
-
-        # Combine the results into a DataFrame
-        distance_comparison = pd.DataFrame({
-            'Point_A': ordered_vertices.geometry[:-1].reset_index(drop=True).iloc[indices_to_keep],
-            'Point_B': ordered_vertices.geometry[1:].reset_index(drop=True).iloc[indices_to_keep],
-            'Euclidean_Distance': euclidean_distances,
-            'Road_Network_Distance': road_network_distances
-        })
-
-        # Calculate tortuosity index (mean ratio)
-        m9 = (distance_comparison['Euclidean_Distance'] / distance_comparison['Road_Network_Distance']).mean()
-        #visualize_tortuosity(rectangle_id, angular_threshold, tortuosity_tolerance, roads_clipped, all_road_vertices, mst, distance_comparison)
-        #print(m9)
-    else:
-        m9 = np.nan
-
-    return m9, all_road_vertices
 
 #10 Average angle between road segments
 def metric_10_average_angle_between_road_segments(intersections, roads):
