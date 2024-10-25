@@ -1,22 +1,17 @@
 # Imports
-from shapely.ops import nearest_points
-import geopandas as gpd
-import pyproj
-from shapely.geometry import Polygon, LineString, Point, MultiPolygon, MultiLineString, GeometryCollection
-from shapely.ops import transform, polygonize, unary_union
-from scipy.optimize import fminbound, minimize
-import matplotlib.pyplot as plt
-from pyproj import Geod
-import math
+import os
 import numpy as np
 import pandas as pd
-import osmnx as ox
-import networkx as nx
-from shapely.geometry import mapping, Polygon
+import geopandas as gpd
+from pyproj import Geod, Transformer
+import matplotlib.pyplot as plt
+from math import atan2, degrees
+from shapely.geometry import Polygon, LineString, Point, MultiPolygon, MultiLineString, GeometryCollection
+from shapely.ops import polygonize, nearest_points
+from shapely.strtree import STRtree
+from scipy.optimize import fminbound, minimize
 from scipy.spatial import cKDTree
 from scipy.stats import t, sem, entropy
-from shapely.strtree import STRtree
-import os
 
 # DEFINE USEFUL FUNCTIONS
 
@@ -34,7 +29,7 @@ def get_utm_proj(lon, lat):
 def degrees_to_meters(distance_in_degrees, utm_proj_rectangle):
     
     # Create transformers for a small unit distance in degrees (1 degree) to meters
-    transformer = pyproj.Transformer.from_crs("EPSG:4326", utm_proj_rectangle, always_xy=True)
+    transformer = Transformer.from_crs("EPSG:4326", utm_proj_rectangle, always_xy=True)
     
     # Convert 1 degree distance to meters (latitude = 0 -- assume small distance near the UTM zone)
     lon1, lat1 = 0, 0
@@ -311,10 +306,10 @@ def calculate_azimuth(segment):
     delta_y = end_point[1] - start_point[1]
     
     # Calculate the azimuth in radians
-    azimuth_rad = math.atan2(delta_x, delta_y)
+    azimuth_rad = atan2(delta_x, delta_y)
     
     # Convert the azimuth to degrees
-    azimuth_deg = math.degrees(azimuth_rad)
+    azimuth_deg = degrees(azimuth_rad)
     
     # Normalize the azimuth to be within 0 to 360 degrees
     azimuth_deg = (azimuth_deg + 360) % 360
@@ -944,7 +939,7 @@ def metric_10_average_angle_between_road_segments(intersections, roads):
     to_keep_4_or_more.index.names = ['index']
     to_keep_df = pd.concat([to_keep_3,to_keep_4_or_more])
     if not to_keep_df.empty:
-        m10 = np.std(np.abs(90. - to_keep_df['Angle']))
+        m10 = np.mean(np.abs(90. - to_keep_df['Angle']))
     else:
         m10 = np.nan
     return m10
