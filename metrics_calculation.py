@@ -936,13 +936,13 @@ def metric_10_average_angle_between_road_segments(intersections, roads):
     else:
         to_keep_3 = pd.DataFrame([])
     # In 4-way intersections, include only the two smallest angles in the tile average.
-    df_4_way = intersection_angles_df[intersection_angles_df.street_count==4]
-    if not df_4_way.empty:
-        to_keep_4 = df_4_way.groupby(df_4_way.index).apply(lambda x: x.nsmallest(2, 'Angle')).reset_index(drop=True)   
+    df_4_way_or_more = intersection_angles_df[intersection_angles_df.street_count>=4]
+    if not df_4_way_or_more.empty:
+        to_keep_4_or_more = df_4_way_or_more.groupby(df_4_way_or_more.index).apply(lambda x: x.nsmallest(2, 'Angle')).reset_index(drop=True)   
     else:
-        to_keep_4 = pd.DataFrame([])
-    to_keep_4.index.names = ['index']
-    to_keep_df = pd.concat([to_keep_3,to_keep_4])
+        to_keep_4_or_more = pd.DataFrame([])
+    to_keep_4_or_more.index.names = ['index']
+    to_keep_df = pd.concat([to_keep_3,to_keep_4_or_more])
     if not to_keep_df.empty:
         m10 = np.std(np.abs(90. - to_keep_df['Angle']))
     else:
