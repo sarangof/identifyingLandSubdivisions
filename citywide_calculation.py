@@ -175,7 +175,7 @@ def process_cell(cell_id, rectangle_projected):
 
         if (not buildings_clipped.empty):
             # Metric 1 -- share of buildings closer than 10 ms from the road
-            m1, buildings_clipped = metric_1_distance_less_than_10m(buildings_clipped, road_union, utm_proj_city)
+            m1, buildings_clipped = metric_1_distance_less_than_20m(buildings_clipped, road_union, utm_proj_city)
             
             # Metric 2 -- average distance to roads
             m2 = metric_2_average_distance_to_roads(buildings_clipped)
@@ -193,10 +193,10 @@ def process_cell(cell_id, rectangle_projected):
         # Metrics 4 and 5 -- share of 3 and 4-way intersections
         if not OSM_intersections.empty:
             if ((4 in OSM_intersections['street_count'].values) or (3 in OSM_intersections['street_count'].values)):
-                m4 = metric_4_share_3_and_4way_intersections(OSM_intersections)
+                m4 = metric_4_share_4way_intersections(OSM_intersections)
             else:
                 m4 = np.nan
-            m5 = metric_5_4way_intersections(OSM_intersections, rectangle_area)    
+            m5 = metric_5_intersection_density(OSM_intersections, rectangle_area)    
         else:
             m4, m5 = np.nan, np.nan
 
