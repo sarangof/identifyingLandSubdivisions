@@ -1,4 +1,5 @@
 from metrics_calculation import *
+from standardize_metrics import *
 from create_rectangles import *
 #from gather_data_pilot import *
 from metric_plots import *
@@ -42,6 +43,8 @@ for rectangle_id, rectangle in rectangles.iterrows():
     geometry = gpd.GeoSeries(rectangle['geometry'])
     rectangle_projected = gpd.GeoDataFrame({'geometry': geometry}, crs="EPSG:4326").to_crs(epsg=CRS.from_proj4(utm_proj_rectangle).to_epsg())
     rectangle_area = calculate_area_geodesic(rectangle)
+    bounding_box = rectangle_projected.bounds.values[0]
+    bounding_box_geom = box(*bounding_box)
 
     # Read buildings, roads and intersections data
 
@@ -95,8 +98,6 @@ for rectangle_id, rectangle in rectangles.iterrows():
         Overture_buildings_bool = False
 
     buildings = gpd.GeoDataFrame(pd.concat([buildings_OSM, Overture_data], axis=0, ignore_index=True, join='outer')).drop_duplicates('geometry').to_crs(utm_proj_rectangle).dropna(how='all')
-    bounding_box = rectangle_projected.bounds.values[0]
-    bounding_box_geom = box(*bounding_box)
     try:
         buildings_clipped = buildings[buildings.geometry.intersects(bounding_box_geom)]
         #buildings_clipped = buildings_clipped.reset_index()
@@ -144,7 +145,7 @@ for rectangle_id, rectangle in rectangles.iterrows():
     if not buildings_clipped.empty:
         n_orientation_groups = 4
         m6_A, buildings_clipped = metric_6_deviation_of_building_azimuth(buildings_clipped, n_orientation_groups, rectangle_id)
-        m6_B, buildings_clipped = metric_6_entropy_of_building_azimuth(buildings_clipped, rectangle_id, bin_width_degrees=5, plot=True)
+        m6_B, buildings_clipped = metric_6_entropy_of_building_azimuth(buildings_clipped, rectangle_id, bin_width_degrees=5, plot=False)
         #m6_A, m6_B, m6_C, m6_D, m6_E, 
         #m6_B, buildings_clipped = metric_6_homogeneity_of_building_azimuth(buildings_clipped, n_orientation_groups, rectangle_id)
         #m6_B = np.nan
@@ -230,27 +231,12 @@ all_metrics_columns = ['metric_1','metric_2','metric_3','metric_4','metric_5','m
 metrics_original_names = [col+'_original' for col in all_metrics_columns]
 final_geo_df[metrics_original_names] = final_geo_df[all_metrics_columns].copy()
 
-# Center at zero and maximize information
-final_geo_df.loc[:,all_metrics_columns] = (
-    final_geo_df[all_metrics_columns]
-    .apply(lambda x: (x - x.mean()) / (x.std()), axis=0)
-)
-
-# Convert metrics to a range between 0 and 1
-final_geo_df.loc[:,all_metrics_columns] = (
-    final_geo_df[all_metrics_columns]
-    .apply(lambda x: (x - x.min()) / (x.max()-x.min()), axis=0)
-)
-
-# Invert metrics with directions that are opposite to the index meaning
-not_inverted_metrics = ['metric_2','metric_6','metric_7','metric_8']
-metrics_to_invert = [col for col in all_metrics_columns if col not in not_inverted_metrics]
-metrics_to_invert_names = [col+'_before_invert' for col in all_metrics_columns if col not in not_inverted_metrics]
-final_geo_df[metrics_to_invert_names] = final_geo_df[metrics_to_invert].copy()
-final_geo_df[metrics_to_invert] = final_geo_df[metrics_to_invert].apply(lambda x: 1-x, axis=0)
+# Apply the standardization functions
+for metric, func in standardization_functions.items():
+    final_geo_df[metric] = func(final_geo_df[metric])
 
 # Calculate equal-weights irregularity index
-final_geo_df['irregularity_index'] = final_geo_df[all_metrics_columns].mean(axis=1)
+final_geo_df['regularity_index'] = final_geo_df[all_metrics_columns].mean(axis=1)
 
 # Save output file
 cols_to_save = [col for col in final_geo_df.columns if col!='geometry']
