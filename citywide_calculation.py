@@ -142,10 +142,12 @@ def process_cell(cell_id, rectangle_projected):
 
         try:
             roads_clipped = OSM_roads_all_projected[OSM_roads_all_projected.geometry.intersects(bounding_box_geom)]
+            roads_intersection = OSM_roads_all_projected[OSM_roads_all_projected.geometry.intersects(bounding_box_geom)]
             OSM_roads_bool = True
         except fiona.errors.DriverError:
             roads_clipped = gpd.GeoDataFrame([])
             OSM_roads_all = gpd.GeoDataFrame([])
+            roads_intersection = gpd.GeoDataFrame([])
             OSM_roads_bool = False
 
 
@@ -237,7 +239,7 @@ def process_cell(cell_id, rectangle_projected):
         
         if (not roads_clipped.empty) and (not OSM_intersections.empty):
             # Metric 9 -- tortuosity index
-            m9, all_road_vertices = metric_9_tortuosity_index(city_name, roads_clipped, OSM_intersections, rectangle_projected, angular_threshold=30, tortuosity_tolerance=5)
+            m9, all_road_vertices = metric_9_tortuosity_index(city_name, roads_intersection, OSM_intersections, rectangle_projected, angular_threshold=30, tortuosity_tolerance=5)
                                                             
             # Metric 10 -- average angle between road segments
             m10 = metric_10_average_angle_between_road_segments(OSM_intersections, roads_clipped) #OJO, ROADS EXPANDED
