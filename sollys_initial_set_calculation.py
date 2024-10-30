@@ -124,7 +124,7 @@ for rectangle_id, rectangle in rectangles.iterrows():
 
     # Metrics 1, 2 and 3
     if (not roads_clipped.empty) and (not buildings_clipped.empty):
-        m1, buildings_clipped = metric_1_distance_less_than_20m(buildings_clipped, road_union, utm_proj_rectangle)
+        m1, buildings_clipped = metric_1_distance_less_than_10m(buildings_clipped, road_union, utm_proj_rectangle)
         m2 = metric_2_average_distance_to_roads(buildings_clipped)
         #plot_distance_to_roads(buildings_clipped, roads, rectangle_projected, rectangle_id)
         m3 = metric_3_road_density(rectangle_area,roads_clipped)
@@ -187,7 +187,7 @@ for rectangle_id, rectangle in rectangles.iterrows():
 
     # Metric 10 -- average angle between road segments
     if (not OSM_intersections_clipped.empty) and ((not roads.empty)):                                               
-        m10 = metric_10_average_angle_between_road_segments(OSM_intersections_clipped, roads)
+        m10 = metric_10_average_angle_between_road_segments(OSM_intersections, roads)
         #plot_inflection_points(rectangle_id, rectangle_projected, all_road_vertices, roads)
     else:
         m10 = np.nan
