@@ -17,6 +17,17 @@ from scipy.stats import t, sem, entropy
 
 plots_path = '../plots/pilot'
 
+# Block polygons
+def get_blocks(road_union, roads):
+    # Use polygonize to create polygons from the merged lines
+    blocks = list(polygonize(road_union))
+    blocks_gdf = gpd.GeoDataFrame(geometry=blocks, crs=roads.crs)
+    # Filter out very small polygons if necessary
+    blocks_gdf = blocks_gdf[blocks_gdf.area > 9]
+    blocks_gdf.loc[:,'area'] = blocks_gdf.area
+    #blocks_gdf.to_file("blocks_tile1.gpkg", driver="GPKG")
+    return blocks_gdf.sort_values('area')
+
 def get_utm_zone(lon):
     return int((lon + 180) // 6) + 1
 
@@ -91,7 +102,6 @@ def calculate_minimum_distance_to_roads_option_B(building, road_union):
     else:
         raise TypeError(f"Unsupported geometry type: {type(building)}")
 
-
 # Function to calculate the angle between two vectors
 def calculate_angle(vector1, vector2):
     angle = np.arctan2(vector2[1], vector2[0]) - np.arctan2(vector1[1], vector1[0])
@@ -99,7 +109,6 @@ def calculate_angle(vector1, vector2):
     if angle < 0:
         angle += 360
     return angle
-
 
 def extract_coords(geometry):
     if isinstance(geometry, (LineString, Polygon)):
@@ -113,8 +122,6 @@ def extract_coords(geometry):
         return coords
     else:
         raise TypeError(f"Unsupported geometry type: {type(geometry)}")
-
-
 
 def calculate_sequential_angles_option_A(intersections, roads):
     records = []  # List to store angle records
@@ -161,8 +168,6 @@ def calculate_sequential_angles_option_A(intersections, roads):
     df_angles = pd.DataFrame(records)
     
     return df_angles
-
-
 
 def calculate_sequential_angles(intersections, roads):
     records = []  # List to store angle records
@@ -223,20 +228,6 @@ def calculate_sequential_angles(intersections, roads):
     df_angles = pd.DataFrame(records)
     
     return df_angles
-
-
-
-# Block polygons
-
-def get_blocks(road_union, roads):
-    # Use polygonize to create polygons from the merged lines
-    blocks = list(polygonize(road_union))
-    blocks_gdf = gpd.GeoDataFrame(geometry=blocks, crs=roads.crs)
-    # Filter out very small polygons if necessary
-    blocks_gdf = blocks_gdf[blocks_gdf.area > 9]
-    blocks_gdf.loc[:,'area'] = blocks_gdf.area
-    #blocks_gdf.to_file("blocks_tile1.gpkg", driver="GPKG")
-    return blocks_gdf.sort_values('area')
 
 def longest_segment_option_A(geometry):
     # Flatten geometry by extracting all Polygon components from MultiPolygon or Polygon
@@ -321,7 +312,6 @@ def get_largest_inscribed_circle(block):
     polygon = block
     # Initial guess: the centroid of the polygon
     centroid = polygon.geometry.centroid
-
     if not polygon.geometry.contains(centroid):
     #if not polygon.geometry.iloc[0].contains(centroid).values[0]:
         # If centroid is outside, find an interior point as an alternative starting point
@@ -330,7 +320,6 @@ def get_largest_inscribed_circle(block):
     else:
         initial_guess = [centroid.x, centroid.y]
         #initial_guess = [centroid.x[0], centroid.y[0]]
-
     # Calculate negative radius to maximize
     def negative_radius(point_coords):
         point = Point(point_coords)
@@ -398,55 +387,15 @@ def get_internal_buffer_with_target_area(block, target_area, tolerance=1e-6):
     internal_buffer = block.geometry.buffer(-optimal_radius)#block.geometry.difference(block.geometry.buffer(-optimal_radius))
     return internal_buffer
 
-# Inflection points
-def get_inflection_points(roads,threshold):
-    inflection_gdf = gpd.GeoDataFrame({'geometry':[],'angle':[]})
-    for row in roads.iterfeatures():
-        line = row['geometry']
-        inflection_points = []
-        angles = []
-        coords = list(line['coordinates'])
-        for i in range(1, len(coords) - 1):
-            p1 = np.array(coords[i - 1])
-            p2 = np.array(coords[i])
-            p3 = np.array(coords[i + 1])
-
-            # Calculate angle between the segments
-            v1 = p2 - p1
-            v2 = p3 - p2
-
-            angle1 = np.arctan2(v1[1], v1[0])
-            angle2 = np.arctan2(v2[1], v2[0])
-
-            # Calculate the difference and convert to degrees
-            angle_diff = np.degrees(np.abs(angle2 - angle1))
-            angle_diff = np.mod(angle_diff, 360)
-
-            # Normalize the angle difference to [0, 180] degrees
-            if angle_diff > 180:
-                angle_diff = 360 - angle_diff
-
-            # Store significant changes (e.g., greater than 10 degrees)
-            if angle_diff > threshold:  
-                inflection_points.append(Point(p2))
-                angles.append(angle_diff)
-        inflection_dict = gpd.GeoDataFrame({
-            'geometry': inflection_points,
-            'angle': angles
-        })
-        if len(inflection_points)>0:
-            inflection_gdf = pd.concat([inflection_gdf,inflection_dict])
-    return inflection_gdf
-
 #1 Share of building footprints that are less than 10-meters away from the nearest road
-def metric_1_distance_less_than_20m(buildings, road_union, utm_proj_rectangle):
+def metric_1_distance_less_than_10m(buildings, road_union, utm_proj_rectangle):
     # Apply the distance calculation to each building
     #buildings.loc[:,'distance_to_road'] = buildings['geometry'].apply(lambda x: x.centroid).apply(calculate_minimum_distance_to_roads, 
     
     buildings_geometry_copy = buildings['geometry'].copy()
     buildings.loc[:,'distance_to_road'] = buildings_geometry_copy.apply(lambda x: calculate_minimum_distance_to_roads_option_B(x, road_union))
 
-    m1 = 1.*((sum(buildings['distance_to_road']<=20))/len(buildings))
+    m1 = 1.*((sum(buildings['distance_to_road']<=10))/len(buildings))
     return m1, gpd.GeoDataFrame(buildings)
 
 #2 Average distance of building footprint centroids to roads
@@ -473,7 +422,6 @@ def metric_4_share_4way_intersections(intersections):
 def metric_5_intersection_density(intersections, rectangle_area):
     m5 = (1000.**2)*(len(intersections)/rectangle_area) #(1000.**2)*(len(intersections[(intersections.street_count >= 3)])/rectangle_area)
     return m5
-
 
 def plot_building_azimuths(buildings_clipped, save_path):
     fig, ax = plt.subplots(figsize=(20, 16))
@@ -506,8 +454,6 @@ def plot_building_azimuths(buildings_clipped, save_path):
     plt.savefig(save_path, dpi=400, bbox_inches='tight')  # Save with high DPI (300) and tight layout
 
     #plt.show()
-
-
 
 def save_azimuth_histograms(buildings_clipped, file_name ,output_dir='histogram_plots'):
     """
@@ -552,7 +498,6 @@ def save_azimuth_histograms(buildings_clipped, file_name ,output_dir='histogram_
     plt.close()
 
     #print(f'Histograms saved in {output_dir}/')
-
 
 def calculate_azimuth_diff(x,y):
     comp_list = [np.abs(y-x)]
@@ -623,7 +568,6 @@ def metric_6_deviation_of_building_azimuth(buildings_clipped, n_orientation_grou
     # m6_A, m6_B, m6_C, m6_D, m6_E, 
     return m6, buildings_clipped
 
-
 #6 Average building footprint orientation of the tile
 def metric_6_deviation_of_building_azimuth_no_mod(buildings_clipped, n_orientation_groups,rectangle_id):
     # Step 1: Calculate azimuth for each building
@@ -658,7 +602,6 @@ def metric_6_deviation_of_building_azimuth_no_mod(buildings_clipped, n_orientati
 
     # m6_A, m6_B, m6_C, m6_D, m6_E, 
     return m6, buildings_clipped
-
 
 def metric_6_entropy_of_building_azimuth(buildings_clipped, rectangle_id, bin_width_degrees, plot=True):
     """
@@ -718,7 +661,6 @@ def metric_6_entropy_of_building_azimuth(buildings_clipped, rectangle_id, bin_wi
 
     return standardized_kl_divergence, buildings_clipped
 
-
 #7 Average block width
 def metric_7_average_block_width(blocks_clipped, rectangle_projected, rectangle_area):
 #blocks_clipped, rectangle_projected_arg, rectangle_area
@@ -776,7 +718,6 @@ def metric_7_average_block_width(blocks_clipped, rectangle_projected, rectangle_
     else:
         m7 = blocks_clipped['weighted_width'].sum()
     return m7, blocks_clipped
-
 
 def apply_internal_buffer(blocks_clipped, row_epsilon, tolerance=1e-6):
     def process_block(row):
@@ -873,7 +814,6 @@ def visualize_tortuosity_comparison(roads_clipped, n_samples=5):
     
     plt.show()
 
-
 def calculate_tortuosity(geometry):
     road_lengths = []
     euclidean_distances = []
@@ -905,7 +845,6 @@ def calculate_tortuosity(geometry):
     else:
         np.nan, np.nan
 
-
 #9 Tortuosity index
 def metric_9_tortuosity_index(roads_clipped):
  
@@ -922,6 +861,7 @@ def metric_9_tortuosity_index(roads_clipped):
 
 #10 Average angle between road segments
 def metric_10_average_angle_between_road_segments(intersections, roads):
+
     df_angles = calculate_sequential_angles_option_A(intersections, roads)
     intersection_angles_df = intersections[['osmid','street_count']].set_index('osmid').merge(df_angles.set_index('Intersection ID'),left_index=True,right_index=True,how='outer')
     # In 3-way intersections, include only the smallest angle in the tile average. 
@@ -943,3 +883,4 @@ def metric_10_average_angle_between_road_segments(intersections, roads):
     else:
         m10 = np.nan
     return m10
+
