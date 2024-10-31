@@ -144,19 +144,11 @@ for rectangle_id, rectangle in rectangles.iterrows():
     # Metric 6 -- building azimuth
     if not buildings_clipped.empty:
         n_orientation_groups = 4
-        m6_B, buildings_clipped = metric_6_entropy_of_building_azimuth(buildings_clipped, rectangle_id, bin_width_degrees=5, plot=False)
+        m6, buildings_clipped = metric_6_entropy_of_building_azimuth(buildings_clipped, rectangle_id, bin_width_degrees=5, plot=False)
         #plot_azimuth(buildings_clipped, roads, rectangle_projected, rectangle_id, n_orientation_groups)
-
-        # Calculate relevant building metrics, making use of the if statement.
-        n_buildings = len(buildings_clipped)
-        building_area = buildings_clipped.area.sum()
-        building_density = (1000.*1000*n_buildings)/rectangle_area
-        built_share = building_area/rectangle_area
-        average_building_area = building_area / n_buildings 
     else:
         m6 = np.nan
-        n_buildings = np.nan
-        m6_A, m6_B, m6_C, m6_D, m6_E = np.nan, np.nan, np.nan, np.nan, np.nan
+
 
     # Metrics 7 and 8
     if not blocks_clipped.empty:
@@ -187,6 +179,20 @@ for rectangle_id, rectangle in rectangles.iterrows():
         #plot_inflection_points(rectangle_id, rectangle_projected, all_road_vertices, roads)
     else:
         m10 = np.nan
+    
+    # Metrics 11 and 12
+    if not buildings_clipped.empty:
+        # Calculate relevant building metrics, making use of the if statement.
+        n_buildings = len(buildings_clipped)
+        building_area = buildings_clipped.area.sum()
+        average_building_area = building_area / n_buildings 
+        m11 = metric_11_building_density(n_buildings,rectangle_area)
+        m12 = metric_12_building_area_share(building_area,rectangle_area)
+    else:
+        n_buildings = np.nan
+        building_area = np.nan
+        average_building_area = np.nan
+        m11, m12 = np.nan, np.nan
 
     metrics_pilot.append({'index':rectangle_id,
                         'metric_1':m1,
@@ -199,16 +205,16 @@ for rectangle_id, rectangle in rectangles.iterrows():
                         'metric_8':m8,
                         'metric_9':m9,
                         'metric_10':m10,
+                        'metric_11':m11,
+                        'metric_12':m12,
                         'OSM_buildings_available':OSM_buildings_bool,
                         'OSM_intersections_available':OSM_intersections_bool,
                         'OSM_roads_available':OSM_roads_bool,
                         'Overture_buildings_available':Overture_buildings_bool,
                         'rectangle_area': rectangle_area,
                         'building_area':building_area,
-                        'building_density':building_density,
                         'average_building_area':average_building_area,
                         'share_tiled_by_blocks': share_tiled_by_blocks,
-                        'built_share':built_share,
                         'road_length':road_length,
                         'n_intersections':len(OSM_intersections_clipped.drop_duplicates('osmid')),
                         'n_buildings':n_buildings
@@ -216,7 +222,7 @@ for rectangle_id, rectangle in rectangles.iterrows():
 
 metrics_pilot = pd.DataFrame(metrics_pilot)
 final_geo_df = gpd.GeoDataFrame(pd.merge(rectangles, metrics_pilot, how='left', left_on='n', right_on='index'), geometry=rectangles.geometry)
-all_metrics_columns = ['metric_1','metric_2','metric_3','metric_4','metric_5','metric_6','metric_7','metric_8','metric_9','metric_10']
+all_metrics_columns = ['metric_1','metric_2','metric_3','metric_4','metric_5','metric_6','metric_7','metric_8','metric_9','metric_10','metric_11','metric_12']
 
 # Save original values before transformations
 metrics_original_names = [col+'_original' for col in all_metrics_columns]

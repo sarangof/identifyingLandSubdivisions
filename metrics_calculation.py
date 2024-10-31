@@ -630,6 +630,9 @@ def metric_6_entropy_of_building_azimuth(buildings_clipped, rectangle_id, bin_wi
     Returns:
     - standardized_kl_divergence: KL divergence divided by log(n), where n is the number of bins.
     """
+    
+    buildings_clipped.loc[:, 'azimuth'] = buildings_clipped['geometry'].apply(lambda x: calculate_azimuth(longest_segment(x))  % 90. )
+
     # Extract azimuths (assuming they are in degrees)
     azimuths = buildings_clipped['azimuth'].values
 
@@ -795,3 +798,10 @@ def metric_10_average_angle_between_road_segments(intersections, roads):
         m10 = np.nan
     return m10
 
+
+#11 
+def metric_11_building_density(n_buildings,rectangle_area):
+    return (1000.*1000*n_buildings)/rectangle_area
+
+def metric_12_building_area_share(building_area,rectangle_area):
+    return building_area/rectangle_area

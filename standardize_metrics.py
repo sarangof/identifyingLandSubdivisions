@@ -32,6 +32,10 @@ def standardize_metric_8(series):
 def standardize_metric_10(series):
     return 1-(series/90)
 
+def standardize_metric_11(series):
+    series = np.where(series > 3000, 3000, series)
+    return series/3000
+
 # Map metrics to their respective functions
 standardization_functions = {
     'metric_2': standardize_metric_2,
@@ -40,4 +44,5 @@ standardization_functions = {
     'metric_7': standardize_metric_7,
     'metric_8': standardize_metric_8,
     'metric_10': standardize_metric_10,
+    'metric_11': standardize_metric_11
 }
