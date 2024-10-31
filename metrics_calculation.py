@@ -388,14 +388,14 @@ def get_internal_buffer_with_target_area(block, target_area, tolerance=1e-6):
     return internal_buffer
 
 #1 Share of building footprints that are less than 10-meters away from the nearest road
-def metric_1_distance_less_than_10m(buildings, road_union, utm_proj_rectangle):
+def metric_1_distance_less_than_20m(buildings, road_union, utm_proj_rectangle):
     # Apply the distance calculation to each building
     #buildings.loc[:,'distance_to_road'] = buildings['geometry'].apply(lambda x: x.centroid).apply(calculate_minimum_distance_to_roads, 
     
     buildings_geometry_copy = buildings['geometry'].copy()
     buildings.loc[:,'distance_to_road'] = buildings_geometry_copy.apply(lambda x: calculate_minimum_distance_to_roads_option_B(x, road_union))
 
-    m1 = 1.*((sum(buildings['distance_to_road']<=10))/len(buildings))
+    m1 = 1.*((sum(buildings['distance_to_road']<=20))/len(buildings))
     return m1, gpd.GeoDataFrame(buildings)
 
 #2 Average distance of building footprint centroids to roads
