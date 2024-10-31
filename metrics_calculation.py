@@ -387,41 +387,6 @@ def get_internal_buffer_with_target_area(block, target_area, tolerance=1e-6):
     internal_buffer = block.geometry.buffer(-optimal_radius)#block.geometry.difference(block.geometry.buffer(-optimal_radius))
     return internal_buffer
 
-#1 Share of building footprints that are less than 10-meters away from the nearest road
-def metric_1_distance_less_than_20m(buildings, road_union, utm_proj_rectangle):
-    # Apply the distance calculation to each building
-    #buildings.loc[:,'distance_to_road'] = buildings['geometry'].apply(lambda x: x.centroid).apply(calculate_minimum_distance_to_roads, 
-    
-    buildings_geometry_copy = buildings['geometry'].copy()
-    buildings.loc[:,'distance_to_road'] = buildings_geometry_copy.apply(lambda x: calculate_minimum_distance_to_roads_option_B(x, road_union))
-
-    m1 = 1.*((sum(buildings['distance_to_road']<=20))/len(buildings))
-    return m1, gpd.GeoDataFrame(buildings)
-
-#2 Average distance of building footprint centroids to roads
-# THIS FUNCTION CAN ONLY BE CALLED AFTER metric_1
-def metric_2_average_distance_to_roads(buildings):
-    m2 = buildings['distance_to_road'].mean()
-    return m2
-
-#3 Density of roads
-def metric_3_road_density(rectangle_area,roads_clipped):
-    km_length = roads_clipped.length.sum()/1000.
-    rectangle_area_km2 = rectangle_area/1000000.
-    m3 = km_length/rectangle_area_km2
-    return m3
-
-#4 Share of 3-way and 4-way intersections 
-def metric_4_share_4way_intersections(intersections):
-    n_intersections_3_or_higher = 1.*len(intersections[(intersections.street_count >= 3)])
-    n_4_way = 1.*len(intersections[(intersections.street_count == 4)])
-    m4 = (n_4_way / n_intersections_3_or_higher)
-    return m4
-
-#5 Density of intersections
-def metric_5_intersection_density(intersections, rectangle_area):
-    m5 = (1000.**2)*(len(intersections)/rectangle_area) #(1000.**2)*(len(intersections[(intersections.street_count >= 3)])/rectangle_area)
-    return m5
 
 def plot_building_azimuths(buildings_clipped, save_path):
     fig, ax = plt.subplots(figsize=(20, 16))
@@ -511,98 +476,146 @@ def calculate_azimuth_diff(x,y):
         comp_list.append(np.abs(y - x))
     return min(comp_list)
 
-def calculate_azimuth_diff_no_mod(x,y):
-    diff = np.abs(y-x)
-    if diff >=45 :
-        true_angle = 90-diff
-    elif diff < 45:
-        true_angle = diff
-    return true_angle
+def apply_internal_buffer(blocks_clipped, row_epsilon, tolerance=1e-6):
+    def process_block(row):
+        # Calculate the target area based on block area and row_epsilon
+        block_area = row.geometry.area
+        target_area = block_area * (1.0 - row_epsilon)
 
-#6 Average building footprint orientation of the tile
-def metric_6_deviation_of_building_azimuth(buildings_clipped, n_orientation_groups,rectangle_id):
-    # Step 1: Calculate azimuth for each building
-    buildings_clipped.loc[:, 'azimuth'] = buildings_clipped['geometry'].apply(lambda x: calculate_azimuth(longest_segment(x))  % 90. )
+        # Call the function for this specific block
+        internal_buffer = get_internal_buffer_with_target_area(row, target_area, tolerance)
 
-    # Step 2: Create spatial index for the buildings
-    buildings_clipped['centroid'] = buildings_clipped.geometry.centroid
-    centroids = np.array(list(zip(buildings_clipped['centroid'].x, buildings_clipped['centroid'].y)))
+        return internal_buffer
 
-    # Use cKDTree for fast nearest neighbor search
-    tree = cKDTree(centroids)
-    distances, indices = tree.query(centroids, k=2)  # k=2 to get the nearest neighbor excluding itself
+    # Apply the function to each row and store the results in a new column
+    blocks_clipped['internal_buffer'] = blocks_clipped.apply(process_block, axis=1)
 
-    # Step 3: Calculate azimuth difference with the nearest neighbor
-    buildings_clipped.loc[indices[:, 0],'closest_azimuth'] = buildings_clipped.iloc[indices[:, 1]]['azimuth'].values
+    return blocks_clipped
+
+def visualize_tortuosity_comparison(roads_clipped, n_samples=5):
+    fig, ax = plt.subplots(figsize=(10, 10))
+    
+    # Sample a few roads for visualization (you can adjust this)
+    sampled_roads = roads_clipped.sample(n=n_samples)
+    
+    for idx, road in sampled_roads.iterrows():
+        geometry = road.geometry
+        
+        if isinstance(geometry, LineString):
+            coords = list(geometry.coords)
+            start_point = Point(coords[0])
+            end_point = Point(coords[-1])
+
+            # Plot actual road
+            xs, ys = geometry.xy
+            ax.plot(xs, ys, color='blue', label='Road Segment' if idx == 0 else "")
+
+            # Plot straight line (Euclidean distance)
+            straight_line = LineString([start_point, end_point])
+            xs_straight, ys_straight = straight_line.xy
+            ax.plot(xs_straight, ys_straight, color='red', linestyle='--', label='Straight Line' if idx == 0 else "")
+
+            # Add annotations for distances
+            ax.annotate(f"Road: {geometry.length:.2f}", (xs[0], ys[0]), fontsize=10, color='blue')
+            ax.annotate(f"Straight: {start_point.distance(end_point):.2f}", (xs_straight[0], ys_straight[0]), fontsize=10, color='red')
+
+        elif isinstance(geometry, MultiLineString):
+            # Handle each line separately
+            for line in geometry.geoms:
+                coords = list(line.coords)
+                start_point = Point(coords[0])
+                end_point = Point(coords[-1])
+
+                # Plot actual road
+                xs, ys = line.xy
+                ax.plot(xs, ys, color='blue')
+
+                # Plot straight line (Euclidean distance)
+                straight_line = LineString([start_point, end_point])
+                xs_straight, ys_straight = straight_line.xy
+                ax.plot(xs_straight, ys_straight, color='red', linestyle='--')
+
+                # Add annotations for distances
+                ax.annotate(f"Road: {line.length:.2f}", (xs[0], ys[0]), fontsize=10, color='blue')
+                ax.annotate(f"Straight: {start_point.distance(end_point):.2f}", (xs_straight[0], ys_straight[0]), fontsize=10, color='red')
+
+    # Set the axis limits and labels
+    ax.set_xlabel("Longitude")
+    ax.set_ylabel("Latitude")
+    ax.set_title("Road Segment vs Straight Line Comparison")
+    ax.legend()
+    
+    plt.show()
+
+def calculate_tortuosity(geometry):
+    road_lengths = []
+    euclidean_distances = []
+
+    # If the geometry is a MultiLineString, handle each LineString separately
+    if isinstance(geometry, MultiLineString):
+        for line in geometry.geoms:
+            coords = list(line.coords)
+            road_length = line.length
+            euclidean_distance = Point(coords[0]).distance(Point(coords[-1]))
+            if euclidean_distance > 0:
+                road_lengths.append(road_length)
+                euclidean_distances.append(euclidean_distance)
+    elif isinstance(geometry, LineString):
+        coords = list(geometry.coords)
+        road_length = geometry.length
+        euclidean_distance = Point(coords[0]).distance(Point(coords[-1]))
+        if euclidean_distance > 0:
+            road_lengths.append(road_length)
+            euclidean_distances.append(euclidean_distance)
+
+    if len(road_lengths) == 0:
+        return np.nan  # No valid road segments
+
+    # Calculate tortuosity index for each road segment (length/Euclidean)
+    tortuosity_index = np.array(euclidean_distances) / np.array(road_lengths)
+    if len(tortuosity_index) > 0:
+        return euclidean_distances,road_lengths
+    else:
+        np.nan, np.nan
 
 
-    buildings_clipped.loc[indices[:, 0],'azimuth_diff'] = buildings_clipped[['azimuth', 'closest_azimuth']].apply(
-        lambda row: calculate_azimuth_diff(row['azimuth'], row['closest_azimuth']), axis=1
-        )
+#1 Share of building footprints that are less than 10-meters away from the nearest road
+def metric_1_distance_less_than_20m(buildings, road_union, utm_proj_rectangle):
+    # Apply the distance calculation to each building
+    #buildings.loc[:,'distance_to_road'] = buildings['geometry'].apply(lambda x: x.centroid).apply(calculate_minimum_distance_to_roads, 
+    
+    buildings_geometry_copy = buildings['geometry'].copy()
+    buildings.loc[:,'distance_to_road'] = buildings_geometry_copy.apply(lambda x: calculate_minimum_distance_to_roads_option_B(x, road_union))
 
-    # Store the ID of the closest building for plotting purposes
-    buildings_clipped.loc[indices[:, 0],'closest_building_id'] = indices[:, 1]
+    m1 = 1.*((sum(buildings['distance_to_road']<=20))/len(buildings))
+    return m1, gpd.GeoDataFrame(buildings)
 
-    # Step 4: Group buildings into orientation groups
-    cutoff_angles = [(x * 90. / (2 * n_orientation_groups)) for x in range(0, (2 * n_orientation_groups) + 1)]
-    labels = [1] + [i for i in range(2, n_orientation_groups + 1) for _ in (0, 1)] + [1]
-    buildings_clipped['azimuth_group'] = pd.cut(buildings_clipped['azimuth'], bins=cutoff_angles, labels=labels, ordered=False)
+#2 Average distance of building footprint centroids to roads
+# THIS FUNCTION CAN ONLY BE CALLED AFTER metric_1
+def metric_2_average_distance_to_roads(buildings):
+    m2 = buildings['distance_to_road'].mean()
+    return m2
 
-    # Step 5: Calculate the standard deviation of azimuth differences
-    lb, ub = t.interval(1 - 0.05, df=len(buildings_clipped)-1, loc=np.mean(buildings_clipped['azimuth_diff']), scale=sem(buildings_clipped['azimuth_diff']))
-    m6 = np.mean(buildings_clipped['azimuth_diff'])#ub-lb #np.std(buildings_clipped['azimuth_diff']) #ub-lb  #np.std(buildings_clipped['azimuth_diff']) # 
+#3 Density of roads
+def metric_3_road_density(rectangle_area,roads_clipped):
+    km_length = roads_clipped.length.sum()/1000.
+    rectangle_area_km2 = rectangle_area/1000000.
+    m3 = km_length/rectangle_area_km2
+    return m3
 
-    # Step 6: Call the plot function to visualize the results
-    #plot_building_azimuths(buildings_clipped,save_path=f"./{str(rectangle_id)}_azimuth_plot_NEW_.png")
-    #save_azimuth_histograms(buildings_clipped, f"{str(rectangle_id)}_histogram.png",output_dir='histogram_plots')
+#4 Share of 3-way and 4-way intersections 
+def metric_4_share_4way_intersections(intersections):
+    n_intersections_3_or_higher = 1.*len(intersections[(intersections.street_count >= 3)])
+    n_4_way = 1.*len(intersections[(intersections.street_count == 4)])
+    m4 = (n_4_way / n_intersections_3_or_higher)
+    return m4
 
+#5 Density of intersections
+def metric_5_intersection_density(intersections, rectangle_area):
+    m5 = (1000.**2)*(len(intersections)/rectangle_area) #(1000.**2)*(len(intersections[(intersections.street_count >= 3)])/rectangle_area)
+    return m5
 
-    m6_A = np.std(buildings_clipped['azimuth_diff'])
-    lb, ub = t.interval(1 - 0.05, df=len(buildings_clipped)-1, loc=np.mean(buildings_clipped['azimuth_diff']), scale=sem(buildings_clipped['azimuth_diff']))
-    m6_B = ub - lb
-    lb, ub = t.interval(1 - 0.05, df=len(buildings_clipped)-1, loc=np.mean(buildings_clipped['azimuth']), scale=sem(buildings_clipped['azimuth']))
-    m6_C = ub - lb
-    m6_D = np.std(buildings_clipped['azimuth'])
-    m6_E = np.median(np.abs(buildings_clipped['azimuth_diff'] - buildings_clipped['azimuth_diff'].median()))
-
-    # m6_A, m6_B, m6_C, m6_D, m6_E, 
-    return m6, buildings_clipped
-
-#6 Average building footprint orientation of the tile
-def metric_6_deviation_of_building_azimuth_no_mod(buildings_clipped, n_orientation_groups,rectangle_id):
-    # Step 1: Calculate azimuth for each building
-    buildings_clipped.loc[:, 'azimuth'] = buildings_clipped['geometry'].apply(lambda x: calculate_azimuth(longest_segment(x)))
-
-    # Step 2: Create spatial index for the buildings
-    buildings_clipped['centroid'] = buildings_clipped.geometry.centroid
-    centroids = np.array(list(zip(buildings_clipped['centroid'].x, buildings_clipped['centroid'].y)))
-
-    # Use cKDTree for fast nearest neighbor search
-    tree = cKDTree(centroids)
-    distances, indices = tree.query(centroids, k=2)  # k=2 to get the nearest neighbor excluding itself
-
-    # Step 3: Calculate azimuth difference with the nearest neighbor
-    buildings_clipped.loc[indices[:, 0],'closest_azimuth'] = buildings_clipped.iloc[indices[:, 1]]['azimuth'].values
-
-
-    buildings_clipped.loc[indices[:, 0],'azimuth_diff'] = buildings_clipped[['azimuth', 'closest_azimuth']].apply(
-        lambda row: calculate_azimuth_diff_no_mod(row['azimuth'], row['closest_azimuth']), axis=1
-        )
-
-    # Store the ID of the closest building for plotting purposes
-    buildings_clipped.loc[indices[:, 0],'closest_building_id'] = indices[:, 1]
-
-    # Step 4: Group buildings into orientation groups
-    cutoff_angles = [(x * 90. / (2 * n_orientation_groups)) for x in range(0, (2 * n_orientation_groups) + 1)]
-    labels = [1] + [i for i in range(2, n_orientation_groups + 1) for _ in (0, 1)] + [1]
-    buildings_clipped['azimuth_group'] = pd.cut(buildings_clipped['azimuth'], bins=cutoff_angles, labels=labels, ordered=False)
-
-    # Step 5: Calculate the standard deviation of azimuth differences
-    m6 = np.mean(buildings_clipped['azimuth_diff'])#ub-lb #np.std(buildings_clipped['azimuth_diff']) #ub-lb  #np.std(buildings_clipped['azimuth_diff']) # 
-
-    # m6_A, m6_B, m6_C, m6_D, m6_E, 
-    return m6, buildings_clipped
-
+#6 Entropy of building Azimuth
 def metric_6_entropy_of_building_azimuth(buildings_clipped, rectangle_id, bin_width_degrees, plot=True):
     """
     Calculate the standardized KL divergence between the azimuth distribution
@@ -719,22 +732,6 @@ def metric_7_average_block_width(blocks_clipped, rectangle_projected, rectangle_
         m7 = blocks_clipped['weighted_width'].sum()
     return m7, blocks_clipped
 
-def apply_internal_buffer(blocks_clipped, row_epsilon, tolerance=1e-6):
-    def process_block(row):
-        # Calculate the target area based on block area and row_epsilon
-        block_area = row.geometry.area
-        target_area = block_area * (1.0 - row_epsilon)
-
-        # Call the function for this specific block
-        internal_buffer = get_internal_buffer_with_target_area(row, target_area, tolerance)
-
-        return internal_buffer
-
-    # Apply the function to each row and store the results in a new column
-    blocks_clipped['internal_buffer'] = blocks_clipped.apply(process_block, axis=1)
-
-    return blocks_clipped
-
 #8 Two row blocks
 def metric_8_two_row_blocks(blocks_clipped, buildings, utm_proj_rectangle, row_epsilon):
     
@@ -758,92 +755,6 @@ def metric_8_two_row_blocks(blocks_clipped, buildings, utm_proj_rectangle, row_e
     #    m8 = 1.-(building_to_buffer_share/building_to_block_share)
     m8 = building_to_buffer_share/building_to_block_share 
     return m8, internal_buffers
-
-def visualize_tortuosity_comparison(roads_clipped, n_samples=5):
-    fig, ax = plt.subplots(figsize=(10, 10))
-    
-    # Sample a few roads for visualization (you can adjust this)
-    sampled_roads = roads_clipped.sample(n=n_samples)
-    
-    for idx, road in sampled_roads.iterrows():
-        geometry = road.geometry
-        
-        if isinstance(geometry, LineString):
-            coords = list(geometry.coords)
-            start_point = Point(coords[0])
-            end_point = Point(coords[-1])
-
-            # Plot actual road
-            xs, ys = geometry.xy
-            ax.plot(xs, ys, color='blue', label='Road Segment' if idx == 0 else "")
-
-            # Plot straight line (Euclidean distance)
-            straight_line = LineString([start_point, end_point])
-            xs_straight, ys_straight = straight_line.xy
-            ax.plot(xs_straight, ys_straight, color='red', linestyle='--', label='Straight Line' if idx == 0 else "")
-
-            # Add annotations for distances
-            ax.annotate(f"Road: {geometry.length:.2f}", (xs[0], ys[0]), fontsize=10, color='blue')
-            ax.annotate(f"Straight: {start_point.distance(end_point):.2f}", (xs_straight[0], ys_straight[0]), fontsize=10, color='red')
-
-        elif isinstance(geometry, MultiLineString):
-            # Handle each line separately
-            for line in geometry.geoms:
-                coords = list(line.coords)
-                start_point = Point(coords[0])
-                end_point = Point(coords[-1])
-
-                # Plot actual road
-                xs, ys = line.xy
-                ax.plot(xs, ys, color='blue')
-
-                # Plot straight line (Euclidean distance)
-                straight_line = LineString([start_point, end_point])
-                xs_straight, ys_straight = straight_line.xy
-                ax.plot(xs_straight, ys_straight, color='red', linestyle='--')
-
-                # Add annotations for distances
-                ax.annotate(f"Road: {line.length:.2f}", (xs[0], ys[0]), fontsize=10, color='blue')
-                ax.annotate(f"Straight: {start_point.distance(end_point):.2f}", (xs_straight[0], ys_straight[0]), fontsize=10, color='red')
-
-    # Set the axis limits and labels
-    ax.set_xlabel("Longitude")
-    ax.set_ylabel("Latitude")
-    ax.set_title("Road Segment vs Straight Line Comparison")
-    ax.legend()
-    
-    plt.show()
-
-def calculate_tortuosity(geometry):
-    road_lengths = []
-    euclidean_distances = []
-
-    # If the geometry is a MultiLineString, handle each LineString separately
-    if isinstance(geometry, MultiLineString):
-        for line in geometry.geoms:
-            coords = list(line.coords)
-            road_length = line.length
-            euclidean_distance = Point(coords[0]).distance(Point(coords[-1]))
-            if euclidean_distance > 0:
-                road_lengths.append(road_length)
-                euclidean_distances.append(euclidean_distance)
-    elif isinstance(geometry, LineString):
-        coords = list(geometry.coords)
-        road_length = geometry.length
-        euclidean_distance = Point(coords[0]).distance(Point(coords[-1]))
-        if euclidean_distance > 0:
-            road_lengths.append(road_length)
-            euclidean_distances.append(euclidean_distance)
-
-    if len(road_lengths) == 0:
-        return np.nan  # No valid road segments
-
-    # Calculate tortuosity index for each road segment (length/Euclidean)
-    tortuosity_index = np.array(euclidean_distances) / np.array(road_lengths)
-    if len(tortuosity_index) > 0:
-        return euclidean_distances,road_lengths
-    else:
-        np.nan, np.nan
 
 #9 Tortuosity index
 def metric_9_tortuosity_index(roads_clipped):
