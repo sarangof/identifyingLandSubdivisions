@@ -799,9 +799,15 @@ def metric_10_average_angle_between_road_segments(intersections, roads):
     return m10
 
 
-#11 
+#11 Building density
 def metric_11_building_density(n_buildings,rectangle_area):
-    return (1000.*1000*n_buildings)/rectangle_area
+    """Number of buildings per hectare"""
+    return (10000*n_buildings)/rectangle_area
 
+#12 Built area share
 def metric_12_built_area_share(building_area,rectangle_area):
     return building_area/rectangle_area
+
+# 13 Average building area
+def metric_13_average_building_area(building_area,n_buildings):
+    return building_area/n_buildings
