@@ -1,15 +1,15 @@
-
 import ee
 import geemap
 from math import sqrt, pi
 import os
+import geopandas as gpd
+import numpy as np
+from shapely.geometry import box
+import tempfile
 
 # Define paths
 main_path = '../data'
 input_path = f'{main_path}/input'
-buildings_path = f'{input_path}/buildings'
-roads_path = f'{input_path}/roads'
-intersections_path = f'{input_path}/intersections'
 city_info_path = f'{input_path}/city_info'
 extents_path = f'{city_info_path}/extents'
 analysis_buffers_path = f'{city_info_path}/analysis_buffers'
@@ -23,9 +23,8 @@ ee.Initialize(project='city-extent')
 
 # List of cities to process
 cities = ["Belo Horizonte", "Campinas", "Bogota", "Nairobi", "Bamako", 
-        "Lagos", "Accra", "Abidjan", "Mogadishu", "Cape Town", 
-        "Maputo", "Luanda"]
-#cities = [city.replace(" ", "_") for city in cities]
+          "Lagos", "Accra", "Abidjan", "Mogadishu", "Cape Town", 
+          "Maputo", "Luanda"]
 
 # Urban extent dataset
 urban_extent = ee.FeatureCollection("projects/wri-datalab/cities/urban_land_use/data/global_cities_Aug2024/urbanextents_unions_2020")
@@ -34,75 +33,99 @@ urban_extent = ee.FeatureCollection("projects/wri-datalab/cities/urban_land_use/
 def compute_buffer_radius(city_area):
     return sqrt(city_area) / pi / 4
 
+# Function to create a grid of squares over the given bounding box using geopandas
+def create_grid(geometry, grid_size):
+    """Creates a grid of full squares over the bounding box of the given geometry."""
+    bounds = geometry.bounds
+    xmin, ymin, xmax, ymax = bounds
 
-# Function to create a grid image over a given geometry
-def create_grid_image(geometry, grid_size):
-    """Creates a raster-based grid over the given geometry using Earth Engine."""
-    # Create an image with lon/lat bands
-    lon_lat = ee.Image.pixelLonLat()
+    # Generate columns and rows for grid cells
+    cols = np.arange(xmin, xmax, grid_size)
+    rows = np.arange(ymin, ymax, grid_size)
 
-    # Create a grid using floor division to create unique integer values for each grid cell
-    lon_grid = lon_lat.select('longitude').divide(grid_size).floor()
-    lat_grid = lon_lat.select('latitude').divide(grid_size).floor()
+    # Create full rectangular polygons for each grid cell
+    polygons = [box(x, y, x + grid_size, y + grid_size) for x in cols for y in rows]
 
-    # Combine the longitude and latitude grids into one image
-    grid = lon_grid.addBands(lat_grid).reduce(ee.Reducer.sum()).rename('grid')
+    # Convert to GeoDataFrame
+    grid = gpd.GeoDataFrame({'geometry': polygons}, crs="EPSG:4326")
 
-    # Clip the grid to the geometry area
-    grid_masked = grid.clip(geometry)
+    return grid
 
-    return grid_masked
+# Function to filter grid cells by intersection with the target geometry, retaining full grid cells
+def filter_grid_by_geometry(grid_gdf, target_geometry):
+    """Filters grid cells, keeping only those that intersect with the target geometry, retaining full grid cells."""
+    # Filter cells that intersect with the target geometry
+    filtered_grid = grid_gdf[grid_gdf.intersects(target_geometry)]
 
+    return filtered_grid
+
+# Function to convert Earth Engine FeatureCollection to GeoDataFrame using tempfile
+def ee_to_gdf(ee_fc):
+    """Exports an Earth Engine FeatureCollection to a GeoDataFrame using a temporary file."""
+    with tempfile.NamedTemporaryFile(suffix='.geojson') as tmpfile:
+        # Export to a temporary GeoJSON file using geemap
+        geemap.ee_export_vector(ee_fc, filename=tmpfile.name)
+        
+        # Load the GeoJSON into a GeoDataFrame
+        gdf = gpd.read_file(tmpfile.name)
+    return gdf
 
 # Function to process each city
-def process_city(city_name, search_buffer_distance=500):
+def process_city(city_name, search_buffer_distance=500, grid_sizes=[100, 200]):
     # Filter urban extent for the city
     city_extent = urban_extent.filter(ee.Filter.eq('city_name_large', city_name))
-
-    # Calculate city area (assuming the geometry is in square meters)
     city_geometry = city_extent.geometry()
     city_area = city_geometry.area().getInfo()
 
-    # Create analysis buffer
+    # Create analysis buffer and subtract the urban extent to make it hollow
     analysis_buffer_radius = compute_buffer_radius(city_area)
-    analysis_buffer = city_geometry.buffer(analysis_buffer_radius)#ee.Geometry(city_extent.geometry()).buffer(analysis_buffer_radius)
+    analysis_buffer = city_geometry.buffer(analysis_buffer_radius)
+    analysis_expansion_area = analysis_buffer.difference(city_geometry)
 
-    # Create search buffer by buffering inward from urban extent and outward from analysis buffer
-    search_buffer_inward = city_geometry.buffer(-search_buffer_distance)
-    search_buffer_outward = analysis_buffer.buffer(search_buffer_distance)
-    search_buffer = search_buffer_inward.union(search_buffer_outward)
+    # Create a full search buffer that extends outward from the analysis area
+    search_buffer = analysis_buffer.buffer(search_buffer_distance)
 
-    # Create grids (200m x 200m and 100m x 100m) inside the analysis area using Earth Engine
-    grid_200m = create_grid_image(analysis_buffer, 200)
-    grid_100m = create_grid_image(analysis_buffer, 100)
+    # Convert the buffers to FeatureCollections with properties
+    city_fc = ee.FeatureCollection([ee.Feature(city_geometry, {'name': city_name})])
+    analysis_fc = ee.FeatureCollection([ee.Feature(analysis_expansion_area, {'name': f'{city_name}_analysis_buffer'})])
+    search_fc = ee.FeatureCollection([ee.Feature(search_buffer, {'name': f'{city_name}_search_buffer'})])
 
-    # Convert the buffers to FeatureCollections
-    analysis_fc = ee.FeatureCollection([ee.Feature(analysis_buffer)])
-    search_fc = ee.FeatureCollection([ee.Feature(search_buffer)])
+    # Convert EE FeatureCollections to GeoDataFrames using temporary files
+    city_gdf = ee_to_gdf(city_fc)
+    analysis_gdf = ee_to_gdf(analysis_fc)
+    search_gdf = ee_to_gdf(search_fc)
 
-    # Export the buffers and grids as GeoJSON or TIFF
-    # Create output directory if it does not exist
+    # Save GeoDataFrames to Parquet directly
     city_file_name = city_name.replace(" ", "_")
 
     if not os.path.exists(f'{extents_path}/{city_file_name}'):
         os.makedirs(f'{extents_path}/{city_file_name}')
-    geemap.ee_export_vector(city_extent, filename=f'{extents_path}/{city_file_name}/{city_name}_city_extent.geojson')
+    city_gdf.to_parquet(f'{extents_path}/{city_file_name}/{city_name}_urban_extent.parquet')
 
     if not os.path.exists(f'{analysis_buffers_path}/{city_file_name}'):
         os.makedirs(f'{analysis_buffers_path}/{city_file_name}')
-    geemap.ee_export_vector(analysis_fc, filename=f'{analysis_buffers_path}/{city_file_name}/{city_name}_analysis_buffer.geojson')
+    analysis_gdf.to_parquet(f'{analysis_buffers_path}/{city_file_name}/{city_name}_analysis_buffer.parquet')
 
     if not os.path.exists(f'{search_buffers_path}/{city_file_name}'):
         os.makedirs(f'{search_buffers_path}/{city_file_name}')
-    geemap.ee_export_vector(search_fc, filename=f'{search_buffers_path}/{city_file_name}/{city_name}_search_buffer.geojson')
-    
-    # Export grids as images (TIFF format) for easier processing
-    if not os.path.exists(f'{grids_path}/{city_file_name}'):
-        os.makedirs(f'{grids_path}/{city_file_name}')
-    geemap.ee_export_image(grid_200m, filename=f'{grids_path}/{city_file_name}/{city_name}_200m_grid.tif', scale=200)
-    geemap.ee_export_image(grid_100m, filename=f'{grids_path}/{city_file_name}/{city_name}_100m_grid.tif', scale=100)
+    search_gdf.to_parquet(f'{search_buffers_path}/{city_file_name}/{city_name}_search_buffer.parquet')
+
+    # Create grids for the search area using GeoPandas
+    for grid_size in grid_sizes:
+        # Convert meters to degrees approximately (grid_size / 111139 to approximate degrees from meters)
+        grid_gdf = create_grid(search_gdf.geometry.iloc[0], grid_size / 111139.0)
+
+        # Filter the grid to include only cells that intersect with the search geometry
+        filtered_grid_gdf = filter_grid_by_geometry(grid_gdf, search_gdf.geometry.iloc[0])
+
+        # Add a boolean attribute to indicate if the cell intersects with the analysis area
+        filtered_grid_gdf['intersects_analysis_area'] = filtered_grid_gdf.intersects(analysis_gdf.geometry.iloc[0])
+
+        if not os.path.exists(f'{grids_path}/{city_file_name}'):
+            os.makedirs(f'{grids_path}/{city_file_name}')
+        filtered_grid_gdf.to_parquet(f'{grids_path}/{city_file_name}/{city_name}_{grid_size}m_grid.parquet')
 
 # Process each city
 for city in cities:
-    print(f'{city}')
+    print(f'Processing city: {city}')
     process_city(city)
