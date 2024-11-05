@@ -6,6 +6,9 @@ import geopandas as gpd
 import numpy as np
 from shapely.geometry import box
 import tempfile
+import dask
+from dask import delayed
+from dask.diagnostics import ProgressBar
 
 # Define paths
 main_path = '../data'
@@ -71,6 +74,7 @@ def ee_to_gdf(ee_fc):
     return gdf
 
 # Function to process each city
+@delayed
 def process_city(city_name, search_buffer_distance=500, grid_sizes=[100, 200]):
     # Filter urban extent for the city
     city_extent = urban_extent.filter(ee.Filter.eq('city_name_large', city_name))
@@ -125,7 +129,9 @@ def process_city(city_name, search_buffer_distance=500, grid_sizes=[100, 200]):
             os.makedirs(f'{grids_path}/{city_file_name}')
         filtered_grid_gdf.to_parquet(f'{grids_path}/{city_file_name}/{city_name}_{grid_size}m_grid.parquet')
 
-# Process each city
-for city in cities:
-    print(f'Processing city: {city}')
-    process_city(city)
+# Use Dask to parallelize the processing of cities
+tasks = [process_city(city) for city in cities]
+
+# Use ProgressBar to monitor progress
+with ProgressBar():
+    dask.compute(*tasks)
