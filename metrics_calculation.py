@@ -803,5 +803,5 @@ def metric_10_average_angle_between_road_segments(intersections, roads):
 def metric_11_building_density(n_buildings,rectangle_area):
     return (1000.*1000*n_buildings)/rectangle_area
 
-def metric_12_building_area_share(building_area,rectangle_area):
+def metric_12_built_area_share(building_area,rectangle_area):
     return building_area/rectangle_area

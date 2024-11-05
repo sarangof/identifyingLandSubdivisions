@@ -187,7 +187,7 @@ for rectangle_id, rectangle in rectangles.iterrows():
         building_area = buildings_clipped.area.sum()
         average_building_area = building_area / n_buildings 
         m11 = metric_11_building_density(n_buildings,rectangle_area)
-        m12 = metric_12_building_area_share(building_area,rectangle_area)
+        m12 = metric_12_built_area_share(building_area,rectangle_area)
     else:
         n_buildings = np.nan
         building_area = np.nan
