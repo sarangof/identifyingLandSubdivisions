@@ -185,9 +185,9 @@ for rectangle_id, rectangle in rectangles.iterrows():
         # Calculate relevant building metrics, making use of the if statement.
         n_buildings = len(buildings_clipped)
         building_area = buildings_clipped.area.sum()
-        average_building_area = building_area / n_buildings 
         m11 = metric_11_building_density(n_buildings,rectangle_area)
         m12 = metric_12_built_area_share(building_area,rectangle_area)
+        m13 = metric_13_average_building_area(building_area,n_buildings)
     else:
         n_buildings = np.nan
         building_area = np.nan
@@ -207,13 +207,13 @@ for rectangle_id, rectangle in rectangles.iterrows():
                         'metric_10':m10,
                         'metric_11':m11,
                         'metric_12':m12,
+                        'metric_13':m13,
                         'OSM_buildings_available':OSM_buildings_bool,
                         'OSM_intersections_available':OSM_intersections_bool,
                         'OSM_roads_available':OSM_roads_bool,
                         'Overture_buildings_available':Overture_buildings_bool,
                         'rectangle_area': rectangle_area,
                         'building_area':building_area,
-                        'average_building_area':average_building_area,
                         'share_tiled_by_blocks': share_tiled_by_blocks,
                         'road_length':road_length,
                         'n_intersections':len(OSM_intersections_clipped.drop_duplicates('osmid')),
@@ -222,7 +222,7 @@ for rectangle_id, rectangle in rectangles.iterrows():
 
 metrics_pilot = pd.DataFrame(metrics_pilot)
 final_geo_df = gpd.GeoDataFrame(pd.merge(rectangles, metrics_pilot, how='left', left_on='n', right_on='index'), geometry=rectangles.geometry)
-all_metrics_columns = ['metric_1','metric_2','metric_3','metric_4','metric_5','metric_6','metric_7','metric_8','metric_9','metric_10','metric_11','metric_12']
+all_metrics_columns = ['metric_1','metric_2','metric_3','metric_4','metric_5','metric_6','metric_7','metric_8','metric_9','metric_10','metric_11','metric_12','metric_13']
 
 # Save original values before transformations
 metrics_original_names = [col+'_original' for col in all_metrics_columns]
