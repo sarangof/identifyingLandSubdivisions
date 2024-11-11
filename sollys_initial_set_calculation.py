@@ -180,7 +180,7 @@ for rectangle_id, rectangle in rectangles.iterrows():
     else:
         m10 = np.nan
     
-    # Metrics 11 and 12
+    # Metrics 11, 12 and 13
     if not buildings_clipped.empty:
         # Calculate relevant building metrics, making use of the if statement.
         n_buildings = len(buildings_clipped)
@@ -192,7 +192,7 @@ for rectangle_id, rectangle in rectangles.iterrows():
         n_buildings = np.nan
         building_area = np.nan
         average_building_area = np.nan
-        m11, m12 = np.nan, np.nan
+        m11, m12, m13 = np.nan, np.nan, np.nan
 
     metrics_pilot.append({'index':rectangle_id,
                         'metric_1':m1,
@@ -231,6 +231,20 @@ final_geo_df[metrics_original_names] = final_geo_df[all_metrics_columns].copy()
 # Apply the standardization functions
 for metric, func in standardization_functions.items():
     final_geo_df[metric] = func(final_geo_df[metric])
+
+metrics_standardized_names = [col+'_standardized' for col in all_metrics_columns]
+
+# Center at zero and maximize information
+final_geo_df.loc[:, all_metrics_columns] = (
+    final_geo_df[metrics_standardized_names]
+    .apply(lambda x: (x - x.mean()) / (x.std()), axis=0)
+)
+
+# Convert metrics to a range between 0 and 1
+final_geo_df.loc[:,all_metrics_columns] = (
+    final_geo_df[all_metrics_columns]
+    .apply(lambda x: (x - x.min()) / (x.max()-x.min()), axis=0)
+)
 
 # Calculate equal-weights irregularity index
 final_geo_df['regularity_index'] = final_geo_df[all_metrics_columns].mean(axis=1)
