@@ -22,13 +22,14 @@ roads_path = f'{input_path}/roads'
 intersections_path = f'{input_path}/intersections'
 urban_extents_path = f'{input_path}/urban_extents'
 output_path = f'{main_path}/output'
+output_path_csv = f'{main_path}/output'
+output_path_raster = f'{main_path}/output'
 
 city_info_path = f'{input_path}/city_info'
 extents_path = f'{city_info_path}/extents'
 analysis_buffers_path = f'{city_info_path}/analysis_buffers'
 search_buffers_path = f'{city_info_path}/search_buffers'
 grids_path = f'{city_info_path}/grids'
-output_path = f'{main_path}/output'
 
 def create_square_from_coords(coord_pair, grid_size):
     x, y = coord_pair
@@ -45,39 +46,9 @@ def get_utm_crs(geometry):
 # Define important parameters for this run
 grid_size = 200
 row_epsilon = 0.01
-city_name = 'Belo Horizonte'
 
-city_grid = gpd.read_parquet(f'{grids_path}/{city_name}/{city_name}_{str(grid_size)}m_grid.parquet')
 
-metrics_pilot = []
-#rectangles = city_grids[city_grids.city_name==city_name]['lower_left_coordinates'][0]
-rectangles = city_grid['geometry']
-Overture_data_all = gpd.read_parquet(f'{buildings_path}/{city_name}/Overture_building_{city_name}.parquet')
-print("Overture file read")
-
-Overture_data_all['confidence'] = Overture_data_all.sources.apply(lambda x: json.loads(x)[0]['confidence'])
-Overture_data_all['dataset'] = Overture_data_all.sources.apply(lambda x: json.loads(x)[0]['dataset'])
-Overture_data = Overture_data_all.set_geometry('geometry')[Overture_data_all.dataset!='OpenStreetMap']
-
-OSM_intersections_all = gpd.read_file(f'{intersections_path}/{city_name}/{city_name}_OSM_intersections.gpkg')
-OSM_roads_all = gpd.read_file(f'{roads_path}/{city_name}/{city_name}_OSM_intersections.gpkg')
-print("OSM files read")
-cell_id = 0
-
-utm_proj_city = get_utm_proj(float(OSM_roads_all.iloc[0].geometry.centroid.x), float(OSM_roads_all.iloc[0].geometry.centroid.y))
-project = pyproj.Transformer.from_crs(pyproj.CRS('EPSG:4326'), utm_proj_city, always_xy=True).transform  
-OSM_roads_all_projected = OSM_roads_all.to_crs(epsg=CRS.from_proj4(utm_proj_city).to_epsg())
-OSM_intersections_all_projected = OSM_intersections_all.to_crs(epsg=CRS.from_proj4(utm_proj_city).to_epsg())
-
-blocks_all  = get_blocks(OSM_roads_all_projected.unary_union, OSM_roads_all_projected)
-Overture_data_all_projected = Overture_data_all.to_crs(epsg=CRS.from_proj4(utm_proj_city).to_epsg())
-buildings = Overture_data_all_projected
-road_union = OSM_roads_all_projected.unary_union
-
-rectangles_projected = rectangles.to_crs(epsg=CRS.from_proj4(utm_proj_city).to_epsg())
-print("All preparations done. Ready to calculate metrics on grid.")
-
-def process_cell(cell_id, rectangle_projected):
+def process_cell(cell_id, city_name, rectangle_projected, buildings, blocks_all, OSM_roads_all_projected, OSM_intersections_all_projected, road_union, utm_proj_city):
     print(f"cell_id: {cell_id}")
 
     # Preparatory calculations
@@ -253,56 +224,93 @@ def process_cell(cell_id, rectangle_projected):
     cell_id += 1
     return result
 
-# Use delayed to parallelize the processing
-delayed_results = [delayed(process_cell)(cell_id, cell) for cell_id, cell in enumerate(rectangles_projected)]
 
-# Process in batches
-batch_size = 5000
-n_batches = len(delayed_results) // batch_size + 1
-all_results = []
 
-for batch_num in range(n_batches):
-    print(batch_num)
-    batch_results = delayed_results[batch_num * batch_size: (batch_num + 1) * batch_size]
-    computed_batch = compute(*batch_results)  # This will execute the batch in parallel
-    batch_df = pd.DataFrame(computed_batch)
+def process_city(city_name):
+
+    city_grid = gpd.read_parquet(f'{grids_path}/{city_name}/{city_name}_{str(grid_size)}m_grid.parquet')
+
+    metrics_pilot = []
+    #rectangles = city_grids[city_grids.city_name==city_name]['lower_left_coordinates'][0]
+    rectangles = city_grid['geometry']
+    Overture_data_all = gpd.read_parquet(f'{buildings_path}/{city_name}/Overture_building_{city_name}.parquet')
+    print("Overture file read")
+
+    Overture_data_all['confidence'] = Overture_data_all.sources.apply(lambda x: json.loads(x)[0]['confidence'])
+    Overture_data_all['dataset'] = Overture_data_all.sources.apply(lambda x: json.loads(x)[0]['dataset'])
+    Overture_data = Overture_data_all.set_geometry('geometry')[Overture_data_all.dataset!='OpenStreetMap']
+
+    OSM_intersections_all = gpd.read_file(f'{intersections_path}/{city_name}/{city_name}_OSM_intersections.gpkg')
+    OSM_roads_all = gpd.read_file(f'{roads_path}/{city_name}/{city_name}_OSM_intersections.gpkg')
+    print("OSM files read")
     
-    # Save each batch as a CSV to avoid memory overflow
-    batch_df.to_csv(f'metrics_batch_{batch_num}_{city_name}_{str(grid_size)}m.csv', index=False)
-    
-    all_results.append(batch_df)
 
-# Combine all batch results after processing
-final_metrics_pilot = pd.concat(all_results, ignore_index=True)
-metrics_pilot = pd.DataFrame(final_metrics_pilot)
-result = pd.merge(rectangles, final_metrics_pilot, how='left', left_index=True, right_index=True)
-all_metrics_columns = ['metric_1','metric_2','metric_3','metric_4','metric_5','metric_6','metric_7','metric_8','metric_9','metric_10','metric_11','metric_12','metric_13']
+    utm_proj_city = get_utm_proj(float(OSM_roads_all.iloc[0].geometry.centroid.x), float(OSM_roads_all.iloc[0].geometry.centroid.y))
+    project = pyproj.Transformer.from_crs(pyproj.CRS('EPSG:4326'), utm_proj_city, always_xy=True).transform  
+    OSM_roads_all_projected = OSM_roads_all.to_crs(epsg=CRS.from_proj4(utm_proj_city).to_epsg())
+    OSM_intersections_all_projected = OSM_intersections_all.to_crs(epsg=CRS.from_proj4(utm_proj_city).to_epsg())
 
-# Save original values before transformations
-metrics_original_names = [col+'_original' for col in all_metrics_columns]
-result[metrics_original_names] = result[all_metrics_columns].copy()
+    blocks_all  = get_blocks(OSM_roads_all_projected.unary_union, OSM_roads_all_projected)
+    Overture_data_all_projected = Overture_data_all.to_crs(epsg=CRS.from_proj4(utm_proj_city).to_epsg())
+    buildings = Overture_data_all_projected
+    road_union = OSM_roads_all_projected.unary_union
 
-# Apply the standardization functions
-for metric, func in standardization_functions.items():
-    result[metric+'_standardized'] = func(result[metric])
+    rectangles_projected = rectangles.to_crs(epsg=CRS.from_proj4(utm_proj_city).to_epsg())
+    print("All preparations done. Ready to calculate metrics on grid.")
 
-metrics_standardized_names = [col+'_standardized' for col in all_metrics_columns]
+    cell_id = 0
+    # Use delayed to parallelize the processing
+    delayed_results = [delayed(process_cell)(cell_id, city_name, rectangle_projected, buildings, blocks_all, OSM_roads_all_projected, OSM_intersections_all_projected, road_union, utm_proj_city) for cell_id in enumerate(rectangles_projected)]
 
-# Center at zero and maximize information
-result.loc[:, all_metrics_columns] = (
-    result[metrics_standardized_names]
-    .apply(lambda x: (x - x.mean()) / (x.std()), axis=0)
-)
+    # Process in batches
+    batch_size = 5000
+    n_batches = len(delayed_results) // batch_size + 1
+    all_results = []
 
-# Convert metrics to a range between 0 and 1
-result.loc[:,all_metrics_columns] = (
-    result[all_metrics_columns]
-    .apply(lambda x: (x - x.min()) / (x.max()-x.min()), axis=0)
-)
+    for batch_num in range(n_batches):
+        print(batch_num)
+        batch_results = delayed_results[batch_num * batch_size: (batch_num + 1) * batch_size]
+        computed_batch = compute(*batch_results)  # This will execute the batch in parallel
+        batch_df = pd.DataFrame(computed_batch)
+        
+        # Save each batch as a CSV to avoid memory overflow
+        batch_df.to_csv(f'metrics_batch_{batch_num}_{city_name}_{str(grid_size)}m.csv', index=False)
+        
+        all_results.append(batch_df)
 
-# Calculate equal-weights irregularity index
-result['regularity_index'] = result[all_metrics_columns].mean(axis=1)
+    # Combine all batch results after processing
+    final_metrics = pd.concat(all_results, ignore_index=True)
+    metrics = pd.DataFrame(final_metrics)
+    result = pd.merge(rectangles, metrics, how='left', left_index=True, right_index=True)
+    all_metrics_columns = ['metric_1','metric_2','metric_3','metric_4','metric_5','metric_6','metric_7','metric_8','metric_9','metric_10','metric_11','metric_12','metric_13']
 
-# Save output file
-cols_to_save = [col for col in result.columns if col!='geometry']
-result[cols_to_save].to_excel(f"{output_path}/excel/pilot_test_results.xlsx")
+    # Save original values before transformations
+    metrics_original_names = [col+'_original' for col in all_metrics_columns]
+    result[metrics_original_names] = result[all_metrics_columns].copy()
+
+    # Apply the standardization functions
+    for metric, func in standardization_functions.items():
+        result[metric+'_standardized'] = func(result[metric])
+
+    metrics_standardized_names = [col+'_standardized' for col in all_metrics_columns]
+
+    # Center at zero and maximize information
+    result.loc[:, all_metrics_columns] = (
+        result[metrics_standardized_names]
+        .apply(lambda x: (x - x.mean()) / (x.std()), axis=0)
+    )
+
+    # Convert metrics to a range between 0 and 1
+    result.loc[:,all_metrics_columns] = (
+        result[all_metrics_columns]
+        .apply(lambda x: (x - x.min()) / (x.max()-x.min()), axis=0)
+    )
+
+    # Calculate equal-weights irregularity index
+    result['regularity_index'] = result[all_metrics_columns].mean(axis=1)
+
+    # Save output file
+    cols_to_save = [col for col in result.columns if col!='geometry']
+    output_dir_csv = f'{output_path_csv}/{city_name}'
+    os.makedirs(output_dir_csv, exist_ok=True)
+    result[cols_to_save].to_csv(f'{output_dir_csv}/{city_name}_results.csv')
