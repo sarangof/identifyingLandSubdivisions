@@ -28,6 +28,7 @@ ee.Initialize(project='city-extent')
 cities = ["Belo Horizonte", "Campinas", "Bogota", "Nairobi", "Bamako", 
           "Lagos", "Accra", "Abidjan", "Mogadishu", "Cape Town", 
           "Maputo", "Luanda"]
+cities = [city.replace(' ', '_') for city in cities]
 
 # Urban extent dataset
 urban_extent = ee.FeatureCollection("projects/wri-datalab/cities/urban_land_use/data/global_cities_Aug2024/urbanextents_unions_2020")
