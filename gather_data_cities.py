@@ -92,7 +92,7 @@ def overturemaps_command(bbox_str, request_type: str):
     print(f"Running Overture command with bbox_str={bbox_str} and request_type={request_type}")
     command = [
         "overturemaps", "download",
-        "-f", "geojson",
+        "-f", "geoparquet",
         "--bbox=" + bbox_str,
         "--type=" + request_type
     ]
@@ -112,7 +112,7 @@ def overturemaps_command(bbox_str, request_type: str):
 #@delayed
 def overturemaps_save(overture_file, output_dir, request_type: str, city_name: str):
     if overture_file is not None:
-        output_path = f'{output_dir}/Overture_{request_type}_{city_name}.geojson' #f'./output_data/Overture_{request_type}_{id}.geojson'
+        output_path = f'{output_dir}/Overture_{request_type}_{city_name}.parquet' #f'./output_data/Overture_{request_type}_{id}.geojson'
         print(f"Saving Overture file to {output_path}")
         try:
             overture_file.to_file(output_path)
