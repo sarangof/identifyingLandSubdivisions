@@ -34,6 +34,7 @@ output_path = f'{main_path}/output'
 cities = ["Belo Horizonte", "Campinas", "Bogota", "Nairobi", "Bamako", 
           "Lagos", "Accra", "Abidjan", "Mogadishu", "Cape Town", 
           "Maputo", "Luanda"]
+cities = ["Belo Horizonte", "Campinas"]
 cities = [city.replace(' ', '_') for city in cities]
 
 # Useful auxiliary functions
@@ -88,42 +89,29 @@ def osm_command(city_name, search_area):
 
 
 #@delayed
-def overturemaps_command(bbox_str, request_type: str):
+def overturemaps_download_and_save(bbox_str, request_type: str, output_dir, city_name: str):
     print(f"Running Overture command with bbox_str={bbox_str} and request_type={request_type}")
+    output_path = os.path.join(output_dir, f'Overture_{request_type}_{city_name}.parquet')
     command = [
         "overturemaps", "download",
         "-f", "geoparquet",
         "--bbox=" + bbox_str,
-        "--type=" + request_type
+        "--type=" + request_type,
+        "--output=" + output_path  # Specify the output file
     ]
     result = subprocess.run(command, capture_output=True, text=True)
     if result.returncode == 0:
-        geoparquet_data = result.stdout
         try:
-            overture_file = gpd.read_file(StringIO(geoparquet_data))
-            return overture_file
+            # Load the file into a GeoDataFrame if further processing is needed
+            overture_file = gpd.read_parquet(output_path)
+            print(f"Saved Overture data to {output_path}")
+            return overture_file, output_path
         except Exception as e:
             print(f"Error reading Overture data: {e}")
-            return None
+            return None, None
     else:
         print(f"Error occurred while running Overture command: {result.stderr}")
-    return None
-
-#@delayed
-def overturemaps_save(overture_file, output_dir, request_type: str, city_name: str):
-    if overture_file is not None:
-        output_path = f'{output_dir}/Overture_{request_type}_{city_name}.parquet' #f'./output_data/Overture_{request_type}_{id}.geojson'
-        print(f"Saving Overture file to {output_path}")
-        try:
-            overture_file.to_file(output_path)
-            return output_path
-        except Exception as e:
-            print(f"Error saving Overture file: {e}")
-    else:
-        print(f"Skipping save for Overture ID: {id}")
-    return None
-
-
+        return None, None
 
 def make_requests(partition):
     print(f"Processing partition with {len(partition)} rows")
@@ -154,19 +142,10 @@ def make_requests(partition):
             bbox_str = ','.join(search_area_bounds[['minx', 'miny', 'maxx', 'maxy']].values[0].astype(str))
             request_type = 'building'
             print("About to trigger overturemaps command")
-            overture_file = overturemaps_command(bbox_str, request_type)
-            
-            if overture_file is not None:
-                print("About to trigger overturemaps save")
-                        # Ensure the directory exists
-                output_dir_buildings = f"{buildings_path}/{city_name}"
-                os.makedirs(output_dir_buildings, exist_ok=True)
-                save_result = overturemaps_save(overture_file, output_dir_buildings, request_type, city_name)
-                results.append(save_result)
+            output_dir_buildings = f"{buildings_path}/{city_name}"
+            overturemaps_download_and_save(bbox_str, request_type, output_dir_buildings, city_name)
         except Exception as e:
             print(f"Overture error: {e}")
-
-
     return results
 
 # Paralellize data gathering for all cities in the list.
