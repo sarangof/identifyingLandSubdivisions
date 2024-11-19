@@ -8,8 +8,8 @@ import fiona
 import geopandas as gpd
 import numpy as np
 from shapely.geometry import box
-import pyproj
-from pyproj import CRS
+#import pyproj
+from pyproj import CRS, Geod
 import json
 from dask import delayed, compute
 from shapely.errors import TopologicalError
@@ -39,12 +39,12 @@ def get_utm_crs(geometry):
     return epsg_code
 
 
-def process_cell(cell_id, city_name, geod, rectangle_projected, buildings, blocks_all, OSM_roads_all_projected, OSM_intersections_all_projected, road_union, utm_proj_city):
+def process_cell(cell_id, geod, rectangle, rectangle_projected, buildings, blocks_all, OSM_roads_all_projected, OSM_intersections_all_projected, road_union, utm_proj_city):
     print(f"cell_id: {cell_id}")
 
     bounding_box = rectangle_projected.bounds
     bounding_box_geom = box(*bounding_box)
-    rectangle_area, _ = geod.geometry_area_perimeter(rectangle_projected)
+    rectangle_area, _ = geod.geometry_area_perimeter(rectangle)
 
     if rectangle_area > 0: 
 
@@ -64,6 +64,7 @@ def process_cell(cell_id, city_name, geod, rectangle_projected, buildings, block
             building_density = np.nan
             n_buildings = np.nan
 
+        print(building_density)
         # Only execute calculations above a certain building density
         if building_density > 64:
             blocks_clipped = blocks_all[blocks_all.geometry.intersects(bounding_box_geom)]
@@ -168,7 +169,7 @@ def process_cell(cell_id, city_name, geod, rectangle_projected, buildings, block
             
             if (not roads_clipped.empty) and (not OSM_intersections.empty):
                 # Metric 9 -- tortuosity index
-                m9 = metric_9_tortuosity_index(city_name, roads_intersection, OSM_intersections, rectangle_projected, angular_threshold=30, tortuosity_tolerance=5)
+                m9 = metric_9_tortuosity_index(roads_clipped)
                                                                 
                 # Metric 10 -- average angle between road segments
                 m10 = metric_10_average_angle_between_road_segments(OSM_intersections, roads_clipped) #OJO, ROADS EXPANDED
@@ -196,8 +197,8 @@ def process_cell(cell_id, city_name, geod, rectangle_projected, buildings, block
                 m11, m12, m13 = np.nan, np.nan, np.nan
 
         else:
-            m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13 = np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
-            OSM_buildings_bool, OSM_intersections_bool, building_area, building_density, share_tiled_by_blocks, road_length, n_buildings = np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
+            m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13 = np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
+            OSM_buildings_bool, OSM_roads_bool, OSM_intersections_bool, building_area, building_density, share_tiled_by_blocks, road_length, n_buildings, n_intersections = np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
 
         print(f"One round of metrics done for cell_id: {cell_id}")
 
@@ -224,11 +225,37 @@ def process_cell(cell_id, city_name, geod, rectangle_projected, buildings, block
                 'share_tiled_by_blocks': share_tiled_by_blocks,
                 'road_length':road_length,
                 'n_intersections':n_intersections,
-                'n_buildings':n_buildings
+                'n_buildings':n_buildings,
+                'building_density':building_density
                 }
         cell_id += 1
     else:
-        result = None
+        result = {'index':np.nan,
+                'metric_1':np.nan,
+                'metric_2':np.nan,
+                'metric_3':np.nan,
+                'metric_4':np.nan,
+                'metric_5':np.nan,
+                'metric_6':np.nan,
+                'metric_7':np.nan,
+                'metric_8':np.nan,
+                'metric_9':np.nan,
+                'metric_10':np.nan,
+                'metric_11':np.nan,
+                'metric_12':np.nan,
+                'metric_13':np.nan,
+                'OSM_buildings_available':np.nan,
+                'OSM_intersections_available':np.nan,
+                'OSM_roads_available':np.nan,
+                #'Overture_buildings_available':Overture_buildings_bool,
+                'rectangle_area': rectangle_area,
+                'building_area':np.nan,
+                'share_tiled_by_blocks': np.nan,
+                'road_length':np.nan,
+                'n_intersections':np.nan,
+                'n_buildings':np.nan,
+                'building_density':building_density
+                }
     return result
 
 def process_city(city_name):
@@ -290,10 +317,10 @@ def process_city(city_name):
         # Grid-Level Parallelization using Dask Delayed
         delayed_results = [
             delayed(process_cell)(
-                cell_id, city_name, geod, rectangle, buildings, blocks_all, OSM_roads_all_projected,
+                cell_id, city_name, geod, rectangle, rectangle_projected, buildings, blocks_all, OSM_roads_all_projected,
                 OSM_intersections_all_projected, road_union, utm_proj_city
             )
-            for cell_id, rectangle in enumerate(rectangles_projected)
+            for cell_id, (rectangle, rectangle_projected) in enumerate(zip(rectangles, rectangles_projected))
         ]
 
         # Compute the results using Dask
@@ -304,6 +331,7 @@ def process_city(city_name):
         output_dir_csv = f'{output_path_csv}/{city_name}'
         os.makedirs(output_dir_csv, exist_ok=True)
         if not batch_df.empty:
+            print(batch_df.head())
             batch_df.to_csv(f'{output_dir_csv}/{city_name}_results.csv', index=False)
         else:
             print(f"No valid data for city {city_name}. Skipping CSV output.")
