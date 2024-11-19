@@ -262,7 +262,7 @@ def process_city(city_name):
     try:
         city_grid = gpd.read_parquet(f'{grids_path}/{city_name}/{city_name}_{str(grid_size)}m_grid.parquet')
 
-        rectangles = city_grid['geometry'][:100]
+        rectangles = city_grid['geometry']
 
         # Read buildings
         if not os.path.exists(f'{buildings_path}/{city_name}/Overture_building_{city_name}.geojson'):
