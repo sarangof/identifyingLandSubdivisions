@@ -568,15 +568,12 @@ def calculate_tortuosity(geometry):
             road_lengths.append(road_length)
             euclidean_distances.append(euclidean_distance)
 
-    if len(road_lengths) == 0:
-        return np.nan  # No valid road segments
-
     # Calculate tortuosity index for each road segment (length/Euclidean)
     tortuosity_index = np.array(euclidean_distances) / np.array(road_lengths)
     if len(tortuosity_index) > 0:
         return euclidean_distances,road_lengths
-    else:
-        np.nan, np.nan
+    elif len(tortuosity_index)==0:
+        return [], []
 
 
 #1 Share of building footprints that are less than 10-meters away from the nearest road
