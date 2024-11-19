@@ -317,7 +317,7 @@ def process_city(city_name):
         # Grid-Level Parallelization using Dask Delayed
         delayed_results = [
             delayed(process_cell)(
-                cell_id, city_name, geod, rectangle, rectangle_projected, buildings, blocks_all, OSM_roads_all_projected,
+                cell_id, geod, rectangle, rectangle_projected, buildings, blocks_all, OSM_roads_all_projected,
                 OSM_intersections_all_projected, road_union, utm_proj_city
             )
             for cell_id, (rectangle, rectangle_projected) in enumerate(zip(rectangles, rectangles_projected))
