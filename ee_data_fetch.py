@@ -28,6 +28,7 @@ ee.Initialize(project='city-extent')
 cities = ["Belo Horizonte", "Campinas", "Bogota", "Nairobi", "Bamako", 
           "Lagos", "Accra", "Abidjan", "Mogadishu", "Cape Town", 
           "Maputo", "Luanda"]
+cities = ["Campinas", "Bogota", "Accra", "Cape Town"]
 cities = [city.replace(' ', '_') for city in cities]
 
 # Urban extent dataset
@@ -77,8 +78,9 @@ def ee_to_gdf(ee_fc):
 # Function to process each city
 @delayed
 def process_city(city_name, search_buffer_distance=500, grid_sizes=[100, 200]):
+    print(city_name)
     # Filter urban extent for the city
-    city_extent = urban_extent.filter(ee.Filter.eq('city_name_large', city_name))
+    city_extent = urban_extent.filter(ee.Filter.eq('city_name_large', city_name.replace('_', ' ')))
     city_geometry = city_extent.geometry()
     city_area = city_geometry.area().getInfo()
 
@@ -100,20 +102,17 @@ def process_city(city_name, search_buffer_distance=500, grid_sizes=[100, 200]):
     analysis_gdf = ee_to_gdf(analysis_fc)
     search_gdf = ee_to_gdf(search_fc)
 
-    # Save GeoDataFrames to Parquet directly
-    city_file_name = city_name.replace(" ", "_")
+    if not os.path.exists(f'{extents_path}/{city_name}'):
+        os.makedirs(f'{extents_path}/{city_name}')
+    city_gdf.to_parquet(f'{extents_path}/{city_name}/{city_name}_urban_extent.parquet')
 
-    if not os.path.exists(f'{extents_path}/{city_file_name}'):
-        os.makedirs(f'{extents_path}/{city_file_name}')
-    city_gdf.to_parquet(f'{extents_path}/{city_file_name}/{city_name}_urban_extent.parquet')
+    if not os.path.exists(f'{analysis_buffers_path}/{city_name}'):
+        os.makedirs(f'{analysis_buffers_path}/{city_name}')
+    analysis_gdf.to_parquet(f'{analysis_buffers_path}/{city_name}/{city_name}_analysis_buffer.parquet')
 
-    if not os.path.exists(f'{analysis_buffers_path}/{city_file_name}'):
-        os.makedirs(f'{analysis_buffers_path}/{city_file_name}')
-    analysis_gdf.to_parquet(f'{analysis_buffers_path}/{city_file_name}/{city_name}_analysis_buffer.parquet')
-
-    if not os.path.exists(f'{search_buffers_path}/{city_file_name}'):
-        os.makedirs(f'{search_buffers_path}/{city_file_name}')
-    search_gdf.to_parquet(f'{search_buffers_path}/{city_file_name}/{city_name}_search_buffer.parquet')
+    if not os.path.exists(f'{search_buffers_path}/{city_name}'):
+        os.makedirs(f'{search_buffers_path}/{city_name}')
+    search_gdf.to_parquet(f'{search_buffers_path}/{city_name}/{city_name}_search_buffer.parquet')
 
     # Create grids for the search area using GeoPandas
     for grid_size in grid_sizes:
@@ -126,9 +125,9 @@ def process_city(city_name, search_buffer_distance=500, grid_sizes=[100, 200]):
         # Add a boolean attribute to indicate if the cell intersects with the analysis area
         filtered_grid_gdf['intersects_analysis_area'] = filtered_grid_gdf.intersects(analysis_gdf.geometry.iloc[0])
 
-        if not os.path.exists(f'{grids_path}/{city_file_name}'):
-            os.makedirs(f'{grids_path}/{city_file_name}')
-        filtered_grid_gdf.to_parquet(f'{grids_path}/{city_file_name}/{city_name}_{grid_size}m_grid.parquet')
+        if not os.path.exists(f'{grids_path}/{city_name}'):
+            os.makedirs(f'{grids_path}/{city_name}')
+        filtered_grid_gdf.to_parquet(f'{grids_path}/{city_name}/{city_name}_{grid_size}m_grid.parquet')
 
 # Use Dask to parallelize the processing of cities
 tasks = [process_city(city) for city in cities]
