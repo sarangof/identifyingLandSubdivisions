@@ -148,8 +148,6 @@ def process_cell(cell_id, city_name, rectangle_projected, buildings, blocks_all,
         if (not roads_clipped.empty) and (not OSM_intersections.empty):
             # Metric 9 -- tortuosity index
             m9 = metric_9_tortuosity_index(city_name, roads_intersection, OSM_intersections, rectangle_projected, angular_threshold=30, tortuosity_tolerance=5)
-            # WHY DOES THIS WORK?
-            #m9 = metric_9_tortuosity_index(roads_clipped)
                                                             
             # Metric 10 -- average angle between road segments
             m10 = metric_10_average_angle_between_road_segments(OSM_intersections, roads_clipped) #OJO, ROADS EXPANDED
