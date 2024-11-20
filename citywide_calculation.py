@@ -13,6 +13,9 @@ from pyproj import CRS, Geod
 import json
 from dask import delayed, compute
 from shapely.errors import TopologicalError
+import rasterio
+from rasterio.features import rasterize
+from rasterio.warp import calculate_default_transform, reproject, Resampling
 
 
 main_path = '../data'
@@ -22,6 +25,7 @@ roads_path = f'{input_path}/roads'
 intersections_path = f'{input_path}/intersections'
 grids_path = f'{input_path}/city_info/grids'
 output_path_csv = f'{main_path}/output/csv'
+output_path_raster = f'{main_path}/output/raster'
 
 # Define important parameters for this run
 grid_size = 200
@@ -37,6 +41,77 @@ def get_utm_crs(geometry):
     else:
         epsg_code = None
     return epsg_code
+
+def convert_to_raster(gdf, output_path, resolution = 200):
+    
+    gdf_projected = gdf.to_crs(epsg=3857)
+
+    # Get bounds of the GeoDataFrame after reprojection
+    bounds = gdf_projected.total_bounds  # (minx, miny, maxx, maxy)
+    minx, miny, maxx, maxy = bounds
+
+    # Calculate the number of rows and columns for the raster grid
+    width = int((maxx - minx) / resolution)
+    height = int((maxy - miny) / resolution)
+
+    # Define transform for the raster (top-left corner origin)
+    transform = rasterio.transform.from_origin(minx, maxy, resolution, resolution)
+
+    # Create an empty numpy array for the raster data
+    raster_data = np.zeros((height, width), dtype=rasterio.float32)
+
+    # Create a new raster file to write
+    with rasterio.open(
+        'output_raster_projected.tif',
+        'w',
+        driver='GTiff',
+        height=height,
+        width=width,
+        count=1,
+        dtype=raster_data.dtype,
+        crs=gdf_projected.crs,  # CRS is now EPSG:3857
+        transform=transform,
+    ) as dst:
+        # Prepare shapes (geometry and attribute values) for rasterization
+        shapes = ((geom, value) for geom, value in zip(gdf_projected.geometry, gdf_projected['attribute_column']))
+        
+        # Rasterize the GeoDataFrame
+        burned = rasterize(
+            shapes=shapes,
+            out_shape=raster_data.shape,
+            transform=transform,
+            fill=0,  # Value to use for empty cells
+            dtype=raster_data.dtype,
+        )
+
+        # Write the rasterized data to the file
+        dst.write(burned, 1)
+
+    # Optional: Reproject the raster back to WGS84 if needed
+    with rasterio.open('output_raster_projected.tif') as src:
+        transform, width, height = calculate_default_transform(
+            src.crs, 'EPSG:4326', src.width, src.height, *src.bounds)
+        kwargs = src.meta.copy()
+        kwargs.update({
+            'crs': 'EPSG:4326',
+            'transform': transform,
+            'width': width,
+            'height': height
+        })
+
+        with rasterio.open('output_raster_wgs84.tif', 'w', **kwargs) as dst:
+            reproject(
+                source=rasterio.band(src, 1),
+                destination=rasterio.band(dst, 1),
+                src_transform=src.transform,
+                src_crs=src.crs,
+                dst_transform=transform,
+                dst_crs='EPSG:4326',
+                resampling=Resampling.nearest)
+        
+
+def process_metrics(metrics_df):
+    pass
 
 
 def process_cell(cell_id, geod, rectangle, rectangle_projected, buildings, blocks_all, OSM_roads_all_projected, OSM_intersections_all_projected, road_union, utm_proj_city):
@@ -327,6 +402,8 @@ def process_city(city_name):
         batch_results = compute(*delayed_results)
         batch_df = pd.DataFrame(batch_results)
 
+        (batch_df)
+
         # Save each batch as a CSV to avoid memory overflow
         output_dir_csv = f'{output_path_csv}/{city_name}'
         os.makedirs(output_dir_csv, exist_ok=True)
@@ -335,6 +412,16 @@ def process_city(city_name):
             batch_df.to_csv(f'{output_dir_csv}/{city_name}_results.csv', index=False)
         else:
             print(f"No valid data for city {city_name}. Skipping CSV output.")
+
+        output_dir_csv = f'{output_path_csv}/{city_name}'
+
+
+        output_dir_raster = f'{output_path_raster}/{city_name}'
+
+        # GOTTA JOIN AND DO RESPONSIBLE THINGS WITH THE INDEX
+        convert_to_raster(batch_df,f'{output_dir_raster}/{city_name}')
+
+
 
 
     except Exception as e:
