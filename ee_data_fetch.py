@@ -28,7 +28,6 @@ ee.Initialize(project='city-extent')
 cities = ["Belo Horizonte", "Campinas", "Bogota", "Nairobi", "Bamako", 
           "Lagos", "Accra", "Abidjan", "Mogadishu", "Cape Town", 
           "Maputo", "Luanda"]
-cities = ["Campinas", "Bogota", "Accra", "Cape Town"]
 cities = [city.replace(' ', '_') for city in cities]
 
 # Urban extent dataset
