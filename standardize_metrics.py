@@ -49,7 +49,7 @@ def standardize_metric_11(series):
     return series/200
 
 def standardize_metric_12(series):
-    return 1-series
+    return series
 
 def standardize_metric_13(series):
     series = np.where(series > 200, 200, series)
