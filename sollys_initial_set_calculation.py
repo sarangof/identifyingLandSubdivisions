@@ -228,23 +228,24 @@ all_metrics_columns = ['metric_1','metric_2','metric_3','metric_4','metric_5','m
 metrics_original_names = [col+'_original' for col in all_metrics_columns]
 final_geo_df[metrics_original_names] = final_geo_df[all_metrics_columns].copy()
 
+
+metrics_standardized_names = {col:col+'_standardized' for col in all_metrics_columns}
+
 # Apply the standardization functions
 for metric, func in standardization_functions.items():
-    final_geo_df[metric] = func(final_geo_df[metric])
+    final_geo_df[metrics_standardized_names[metric]] = func(final_geo_df[metric])
 
-metrics_standardized_names = [col+'_standardized' for col in all_metrics_columns]
+# # Center at zero and maximize information
+# final_geo_df.loc[:, all_metrics_columns] = (
+#     final_geo_df[list(metrics_standardized_names.values())]
+#     .apply(lambda x: (x - x.mean()) / (x.std()))
+# )
 
-# Center at zero and maximize information
-final_geo_df.loc[:, all_metrics_columns] = (
-    final_geo_df[metrics_standardized_names]
-    .apply(lambda x: (x - x.mean()) / (x.std()), axis=0)
-)
-
-# Convert metrics to a range between 0 and 1
-final_geo_df.loc[:,all_metrics_columns] = (
-    final_geo_df[all_metrics_columns]
-    .apply(lambda x: (x - x.min()) / (x.max()-x.min()), axis=0)
-)
+# # Convert metrics to a range between 0 and 1
+# final_geo_df.loc[:,all_metrics_columns] = (
+#     final_geo_df[list(metrics_standardized_names.values())]
+#     .apply(lambda x: (x - x.min()) / (x.max()-x.min()), axis=0)
+# )
 
 # Calculate equal-weights irregularity index
 final_geo_df['regularity_index'] = final_geo_df[all_metrics_columns].mean(axis=1)

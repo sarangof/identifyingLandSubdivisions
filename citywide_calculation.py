@@ -110,8 +110,40 @@ def convert_to_raster(gdf, output_path, resolution = 200):
                 resampling=Resampling.nearest)
         
 
-def process_metrics(metrics_df):
-    pass
+def process_metrics(final_geo_df):
+    all_metrics_columns = ['metric_1','metric_2','metric_3','metric_4','metric_5','metric_6','metric_7','metric_8','metric_9','metric_10','metric_11','metric_12','metric_13']
+
+    # Save original values before transformations
+    metrics_original_names = [col+'_original' for col in all_metrics_columns]
+    final_geo_df[metrics_original_names] = final_geo_df[all_metrics_columns].copy()
+
+
+    metrics_standardized_names = {col:col+'_standardized' for col in all_metrics_columns}
+
+    # Apply the standardization functions
+    for metric, func in standardization_functions.items():
+        final_geo_df[metrics_standardized_names[metric]] = func(final_geo_df[metric])
+
+    # # Center at zero and maximize information
+    # final_geo_df.loc[:, all_metrics_columns] = (
+    #     final_geo_df[list(metrics_standardized_names.values())]
+    #     .apply(lambda x: (x - x.mean()) / (x.std()))
+    # )
+
+    # # Convert metrics to a range between 0 and 1
+    # final_geo_df.loc[:,all_metrics_columns] = (
+    #     final_geo_df[list(metrics_standardized_names.values())]
+    #     .apply(lambda x: (x - x.min()) / (x.max()-x.min()), axis=0)
+    # )
+
+    # Calculate equal-weights irregularity index
+    #final_geo_df['regularity_index'] = final_geo_df[all_metrics_columns].mean(axis=1)
+
+    #OJO GOTTA REMOVE
+    final_geo_df['regularity_index'] = final_geo_df[list(metrics_standardized_names.values())].mean(axis=1)
+
+    return final_geo_df
+
 
 
 def process_cell(cell_id, geod, rectangle, rectangle_projected, buildings, blocks_all, OSM_roads_all_projected, OSM_intersections_all_projected, road_union, utm_proj_city):
@@ -335,7 +367,8 @@ def process_cell(cell_id, geod, rectangle, rectangle_projected, buildings, block
 
 def process_city(city_name):
     try:
-        city_grid = gpd.read_parquet(f'{grids_path}/{city_name}/{city_name}_{str(grid_size)}m_grid.parquet')
+        city_grid = gpd.read_parquet(f'{grids_path}/{city_name}/{city_name}_{str(grid_size)}m_grid.parquet').reset_index()
+        city_grid = city_grid[(cols for cols in city_grid.columns if cols != 'index')]
 
         rectangles = city_grid['geometry']
 
@@ -402,10 +435,13 @@ def process_city(city_name):
         batch_results = compute(*delayed_results)
         batch_df = pd.DataFrame(batch_results)
 
-        (batch_df)
+        final_geo_df = gpd.GeoDataFrame(pd.merge(city_grid, batch_df, how='left', left_index=True, right_index=True), geometry=city_grid.geometry)
 
+        final_geo_df = process_metrics(final_geo_df)
+    
         # Save each batch as a CSV to avoid memory overflow
         output_dir_csv = f'{output_path_csv}/{city_name}'
+
         os.makedirs(output_dir_csv, exist_ok=True)
         if not batch_df.empty:
             print(batch_df.head())
