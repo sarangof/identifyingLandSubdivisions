@@ -34,7 +34,6 @@ output_path = f'{main_path}/output'
 cities = ["Belo Horizonte", "Campinas", "Bogota", "Nairobi", "Bamako", 
           "Lagos", "Accra", "Abidjan", "Mogadishu", "Cape Town", 
           "Maputo", "Luanda"]
-cities = ["Belo Horizonte", "Campinas"]
 cities = [city.replace(' ', '_') for city in cities]
 
 # Useful auxiliary functions
