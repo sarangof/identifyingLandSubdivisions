@@ -774,7 +774,7 @@ def metric_9_tortuosity_index(roads_clipped):
 def metric_10_average_angle_between_road_segments(intersections, roads):
 
     df_angles = calculate_sequential_angles_option_A(intersections, roads)
-    intersection_angles_df = intersections[['osmid','street_count']].set_index('osmid').merge(df_angles.set_index('Intersection ID'),left_index=True,right_index=True,how='outer')
+    intersection_angles_df = intersections[['osmid','street_count']].set_index('osmid').merge(df_angles.set_index('Intersection ID'), left_index=True, right_index=True, how='outer')
     # In 3-way intersections, include only the smallest angle in the tile average. 
     df_3_way = intersection_angles_df[(intersection_angles_df.street_count==3)]
     if not df_3_way.empty:
