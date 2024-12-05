@@ -1,0 +1,15 @@
+name: subdivisions2
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - geemap
+  - geopandas
+  - osmnx
+  - coiled
+  - jupyterlab
+  - jupyter-server-proxy
+  - python-graphviz
+  - overturemaps
+  - earthengine-api
+  - google-cloud-sdk
