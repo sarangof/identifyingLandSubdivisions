@@ -124,23 +124,25 @@ def process_metrics(final_geo_df):
     for metric, func in standardization_functions.items():
         final_geo_df[metrics_standardized_names[metric]] = func(final_geo_df[metric])
 
-    # # Center at zero and maximize information
-    # final_geo_df.loc[:, all_metrics_columns] = (
-    #     final_geo_df[list(metrics_standardized_names.values())]
-    #     .apply(lambda x: (x - x.mean()) / (x.std()))
-    # )
+    zero_centered_names_list = [col+'_zero-centered' for col in all_metrics_columns]
+    final_geo_df[zero_centered_names_list] = final_geo_df[list(metrics_standardized_names.values())].copy()
 
-    # # Convert metrics to a range between 0 and 1
-    # final_geo_df.loc[:,all_metrics_columns] = (
-    #     final_geo_df[list(metrics_standardized_names.values())]
-    #     .apply(lambda x: (x - x.min()) / (x.max()-x.min()), axis=0)
-    # )
+    # Center at zero and maximize information
+    final_geo_df.loc[:, zero_centered_names_list] = (
+        final_geo_df.loc[:,zero_centered_names_list]
+        .apply(lambda x: (x - x.mean()) / (x.std()))
+    )
+
+    final_geo_df[all_metrics_columns] = final_geo_df[zero_centered_names_list].copy()
+
+    # Center at zero and maximize information
+    final_geo_df.loc[:, all_metrics_columns] = (
+        final_geo_df[all_metrics_columns]
+        .apply(lambda x: (x - x.min()) / (x.max() - x.min()))
+    )
 
     # Calculate equal-weights irregularity index
-    #final_geo_df['regularity_index'] = final_geo_df[all_metrics_columns].mean(axis=1)
-
-    #OJO GOTTA REMOVE
-    final_geo_df['regularity_index'] = final_geo_df[list(metrics_standardized_names.values())].mean(axis=1)
+    final_geo_df['regularity_index'] = final_geo_df[all_metrics_columns].mean(axis=0)
 
     return final_geo_df
 
