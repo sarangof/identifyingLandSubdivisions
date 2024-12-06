@@ -8,6 +8,11 @@ import dask.dataframe as dd
 import os
 import pyproj
 from shapely.ops import transform
+import logging
+
+# Logging Configuration
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 """
 This script collects and saves data on buildings, roads and intersections information 
@@ -15,7 +20,8 @@ for all the cities provided in analysis_buffers, search_buffers and city_boundar
 """
 
 # Define paths
-main_path = '../data'
+#main_path = '../data'
+main_path = "/mount/wri-cities-sandbox/identifyingLandSubdivisions/data"
 input_path = f'{main_path}/input'
 buildings_path = f'{input_path}/buildings'
 roads_path = f'{input_path}/roads'
@@ -30,11 +36,6 @@ search_buffers_path = f'{city_info_path}/search_buffers'
 grids_path = f'{city_info_path}/grids'
 output_path = f'{main_path}/output'
 
-# List of cities for which to gather data
-cities = ["Belo Horizonte", "Campinas", "Bogota", "Nairobi", "Bamako", 
-          "Lagos", "Accra", "Abidjan", "Mogadishu", "Cape Town", 
-          "Maputo", "Luanda"]
-cities = [city.replace(' ', '_') for city in cities]
 
 # Useful auxiliary functions
 def remove_duplicate_roads(osm_roads):
@@ -148,11 +149,14 @@ def make_requests(partition):
     return results
 
 # Paralellize data gathering for all cities in the list.
-def run_all():
+def run_all(cities):
+    cities = [city.replace(' ', '_') for city in cities]
+    logger.info(f'Cities to be processed: {cities}')
+    
     cities_set = pd.DataFrame({'city':cities})
 
     # Create Dask DataFrame
-    cities_set_ddf = dd.from_pandas(cities_set, npartitions=4)
+    cities_set_ddf = dd.from_pandas(cities_set, npartitions=12)
     
     # Print the Dask DataFrame columns
     print(f"Columns in the Dask DataFrame: {cities_set_ddf.columns.tolist()}")
@@ -164,6 +168,4 @@ def run_all():
     computed_results = results.compute()
     print(f"Results: {computed_results}")
 
-# Execute the function
-run_all()
-print("All tasks completed.")
+
