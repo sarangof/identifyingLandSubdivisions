@@ -10,15 +10,19 @@ import tempfile
 import dask
 from dask import delayed
 from dask.diagnostics import ProgressBar
-from dask.distributed import Client, LocalCluster
+from dask.distributed import Client, LocalCluster, get_client
 import logging
+
 
 # Logging Configuration
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+logger.info("START")
+
 # Paths Configuration
 MAIN_PATH = "data"
+#MAIN_PATH = "/mount/wri-cities-sandbox/identifyingLandSubdivisions/data"
 INPUT_PATH = os.path.join(MAIN_PATH, "input")
 CITY_INFO_PATH = os.path.join(INPUT_PATH, "city_info")
 EXTENTS_PATH = os.path.join(CITY_INFO_PATH, "extents")
@@ -27,10 +31,7 @@ SEARCH_BUFFERS_PATH = os.path.join(CITY_INFO_PATH, "search_buffers")
 GRIDS_PATH = os.path.join(CITY_INFO_PATH, "grids")
 OUTPUT_PATH = os.path.join(MAIN_PATH, "output")
 
-# Dask Configuration
-N_WORKERS = 4
-THREADS_PER_WORKER = 2
-MEMORY_LIMIT = "2GB"
+
 
 def ensure_paths_exist(paths):
     """Ensure all necessary directories exist."""
@@ -67,13 +68,15 @@ def filter_grid_by_geometry(grid_gdf, target_geometry):
     return filtered_grid
 
 # Function to process each city
-#@delayed
+@delayed
 def process_city(city_name, urban_extent, search_buffer_distance=500, grid_sizes=[100, 200]):
     logger.info(f"Processing {city_name} with grid sizes: {grid_sizes}")
+    ee.Initialize()
     # Filter urban extent for the city
     city_extent = urban_extent.filter(ee.Filter.eq('city_name_large', city_name.replace('_', ' ')))
     city_geometry = city_extent.geometry()
     city_area = city_geometry.area().getInfo()
+    logger.info(f"City area: {city_area} m2")
 
     # Create analysis buffer and subtract the urban extent to make it hollow
     analysis_buffer_radius = compute_buffer_radius(city_area)
@@ -119,51 +122,35 @@ def process_city(city_name, urban_extent, search_buffer_distance=500, grid_sizes
         if not os.path.exists(f'{GRIDS_PATH}/{city_name}'):
             os.makedirs(f'{GRIDS_PATH}/{city_name}')
         filtered_grid_gdf.to_parquet(f'{GRIDS_PATH}/{city_name}/{city_name}_{grid_size}m_grid.parquet')
+        logger.info(f"{grid_size}m grid cells: {len(filtered_grid_gdf)}")
 
 
 
 
 
-def main():
+def main(cities):
     # Authenticate and initialize Earth Engine
     logger.info('Authenticate and initialize Earth Engine')
     ee.Authenticate()
-    ee.Initialize(project='citiesindicators')
+    ee.Initialize(opt_url="https://earthengine-highvolume.googleapis.com")
     
     # Urban extent dataset
     urban_extent = ee.FeatureCollection("projects/wri-datalab/cities/urban_land_use/data/global_cities_Aug2024/urbanextents_unions_2020")
 
-    # Start a Dask client for parallel computing
-    cluster = LocalCluster(n_workers=4, threads_per_worker=2, memory_limit="2GB")
-    client = Client(cluster)
-    logger.info(f"Dask dashboard: {client.dashboard_link}")
-
-    # List of cities to process
-    cities = ["Belo Horizonte", "Campinas", "Bogota", "Nairobi", "Bamako", 
-            "Lagos", "Accra", "Abidjan", "Mogadishu", "Cape Town", 
-            "Maputo", "Luanda"]
-
-    test_cities = ["Belo Horizonte"]
-    cities = test_cities
-
     cities = [city.replace(' ', '_') for city in cities]
-    logger.info('Cities to be processed: {cities}')
+    logger.info(f'Cities to be processed: {cities}')
  
 
     # Use Dask to parallelize the processing of cities
     tasks = [process_city(city, urban_extent) for city in cities]
-    logger.info('Dask tasks: {tasks}')
+    logger.info(f'Dask tasks: {tasks}')
 
-    dask.visualize(*tasks, filename='data/dask.svg')
+    #dask.visualize(*tasks, filename='data/dask.svg')
 
     # Use ProgressBar to monitor progress
     logger.info('Computing Dask tasks')
 
     with ProgressBar():
         dask.compute(*tasks)
+        logger.info('FINISH')
 
-    # Shut down the client
-    client.close()
-
-if __name__ == "__main__":
-    main()
