@@ -16,6 +16,7 @@ from shapely.errors import TopologicalError
 import rasterio
 from rasterio.features import rasterize
 from rasterio.warp import calculate_default_transform, reproject, Resampling
+from functools import partial
 
 
 main_path = '../data'
@@ -41,74 +42,7 @@ def get_utm_crs(geometry):
     else:
         epsg_code = None
     return epsg_code
-
-def convert_to_raster(gdf, output_path, resolution = 200):
     
-    gdf_projected = gdf.to_crs(epsg=3857)
-
-    # Get bounds of the GeoDataFrame after reprojection
-    bounds = gdf_projected.total_bounds  # (minx, miny, maxx, maxy)
-    minx, miny, maxx, maxy = bounds
-
-    # Calculate the number of rows and columns for the raster grid
-    width = int((maxx - minx) / resolution)
-    height = int((maxy - miny) / resolution)
-
-    # Define transform for the raster (top-left corner origin)
-    transform = rasterio.transform.from_origin(minx, maxy, resolution, resolution)
-
-    # Create an empty numpy array for the raster data
-    raster_data = np.zeros((height, width), dtype=rasterio.float32)
-
-    # Create a new raster file to write
-    with rasterio.open(
-        'output_raster_projected.tif',
-        'w',
-        driver='GTiff',
-        height=height,
-        width=width,
-        count=1,
-        dtype=raster_data.dtype,
-        crs=gdf_projected.crs,  # CRS is now EPSG:3857
-        transform=transform,
-    ) as dst:
-        # Prepare shapes (geometry and attribute values) for rasterization
-        shapes = ((geom, value) for geom, value in zip(gdf_projected.geometry, gdf_projected['attribute_column']))
-        
-        # Rasterize the GeoDataFrame
-        burned = rasterize(
-            shapes=shapes,
-            out_shape=raster_data.shape,
-            transform=transform,
-            fill=0,  # Value to use for empty cells
-            dtype=raster_data.dtype,
-        )
-
-        # Write the rasterized data to the file
-        dst.write(burned, 1)
-
-    # Optional: Reproject the raster back to WGS84 if needed
-    with rasterio.open('output_raster_projected.tif') as src:
-        transform, width, height = calculate_default_transform(
-            src.crs, 'EPSG:4326', src.width, src.height, *src.bounds)
-        kwargs = src.meta.copy()
-        kwargs.update({
-            'crs': 'EPSG:4326',
-            'transform': transform,
-            'width': width,
-            'height': height
-        })
-
-        with rasterio.open('output_raster_wgs84.tif', 'w', **kwargs) as dst:
-            reproject(
-                source=rasterio.band(src, 1),
-                destination=rasterio.band(dst, 1),
-                src_transform=src.transform,
-                src_crs=src.crs,
-                dst_transform=transform,
-                dst_crs='EPSG:4326',
-                resampling=Resampling.nearest)
-        
 
 def process_metrics(final_geo_df):
     all_metrics_columns = ['metric_1','metric_2','metric_3','metric_4','metric_5','metric_6','metric_7','metric_8','metric_9','metric_10','metric_11','metric_12','metric_13']
@@ -367,14 +301,45 @@ def process_cell(cell_id, geod, rectangle, rectangle_projected, buildings, block
                 }
     return result
 
-def process_city(city_name):
+def process_city(city_name, sample_prop=1.0, override_processed=False):
+    """
+    Processes a city grid, calculates metrics for unprocessed rows, and updates the grid status CSV.
+    """
     try:
+        # Read city grid
         city_grid = gpd.read_parquet(f'{grids_path}/{city_name}/{city_name}_{str(grid_size)}m_grid.parquet').reset_index()
-        city_grid = city_grid[(cols for cols in city_grid.columns if cols != 'index')]
+        city_grid.rename(columns={'index': 'grid_id'}, inplace=True)  # Ensure we have a grid ID column
 
-        rectangles = city_grid['geometry']
+        # Initialize 'processed' column
+        city_grid['processed'] = False
 
-        # Read buildings
+        # Check if a grid status CSV already exists
+        output_dir_csv = f'{output_path_csv}/{city_name}'
+        os.makedirs(output_dir_csv, exist_ok=True)
+        status_csv_path = f'{output_dir_csv}/{city_name}_grid_status.csv'
+
+        if os.path.exists(status_csv_path) and not override_processed:
+            # Load existing status CSV and merge with city grid
+            status_df = pd.read_csv(status_csv_path)
+            city_grid = city_grid.merge(status_df, on='grid_id', how='left', suffixes=('', '_existing'))
+            city_grid['processed'] = city_grid['processed_existing'].fillna(False)
+            city_grid.drop(columns=['processed_existing'], inplace=True)
+
+        # Filter for unprocessed rows
+        unprocessed_grid = city_grid[~city_grid['processed']]
+
+        # Apply sampling to unprocessed rows
+        if sample_prop < 1.0:
+            sampled_grid = unprocessed_grid.sample(frac=sample_prop, random_state=42)
+        else:
+            sampled_grid = unprocessed_grid
+
+        # Update 'processed' column for sampled rows
+        city_grid.loc[sampled_grid.index, 'processed'] = True
+
+        rectangles = sampled_grid['geometry']
+
+        # Read and process required datasets (buildings, roads, intersections)
         if not os.path.exists(f'{buildings_path}/{city_name}/Overture_building_{city_name}.geojson'):
             print(f"Missing buildings data for city {city_name}. Skipping.")
             return
@@ -398,69 +363,57 @@ def process_city(city_name):
 
         print(f"{city_name}: OSM files read")
 
+        # Get UTM projection for the city
         utm_proj_city = get_utm_crs(OSM_roads_all.iloc[0].geometry)
         if utm_proj_city is not None:
             try:
                 OSM_roads_all_projected = OSM_roads_all.to_crs(epsg=utm_proj_city)
-            except Exception as e:
-                print(f"Error reprojecting OSM roads for city {city_name}: {e}")
-                OSM_roads_all_projected = gpd.GeoDataFrame([])  # Empty GeoDataFrame
-            try:
                 OSM_intersections_all_projected = OSM_intersections_all.to_crs(epsg=utm_proj_city)
+                Overture_data_all_projected = Overture_data_all.to_crs(epsg=utm_proj_city)
             except Exception as e:
-                print(f"Error reprojecting OSM intersections for city {city_name}: {e}")
-                OSM_intersections_all_projected = gpd.GeoDataFrame([])  # Empty GeoDataFrame
+                print(f"Error reprojecting data for city {city_name}: {e}")
+                return
         else:
             raise ValueError(f"Unable to determine EPSG code for city {city_name}.")
-        blocks_all = get_blocks(OSM_roads_all_projected.unary_union, OSM_roads_all_projected)
-        Overture_data_all_projected = Overture_data_all.to_crs(epsg=int(utm_proj_city))
-        buildings = Overture_data_all_projected
-        buildings = buildings[~buildings.geometry.is_empty]
-        buildings = buildings[buildings.is_valid]
+
+        # Prepare delayed processing
+        geod = Geod(ellps="WGS84")
+        rectangles_projected = sampled_grid['geometry'].to_crs(epsg=utm_proj_city)
 
         road_union = OSM_roads_all_projected.unary_union
 
-        rectangles_projected = rectangles.to_crs(epsg=int(utm_proj_city))
-        geod = Geod(ellps="WGS84")
-        print(f"{city_name}: All preparations done. Ready to calculate metrics on grid.")
+        if not OSM_roads_all_projected.empty:
+            blocks = get_blocks(road_union, OSM_roads_all_projected)
+        else:
+            blocks = gpd.GeoDataFrame([])
 
-        # Grid-Level Parallelization using Dask Delayed
+
         delayed_results = [
             delayed(process_cell)(
-                cell_id, geod, rectangle, rectangle_projected, buildings, blocks_all, OSM_roads_all_projected,
-                OSM_intersections_all_projected, road_union, utm_proj_city
+                cell_id, geod, rectangle, rectangle_projected, Overture_data_all_projected, blocks,
+                OSM_roads_all_projected, OSM_intersections_all_projected, road_union, utm_proj_city
             )
             for cell_id, (rectangle, rectangle_projected) in enumerate(zip(rectangles, rectangles_projected))
         ]
 
-        # Compute the results using Dask
-        batch_results = compute(*delayed_results)
-        batch_df = pd.DataFrame(batch_results)
+        # Compute metrics for sampled rows
+        final_geo_df = compute(*delayed_results)
 
-        final_geo_df = gpd.GeoDataFrame(pd.merge(city_grid, batch_df, how='left', left_index=True, right_index=True), geometry=city_grid.geometry)
+        final_geo_df = pd.DataFrame(final_geo_df)
 
         final_geo_df = process_metrics(final_geo_df)
-    
-        # Save each batch as a CSV to avoid memory overflow
-        output_dir_csv = f'{output_path_csv}/{city_name}'
 
-        os.makedirs(output_dir_csv, exist_ok=True)
-        if not batch_df.empty:
-            print(batch_df.head())
-            batch_df.to_csv(f'{output_dir_csv}/{city_name}_results.csv', index=False)
-        else:
-            print(f"No valid data for city {city_name}. Skipping CSV output.")
+        # Merge results back into city_grid
+        city_grid = city_grid.merge(final_geo_df, how='left', left_on='grid_id', right_on='index')
 
-        output_dir_csv = f'{output_path_csv}/{city_name}'
+        #Save results to geoparquet
+        os.makedirs(f'{output_path_raster}/{city_name}', exist_ok=True)
+        city_grid.to_parquet(f'{output_path_raster}/{city_name}/{city_name}_results.geoparquet', engine="pyarrow", index=False)
 
+        # Save updated grid status to CSV
+        city_grid[['grid_id', 'processed']].to_csv(status_csv_path, index=False)
 
-        output_dir_raster = f'{output_path_raster}/{city_name}'
-
-        # GOTTA JOIN AND DO RESPONSIBLE THINGS WITH THE INDEX
-        convert_to_raster(batch_df,f'{output_dir_raster}/{city_name}')
-
-
-
+        print(f"{city_name}: Processing complete. Grid status updated in {status_csv_path}.")
 
     except Exception as e:
         print(f"Error processing {city_name}: {e}")
@@ -472,10 +425,11 @@ def main():
     #          "Maputo", "Luanda"]
     cities = ["Belo Horizonte"]
     cities = [city.replace(' ', '_') for city in cities]
+    sample_prop = 0.01  # Sample 1% of the grid cells
 
     # City-Level Parallelization using ProcessPoolExecutor
     with ProcessPoolExecutor() as executor:
-        executor.map(process_city, cities)
+        executor.map(partial(process_city, sample_n=sample_prop), cities)
 
 if __name__ == "__main__":
     main()
