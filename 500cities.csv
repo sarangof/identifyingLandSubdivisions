@@ -1,0 +1,501 @@
+City Name;Country Name
+Anqing, Anhui;China
+Anyang, Henan;China
+Baotao, Inner Mongolia;China
+Beijing, Beijing;China
+Benxi, Liaoning;China
+Bicheng, Chongqing;China
+Changzhi, Hunan;China
+Changzhou, Jingsu;China
+Chengde, Hebei;China
+Chengdu, Sichuan;China
+Chengguan, Guizhou;China
+Chengguan, Henan;China
+Chenzhou, Hunan;China
+Chongqing, Chongqing;China
+Dezhou, Shandong;China
+Dingping, Sichuan;China
+Dongguan, Guangdong;China
+Foshan, Guangdong;China
+Fuzhou, Fujian;China
+Guangzhou, Guangdong;China
+Guixi, Chongqing;China
+Haikou, Hainan;China
+Hangzhou, Zhejiang;China
+Harbin, Heilongjiang;China
+Hengyang, Hunan;China
+Heze, Shandong;China
+Hong Kong, Hong Kong;China
+Jiamusi, Heilongjiang;China
+Jiancheng, Sichuan;China
+Jinan, Shandong;China
+Jingjiang, Jiangsu;China
+Jingzhou, Hubei;China
+Jinjiang, Fujian;China
+Jiujiang, Jiangxi;China
+Kaiping, Guangdong;China
+Kunming, Yunnan;China
+Leiyang, Hunan;China
+Leizhou, Guangdong;China
+Leshan, Sichuan;China
+Lingbao, Henan;China
+Linyi, Shandong;China
+Nanchang, Jiangxi;China
+Nanjing, Jiangsu;China
+Nantong, Jiangsu;China
+Pingxiang, Jiangxi;China
+Pingyi, Shandong;China
+Qidong, Jiangsu;China
+Qingdao, Shandong;China
+Shacheng, Hebei;China
+Shanghai, Shanghai;China
+Shangrao, Jiangxi;China
+Shenzhen, Guangdong;China
+Shijiazhuang, Hebei;China
+Shuangjiang, Chongqing;China
+Suining, Sichuan;China
+Taipei, Taiwan;China
+Tangshan, Hebei;China
+Tianjin,  Tianjin;China
+Tongchuan, Sichuan;China
+Urumqi, Xinjiang;China
+Weitang, Zhejiang;China
+Wendeng, Shandong;China
+Wuhan, Hubei;China
+Wuxi, Jiangsu;China
+Xingping, Shaanxi;China
+Xucheng, Jiangsu;China
+Xuzhou, Jiangsu;China
+Yanggu, Shandong;China
+Yiyang, Hunan;China
+Yulin, Guangxi;China
+Zhengzhou, Henan;China
+Zhuji, Zhejiang;China
+Zhuzhou, Hunan;China
+Zibo, Shandong;China
+Zunyi, Guizhou;China
+Suva;Fiji
+Pyongyang;Korea, Dem. Rep.
+Busan;Korea, Rep.
+Cheonan;Korea, Rep.
+Gwangju;Korea, Rep.
+Jinju;Korea, Rep.
+Seoul;Korea, Rep.
+Ulaanbaatar;Mongolia
+Paoy Pet;Cambodia
+Phnom Penh;Cambodia
+Siem Reap city;Cambodia
+Bandar Lampung;Indonesia
+Bandung;Indonesia
+Banjarbaru;Indonesia
+Batam;Indonesia
+Bogor;Indonesia
+Cianjur;Indonesia
+Cirebon;Indonesia
+Denpasar;Indonesia
+Jakarta;Indonesia
+Jambi;Indonesia
+Malang;Indonesia
+Medan;Indonesia
+Mojokerto;Indonesia
+Padang;Indonesia
+Palembang;Indonesia
+Palopo;Indonesia
+Pangkal Pinang;Indonesia
+Parepare;Indonesia
+Pekalongan;Indonesia
+Pekan Baru;Indonesia
+Pemalang;Indonesia
+Pematang Siantar;Indonesia
+Pontianak;Indonesia
+Prabumulih;Indonesia
+Purwokerto;Indonesia
+Samarinda;Indonesia
+Semarang;Indonesia
+Serang;Indonesia
+Subang;Indonesia
+Surabaya;Indonesia
+Surakarta;Indonesia
+Tanjungpinang;Indonesia
+Tasikmalaya;Indonesia
+Savannakhet;Laos
+Vientiane;Laos
+Alor Star;Malaysia
+Ipoh;Malaysia
+Johor Bahru;Malaysia
+Kuala Lumpur;Malaysia
+Kuching;Malaysia
+Kulim;Malaysia
+Rawang;Malaysia
+Seremban;Malaysia
+Lashio;Myanmar
+Mandalay;Myanmar
+Mawlamyine;Myanmar
+Maymyo;Myanmar
+Myeik;Myanmar
+Nay Pyi Taw;Myanmar
+Pathein;Myanmar
+Yangon;Myanmar
+Bacolod;Philippines
+Cagayan de Oro City;Philippines
+Cebu City;Philippines
+General Santos City;Philippines
+Jolo;Philippines
+Manila;Philippines
+Olongapo City;Philippines
+Tacloban City;Philippines
+Tagum;Philippines
+Tarlac;Philippines
+Zamboanga City;Philippines
+Singapore;Singapore
+Bangkok;Thailand
+Khon-Kaen;Thailand
+Surat Thani;Thailand
+Udon Thani;Thailand
+Bac Lieu;Vietnam
+Bien Hoa;Vietnam
+Can Tho;Vietnam
+Dalat;Vietnam
+Ha Noi;Vietnam
+Hai Phong;Vietnam
+Ho Chi Minh City;Vietnam
+Hue;Vietnam
+My Tho;Vietnam
+Quang Ngai;Vietnam
+Thai Binh;Vietnam
+Vinh Long;Vietnam
+Kabul;Afghanistan
+Chittagong;Bangladesh
+Dhaka;Bangladesh
+Dinajpur;Bangladesh
+Rajshahi;Bangladesh
+Saidpur;Bangladesh
+Satkhira;Bangladesh
+Agra;India
+Ahmadabad;India
+Aligarh;India
+Amravati;India
+Bangalore;India
+Bankura;India
+Belgaum;India
+Bhimavaram;India
+Bhopal;India
+Bilaspur;India
+Chennai;India
+Chittoor;India
+Coimbatore;India
+Delhi;India
+Gandhidham;India
+Gaya;India
+Hindaun;India
+Hindupur;India
+Hyderabad;India
+Jaipur;India
+Jalna;India
+Kanpur;India
+Khargone;India
+Khurja;India
+Kolkata;India
+Kozhikode;India
+Kumarapalayam;India
+Lucknow;India
+Ludhiana;India
+Malegaon;India
+Moradabad;India
+Mumbai;India
+Munger/Jamalpur;India
+Nagpur;India
+Nalgonda;India
+Nashik;India
+Panipat;India
+Parbhani;India
+Patna;India
+Puducherry;India
+Pune;India
+Raipur;India
+Rajahmundry;India
+Roorkee;India
+Singrauli;India
+Sitapur;India
+Srinagar;India
+Surat;India
+Thrissur;India
+Tirupati;India
+Vadodara;India
+Vijayawada;India
+Visakhapatnam;India
+Ahvaz;Iran
+Arak;Iran
+Esfahan;Iran
+Gorgan;Iran
+Mashhad;Iran
+Qom;Iran
+Tehran;Iran
+Torbat-e Heydariyeh;Iran
+Yazd;Iran
+Shimkent;Kazakhstan
+Kathmandu;Nepal
+Pokhara;Nepal
+Burewala;Pakistan
+Chishtian;Pakistan
+Faisalabad;Pakistan
+Gujranwala;Pakistan
+Karachi;Pakistan
+Lahore;Pakistan
+Sialkot;Pakistan
+Wazirabad;Pakistan
+Mary;Turkmenistan
+Bukhara;Uzbekistan
+Namangan;Uzbekistan
+Tashkent;Uzbekistan
+Algiers;Algeria
+Annaba;Algeria
+Bou Saada;Algeria
+Constantine;Algeria
+Laghouat;Algeria
+Mouaskar;Algeria
+Sidi bel Abbes;Algeria
+Souk Ahras;Algeria
+Tebessa ;Algeria
+Baku;Azerbaijan
+Ganja;Azerbaijan
+Alexandria;Egypt
+Bilbeis;Egypt
+Bursaid;Egypt
+Cairo;Egypt
+Luxor;Egypt
+Mit Ghamr;Egypt
+Sawhaj;Egypt
+Tanta;Egypt
+Baghdad;Iraq
+Diwaniyah;Iraq
+Erbil;Iraq
+Karbala;Iraq
+Kirkuk;Iraq
+Mosul;Iraq
+Najaf;Iraq
+Nasiriyah;Iraq
+Samawah;Iraq
+Sulaimaniyah;Iraq
+Jerusalem;Israel
+Tel Aviv;Israel
+Amman;Jordan
+Kuwait City;Kuwait
+Beirut;Lebanon
+Marj;Libya
+Misrata;Libya
+Tripoli;Libya
+Casablanca;Morocco
+Fez;Morocco
+Guelmim;Morocco
+Marrakesh;Morocco
+Meknes;Morocco
+Oujda;Morocco
+Rabat;Morocco
+Tangier;Morocco
+Taza;Morocco
+Gaza;Palestine
+Doha;Qatar
+Buraydah;Saudi Arabia
+Jeddah;Saudi Arabia
+Kharj;Saudi Arabia
+Medina;Saudi Arabia
+Riyadh;Saudi Arabia
+Tabuk;Saudi Arabia
+Khartoum;Sudan
+Aleppo;Syria
+Damascus;Syria
+Hama;Syria
+Idlib;Syria
+Tartus;Syria
+Kairouan;Tunisia
+Tunis;Tunisia
+Agri;Turkey
+Ankara;Turkey
+Antalya;Turkey
+Bursa;Turkey
+Diyarbakir;Turkey
+Eskisehir;Turkey
+Gebze;Turkey
+Istanbul;Turkey
+Izmir;Turkey
+Izmit;Turkey
+Kayseri;Turkey
+Konya;Turkey
+Malatya;Turkey
+Manisa;Turkey
+Zonguldak;Turkey
+Dubai;United Arab Emirates
+Fujayrah ;United Arab Emirates
+Aden;Yemen
+Al Hudaydah;Yemen
+Ibb;Yemen
+Sana;Yemen
+Huambo;Angola
+Luanda;Angola
+Abomey-Calavi;Benin
+Ouagadougou;Burkina Faso
+Bamenda;Cameroon
+Douala;Cameroon
+Maroua;Cameroon
+Yaounde;Cameroon
+Bangui;Central African Republic
+N'Djamena;Chad
+Bukavu;Congo, Dem. Rep.
+Gemena;Congo, Dem. Rep.
+Isiro;Congo, Dem. Rep.
+Kinshasa;Congo, Dem. Rep.
+Lubumbashi;Congo, Dem. Rep.
+Mbuji-Mayi;Congo, Dem. Rep.
+Tshikapa;Congo, Dem. Rep.
+Brazzaville;Congo, Rep.
+Abidjan;Côte d'Ivoire
+Bouake;Côte d'Ivoire
+Daloa;Côte d'Ivoire
+Djibouti;Djibouti
+Keren;Eritrea
+Addis Ababa;Ethiopia
+Libreville;Gabon
+Port-Gentil;Gabon
+Banjul-Kanifeng;Gambia
+Accra;Ghana
+Kumasi;Ghana
+Tema;Ghana
+Conakry;Guinea
+Nairobi;Kenya
+Nakuru;Kenya
+Ruiru;Kenya
+Antananarivo;Madagascar
+Blantyre-Limbe;Malawi
+Bamako;Mali
+Nouakchott;Mauritania
+Beira;Mozambique
+Abeokuta;Nigeria
+Abuja;Nigeria
+Bauchi;Nigeria
+Enugu;Nigeria
+Gombe;Nigeria
+Ibadan;Nigeria
+Ikorodu;Nigeria
+Jimeta;Nigeria
+Jos;Nigeria
+Kaduna;Nigeria
+Kano;Nigeria
+Lagos;Nigeria
+Oshogbo;Nigeria
+Oyo;Nigeria
+Port Harcourt;Nigeria
+Sagamu;Nigeria
+Saki;Nigeria
+Suleja;Nigeria
+Umuahia;Nigeria
+Warri;Nigeria
+Zaria;Nigeria
+Kigali;Rwanda
+Dakar;Senegal
+Rufisque;Senegal
+Thies;Senegal
+Touba Mosquee;Senegal
+Freetown;Sierra Leone
+Hargeysa;Somalia
+Cape Town;South Africa
+Durban;South Africa
+Johannesburg;South Africa
+Nigel;South Africa
+Pietermaritzburg;South Africa
+Polokwane;South Africa
+Port Elizabeth;South Africa
+Pretoria;South Africa
+Juba;South Sudan
+Arusha;Tanzania
+Dar es Salaam;Tanzania
+Sumbawanga;Tanzania
+Kampala;Uganda
+Kabwe;Zambia
+Lusaka;Zambia
+Ndola;Zambia
+Chitungwiza;Zimbabwe
+Buenos Aires;Argentina
+Cordoba;Argentina
+Mar Del Plata;Argentina
+Mendoza;Argentina
+San Juan;Argentina
+Cochabamba;Bolivia
+La Paz;Bolivia
+Barreiras;Brazil
+Barretos;Brazil
+Belem;Brazil
+Belo Horizonte;Brazil
+Brasilia;Brazil
+Cabo Frio;Brazil
+Campinas;Brazil
+Curitiba;Brazil
+Feira De Santana;Brazil
+Florianopolis;Brazil
+Fortaleza;Brazil
+Goiania;Brazil
+Grande Sao Luis;Brazil
+Ilheus;Brazil
+Jequie;Brazil
+Joao Pessoa;Brazil
+Juazeiro Do Norte;Brazil
+Juiz De Fora;Brazil
+Macapa;Brazil
+Manaus;Brazil
+Maringa;Brazil
+Palmas;Brazil
+Pôrto Alegre;Brazil
+Ribeirao Preto;Brazil
+Rio de Janeiro;Brazil
+Salto;Brazil
+Salvador;Brazil
+Sao Jose dos Campos;Brazil
+Sao Paulo;Brazil
+Uruguaiana;Brazil
+Curico;Chile
+Osorno;Chile
+Santiago;Chile
+Barranquilla;Colombia
+Bogota;Colombia
+Cali;Colombia
+Cartagena;Colombia
+Medellin;Colombia
+Monteria;Colombia
+Santa Marta;Colombia
+Valledupar;Colombia
+Havana;Cuba
+Holguin;Cuba
+Willemstad;Curaçao
+Santiago;Dominican Republic
+Quito;Ecuador
+San Salvador;El Salvador
+Guatemala City;Guatemala
+Port-au-Prince;Haiti
+Culiacan;Mexico
+Guadalajara;Mexico
+Leon de los Aldamas;Mexico
+Merida;Mexico
+Mexico City;Mexico
+Monterrey;Mexico
+Puebla;Mexico
+Reynosa;Mexico
+Salina Cruz;Mexico
+Saltillo;Mexico
+Tepic;Mexico
+Tijuana;Mexico
+Toluca de Lerdo;Mexico
+Villahermosa;Mexico
+Xalapa;Mexico
+Leon;Nicaragua
+David;Panama
+Asuncion;Paraguay
+Huancayo;Peru
+Lima;Peru
+Montevideo;Uruguay
+Barcelona-Puerto La Cruz;Venezuela
+Barquisimeto;Venezuela
+Cabimas;Venezuela
+Caracas;Venezuela
+Maracaibo;Venezuela
+San Cristobal;Venezuela
+Valencia;Venezuela
