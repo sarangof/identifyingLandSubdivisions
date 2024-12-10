@@ -310,7 +310,13 @@ def process_city(city_name, sample_prop=1.0, override_processed=False):
         city_grid = gpd.read_parquet(f'{grids_path}/{city_name}/{city_name}_{str(grid_size)}m_grid.parquet').reset_index()
         city_grid.rename(columns={'index': 'grid_id'}, inplace=True)  # Ensure we have a grid ID column
 
+        if city_grid.empty or not 'geometry' in city_grid.columns:
+            print(f"No grid cells available for {city_name}. Skipping.")
+            return
+
         # Initialize 'processed' column
+        if 'grid_id' not in city_grid.columns:
+            city_grid['grid_id'] = city_grid.index
         city_grid['processed'] = False
 
         # Check if a grid status CSV already exists
@@ -398,10 +404,12 @@ def process_city(city_name, sample_prop=1.0, override_processed=False):
 
         # Compute metrics for sampled rows
         final_geo_df = compute(*delayed_results)
-
         final_geo_df = pd.DataFrame(final_geo_df)
-
         final_geo_df = process_metrics(final_geo_df)
+
+        final_geo_df['index'] = sampled_grid['grid_id'].values
+        if final_geo_df['index'].isna().any():
+            print("Warning: Some rows in the results could not be matched with the grid.")
 
         # Merge results back into city_grid
         city_grid = city_grid.merge(final_geo_df, how='left', left_on='grid_id', right_on='index')
@@ -427,9 +435,13 @@ def main():
     cities = [city.replace(' ', '_') for city in cities]
     sample_prop = 0.01  # Sample 1% of the grid cells
 
-    # City-Level Parallelization using ProcessPoolExecutor
+    # City-Level Parallelization
     with ProcessPoolExecutor() as executor:
-        executor.map(partial(process_city, sample_n=sample_prop), cities)
+        try:
+            executor.map(partial(process_city, sample_prop=sample_prop, override_processed=False), cities)
+        except Exception as e:
+            print(f"Error in ProcessPoolExecutor: {e}")
+
 
 if __name__ == "__main__":
     main()
