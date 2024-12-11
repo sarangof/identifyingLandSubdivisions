@@ -21,7 +21,7 @@ for all the cities provided in analysis_buffers, search_buffers and city_boundar
 
 # Define paths
 #main_path = '../data'
-main_path = "/Users/sarangof/Documents/Identifying Land Subdivisions"
+main_path = "/Users/sarangof/Documents/Identifying Land Subdivisions/data"
 input_path = f'{main_path}/input'
 buildings_path = f'{input_path}/buildings'
 roads_path = f'{input_path}/roads'
@@ -91,7 +91,7 @@ def osm_command(city_name, search_area):
 #@delayed
 def overturemaps_download_and_save(bbox_str, request_type: str, output_dir, city_name: str):
     print(f"Running Overture command with bbox_str={bbox_str} and request_type={request_type}")
-    output_path = os.path.join(output_dir, f'Overture_{request_type}_{city_name}.parquet')
+    output_path = os.path.join(output_dir, f'Overture_{request_type}_{city_name}.geoparquet')
     command = [
         "overturemaps", "download",
         "-f", "geoparquet",
@@ -114,59 +114,71 @@ def overturemaps_download_and_save(bbox_str, request_type: str, output_dir, city
         return None, None
 
 def make_requests(partition):
-    print(f"Processing partition with {len(partition)} rows")
-    results = []
-    # OJO: THIS NEEDS TO BE CHANGED
-    for city_name in partition.city:
-        print(city_name)
+    print(f"Partition: {partition}")
+    if partition.empty:
+        print("Empty partition encountered.")
+        return pd.DataFrame() 
+    else:
+        print(f"Processing partition with {len(partition)} rows")
+        results = []
+        # OJO: THIS NEEDS TO BE CHANGED
+        for city_name in partition.city:
+            print(city_name)
 
-        # NEED TO GET THE CITY URBAN EXTENT
-        #urban_extent = gpd.read_parquet(f'{extents_path}/{city_name}/{city_name}_urban_extent.parquet'
-        search_area = gpd.read_parquet(f'{search_buffers_path}/{city_name}/{city_name}_search_buffer.parquet') 
+            # NEED TO GET THE CITY URBAN EXTENT
+            #urban_extent = gpd.read_parquet(f'{extents_path}/{city_name}/{city_name}_urban_extent.parquet'
+            search_area = gpd.read_parquet(f'{search_buffers_path}/{city_name}/{city_name}_search_buffer.geoparquet') 
 
-        # Get city geometries in localized UTMs
-        utm_proj_city = get_utm_proj(float(search_area.geometry.centroid.x), float(search_area.geometry.centroid.y))
-        transformer = pyproj.Transformer.from_crs(pyproj.CRS('EPSG:4326'), utm_proj_city, always_xy=True)
-        def transform_geom(geom):
-            return transform(transformer.transform, geom)
-        
-        #transformed_sarch_area_geom = transform_geom(search_area.geometry[0]) 
-        #road_search_area = gpd.GeoSeries(transformed_sarch_area_geom,crs=utm_proj_city).geometry[0].buffer(2000)        #transformed_urban_border = transform(pyproj.Transformer.from_crs(utm_proj_city, pyproj.CRS('EPSG:4326'), always_xy=True).transform, urban_border)
-        #transformed_road_search_area = transform(pyproj.Transformer.from_crs(utm_proj_city, pyproj.CRS('EPSG:4326'), always_xy=True).transform, road_search_area)
-        #transformed_road_search_area = transform(pyproj.Transformer.from_crs(utm_proj_city, pyproj.CRS('EPSG:4326'), always_xy=True).transform, transformed_sarch_area_geom)
-        osm_command(city_name,search_area)#transformed_road_search_area)
+            # Get city geometries in localized UTMs
+            utm_proj_city = get_utm_proj(float(search_area.geometry.centroid.iloc[0].x),
+                                            float(search_area.geometry.centroid.iloc[0].y))
+            
+            transformer = pyproj.Transformer.from_crs(pyproj.CRS('EPSG:4326'), utm_proj_city, always_xy=True)
+            def transform_geom(geom):
+                return transform(transformer.transform, geom)
+            
+            #transformed_sarch_area_geom = transform_geom(search_area.geometry[0]) 
+            #road_search_area = gpd.GeoSeries(transformed_sarch_area_geom,crs=utm_proj_city).geometry[0].buffer(2000)        #transformed_urban_border = transform(pyproj.Transformer.from_crs(utm_proj_city, pyproj.CRS('EPSG:4326'), always_xy=True).transform, urban_border)
+            #transformed_road_search_area = transform(pyproj.Transformer.from_crs(utm_proj_city, pyproj.CRS('EPSG:4326'), always_xy=True).transform, road_search_area)
+            #transformed_road_search_area = transform(pyproj.Transformer.from_crs(utm_proj_city, pyproj.CRS('EPSG:4326'), always_xy=True).transform, transformed_sarch_area_geom)
+            osm_command(city_name,search_area)#transformed_road_search_area)
 
-        try:
-            # Overture maps commands
-            search_area_bounds = search_area.bounds
-            bbox_str = ','.join(search_area_bounds[['minx', 'miny', 'maxx', 'maxy']].values[0].astype(str))
-            request_type = 'building'
-            print("About to trigger overturemaps command")
-            output_dir_buildings = f"{buildings_path}/{city_name}"
-            overturemaps_download_and_save(bbox_str, request_type, output_dir_buildings, city_name)
-        except Exception as e:
-            print(f"Overture error: {e}")
-    return results
+            try:
+                # Overture maps commands
+                search_area_bounds = search_area.bounds
+                bbox_str = ','.join(search_area_bounds[['minx', 'miny', 'maxx', 'maxy']].values[0].astype(str))
+                request_type = 'building'
+                print("About to trigger overturemaps command")
+                output_dir_buildings = f"{buildings_path}/{city_name}"
+                overturemaps_download_and_save(bbox_str, request_type, output_dir_buildings, city_name)
+            except Exception as e:
+                print(f"Overture error: {e}")
+        return pd.DataFrame(results)
 
 # Paralellize data gathering for all cities in the list.
 def run_all(cities):
-    cities = [city.replace(' ', '_') for city in cities]
-    logger.info(f'Cities to be processed: {cities}')
-    
-    cities_set = pd.DataFrame({'city':cities})
+    if not cities:
+        print("No cities to process.")
+        return
+    else:
+        cities = [city.replace(' ', '_') for city in cities]
+        logger.info(f'Cities to be processed: {cities}')
+        
+        cities_set = pd.DataFrame({'city':cities})
 
-    # Create Dask DataFrame
-    cities_set_ddf = dd.from_pandas(cities_set, npartitions=12)
-    
-    # Print the Dask DataFrame columns
-    print(f"Columns in the Dask DataFrame: {cities_set_ddf.columns.tolist()}")
+        # Create Dask DataFrame
+        cities_set_ddf = dd.from_pandas(cities_set, npartitions=12)
+        
+        # Print the Dask DataFrame columns
+        print(f"Columns in the Dask DataFrame: {cities_set_ddf.columns.tolist()}")
 
-    # Apply function to each partition
-    results = cities_set_ddf.map_partitions(make_requests, meta=cities_set)
+        # Apply function to each partition
+        meta = pd.DataFrame.from_dict({"city": [], "status": []}) #expected structure
+        results = cities_set_ddf.map_partitions(make_requests, meta=meta)
 
-    # Trigger computation
-    computed_results = results.compute()
-    print(f"Results: {computed_results}")
+        # Trigger computation
+        computed_results = results.compute()
+        print(f"Results: {computed_results}")
 
 
 def main():
