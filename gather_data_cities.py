@@ -21,7 +21,7 @@ for all the cities provided in analysis_buffers, search_buffers and city_boundar
 
 # Define paths
 #main_path = '../data'
-main_path = "/mount/wri-cities-sandbox/identifyingLandSubdivisions/data"
+main_path = "/Users/sarangof/Documents/Identifying Land Subdivisions"
 input_path = f'{main_path}/input'
 buildings_path = f'{input_path}/buildings'
 roads_path = f'{input_path}/roads'
@@ -169,3 +169,12 @@ def run_all(cities):
     print(f"Results: {computed_results}")
 
 
+def main():
+    #cities = ["Belo Horizonte", "Campinas", "Bogota", "Nairobi", "Bamako", 
+    #          "Lagos", "Accra", "Abidjan", "Mogadishu", "Cape Town", 
+    #          "Maputo", "Luanda"]
+    cities = ["Belo Horizonte"]
+    run_all(cities)
+
+if __name__ == "__main__":
+    main()
