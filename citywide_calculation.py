@@ -19,14 +19,14 @@ from rasterio.warp import calculate_default_transform, reproject, Resampling
 from functools import partial
 
 
-main_path = '../data'
-input_path = f'{main_path}/input'
-buildings_path = f'{input_path}/buildings'
-roads_path = f'{input_path}/roads'
-intersections_path = f'{input_path}/intersections'
-grids_path = f'{input_path}/city_info/grids'
-output_path_csv = f'{main_path}/output/csv'
-output_path_raster = f'{main_path}/output/raster'
+MAIN_PATH = '../data'
+INPUT_PATH = f'{MAIN_PATH}/input'
+BUILDINGS_PATH = f'{INPUT_PATH}/buildings'
+ROADS_PATH = f'{INPUT_PATH}/roads'
+INTERSECTIONS_PATH = f'{INPUT_PATH}/intersections'
+GRIDS_PATH = f'{INPUT_PATH}/city_info/grids'
+OUTPUT_PATH_CSV = f'{MAIN_PATH}/output/csv'
+OUTPUT_PATH_RASTER = f'{MAIN_PATH}/output/raster'
 
 # Define important parameters for this run
 grid_size = 200
@@ -307,7 +307,7 @@ def process_city(city_name, sample_prop=1.0, override_processed=False):
     """
     try:
         # Read city grid
-        city_grid = gpd.read_parquet(f'{grids_path}/{city_name}/{city_name}_{str(grid_size)}m_grid.parquet').reset_index()
+        city_grid = gpd.read_parquet(f'{GRIDS_PATH}/{city_name}/{city_name}_{str(grid_size)}m_grid.parquet').reset_index()
         city_grid.rename(columns={'index': 'grid_id'}, inplace=True)  # Ensure we have a grid ID column
 
         if city_grid.empty or not 'geometry' in city_grid.columns:
@@ -320,13 +320,13 @@ def process_city(city_name, sample_prop=1.0, override_processed=False):
         city_grid['processed'] = False
 
         # Check if a grid status CSV already exists
-        output_dir_csv = f'{output_path_csv}/{city_name}'
+        output_dir_csv = f'{OUTPUT_PATH_CSV}/{city_name}'
         os.makedirs(output_dir_csv, exist_ok=True)
-        status_csv_path = f'{output_dir_csv}/{city_name}_grid_status.csv'
+        STATUS_CSV_PATH = f'{output_dir_csv}/{city_name}_grid_status.csv'
 
-        if os.path.exists(status_csv_path) and not override_processed:
+        if os.path.exists(STATUS_CSV_PATH) and not override_processed:
             # Load existing status CSV and merge with city grid
-            status_df = pd.read_csv(status_csv_path)
+            status_df = pd.read_csv(STATUS_CSV_PATH)
             city_grid = city_grid.merge(status_df, on='grid_id', how='left', suffixes=('', '_existing'))
             city_grid['processed'] = city_grid['processed_existing'].fillna(False)
             city_grid.drop(columns=['processed_existing'], inplace=True)
@@ -346,26 +346,26 @@ def process_city(city_name, sample_prop=1.0, override_processed=False):
         rectangles = sampled_grid['geometry']
 
         # Read and process required datasets (buildings, roads, intersections)
-        if not os.path.exists(f'{buildings_path}/{city_name}/Overture_building_{city_name}.geojson'):
+        if not os.path.exists(f'{BUILDINGS_PATH}/{city_name}/Overture_building_{city_name}.geojson'):
             print(f"Missing buildings data for city {city_name}. Skipping.")
             return
-        Overture_data_all = gpd.read_file(f'{buildings_path}/{city_name}/Overture_building_{city_name}.geojson')
+        Overture_data_all = gpd.read_file(f'{BUILDINGS_PATH}/{city_name}/Overture_building_{city_name}.geojson')
         print(f"{city_name}: Overture file read")
         Overture_data_all['confidence'] = Overture_data_all.sources.apply(lambda x: json.loads(x)[0]['confidence'])
         Overture_data_all['dataset'] = Overture_data_all.sources.apply(lambda x: json.loads(x)[0]['dataset'])
         Overture_data_all = Overture_data_all.set_geometry('geometry')[Overture_data_all.dataset != 'OpenStreetMap']
 
         # Read intersections
-        if not os.path.exists(f'{intersections_path}/{city_name}/{city_name}_OSM_intersections.gpkg'):
+        if not os.path.exists(f'{INTERSECTIONS_PATH}/{city_name}/{city_name}_OSM_intersections.gpkg'):
             print(f"Missing intersections data for city {city_name}. Skipping.")
             return
-        OSM_intersections_all = gpd.read_file(f'{intersections_path}/{city_name}/{city_name}_OSM_intersections.gpkg')
+        OSM_intersections_all = gpd.read_file(f'{INTERSECTIONS_PATH}/{city_name}/{city_name}_OSM_intersections.gpkg')
 
         # Read roads
-        if not os.path.exists(f'{roads_path}/{city_name}/{city_name}_OSM_roads.gpkg'):
+        if not os.path.exists(f'{ROADS_PATH}/{city_name}/{city_name}_OSM_roads.gpkg'):
             print(f"Missing roads data for city {city_name}. Skipping.")
             return
-        OSM_roads_all = gpd.read_file(f'{roads_path}/{city_name}/{city_name}_OSM_roads.gpkg')
+        OSM_roads_all = gpd.read_file(f'{ROADS_PATH}/{city_name}/{city_name}_OSM_roads.gpkg')
 
         print(f"{city_name}: OSM files read")
 
@@ -415,13 +415,13 @@ def process_city(city_name, sample_prop=1.0, override_processed=False):
         city_grid = city_grid.merge(final_geo_df, how='left', left_on='grid_id', right_on='index')
 
         #Save results to geoparquet
-        os.makedirs(f'{output_path_raster}/{city_name}', exist_ok=True)
-        city_grid.to_parquet(f'{output_path_raster}/{city_name}/{city_name}_results.geoparquet', engine="pyarrow", index=False)
+        os.makedirs(f'{OUTPUT_PATH_RASTER}/{city_name}', exist_ok=True)
+        city_grid.to_parquet(f'{OUTPUT_PATH_RASTER}/{city_name}/{city_name}_results.geoparquet', engine="pyarrow", index=False)
 
         # Save updated grid status to CSV
-        city_grid[['grid_id', 'processed']].to_csv(status_csv_path, index=False)
+        city_grid[['grid_id', 'processed']].to_csv(STATUS_CSV_PATH, index=False)
 
-        print(f"{city_name}: Processing complete. Grid status updated in {status_csv_path}.")
+        print(f"{city_name}: Processing complete. Grid status updated in {STATUS_CSV_PATH}.")
 
     except Exception as e:
         print(f"Error processing {city_name}: {e}")
