@@ -113,7 +113,6 @@ def process_cell(cell_id, geod, rectangle, rectangle_projected, buildings, block
             blocks_clipped = blocks_all[blocks_all.geometry.intersects(bounding_box_geom)]
             OSM_buildings_bool = False
             
-
             # Roads
             try:
                 roads_clipped = OSM_roads_all_projected[OSM_roads_all_projected.geometry.intersects(bounding_box_geom)]
@@ -144,13 +143,11 @@ def process_cell(cell_id, geod, rectangle, rectangle_projected, buildings, block
             print(f"Roads intersecting cell {cell_id}: {len(roads_clipped)}")
             print(f"Intersections intersecting cell {cell_id}: {len(OSM_intersections)}")
 
-
             #Overture_data = Overture_data_all_projected[Overture_data_all_projected.geometry.intersects(rectangle_projected[0])]
             #if not Overture_data.empty:
             #    Overture_buildings_bool = True
             #else:
             #    Overture_buildings_bool = False
-
 
 
             if (not buildings_clipped.empty):
@@ -162,7 +159,6 @@ def process_cell(cell_id, geod, rectangle, rectangle_projected, buildings, block
                 #plot_distance_to_roads(buildings_clipped, roads_clipped, rectangle_projected, cell_id)
             else:
                 m1, m2 = np.nan, np.nan
-
 
             if (not roads_clipped.empty):
                 # Metric 3 -- road density
@@ -184,7 +180,6 @@ def process_cell(cell_id, geod, rectangle, rectangle_projected, buildings, block
             if (not buildings_clipped.empty) and (len(buildings_clipped)>5):
                 n_orientation_groups = 4
                 m6, buildings_clipped = metric_6_entropy_of_building_azimuth(buildings_clipped, rectangle_id=1, bin_width_degrees=5, plot=False)
-                #plot_azimuth(buildings_clipped, roads_clipped, rectangle_projected, rectangle_id, n_orientation_groups)
             else:
                 m6 = np.nan
 
@@ -227,7 +222,6 @@ def process_cell(cell_id, geod, rectangle, rectangle_projected, buildings, block
             
             # Metrics 11, 12 and 13
             if not buildings_clipped.empty:
-                # Calculate relevant building metrics, making use of the if statement.
                 n_buildings = len(buildings_clipped)
                 building_area = buildings_clipped.area.sum()
                 m11 = metric_11_building_density(n_buildings,rectangle_area)
