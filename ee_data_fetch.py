@@ -100,9 +100,9 @@ def process_city(city_name, urban_extent, search_buffer_distance=500, grid_sizes
 
     ensure_paths_exist([f'{EXTENTS_PATH}/{city_name}',f'{ANALYSIS_BUFFERS_PATH}/{city_name}',f'{SEARCH_BUFFERS_PATH}/{city_name}'])
 
-    city_gdf.to_parquet(f'{EXTENTS_PATH}/{city_name}/{city_name}_urban_extent.geoparquet', engine="pyarrow", index=False)
-    analysis_gdf.to_parquet(f'{ANALYSIS_BUFFERS_PATH}/{city_name}/{city_name}_analysis_buffer.geoparquet', engine="pyarrow", index=False)
-    search_gdf.to_parquet(f'{SEARCH_BUFFERS_PATH}/{city_name}/{city_name}_search_buffer.geoparquet', engine="pyarrow", index=False)
+    city_gdf.to_parquet(f'{EXTENTS_PATH}/{city_name}/{city_name}_urban_extent.geoparquet')
+    analysis_gdf.to_parquet(f'{ANALYSIS_BUFFERS_PATH}/{city_name}/{city_name}_analysis_buffer.geoparquet')
+    search_gdf.to_parquet(f'{SEARCH_BUFFERS_PATH}/{city_name}/{city_name}_search_buffer.geoparquet')
 
     # Create grids for the search area using GeoPandas
     for grid_size in grid_sizes:
@@ -116,7 +116,7 @@ def process_city(city_name, urban_extent, search_buffer_distance=500, grid_sizes
         filtered_grid_gdf['intersects_analysis_area'] = filtered_grid_gdf.intersects(analysis_gdf.geometry.iloc[0])
 
         ensure_paths_exist([f"{GRIDS_PATH}/{city_name}"])
-        filtered_grid_gdf.to_parquet(f'{GRIDS_PATH}/{city_name}/{city_name}_{grid_size}m_grid.geoparquet', engine="pyarrow", index=False)
+        filtered_grid_gdf.to_parquet(f'{GRIDS_PATH}/{city_name}/{city_name}_{grid_size}m_grid.geoparquet')
         logger.info(f"{grid_size}m grid cells: {len(filtered_grid_gdf)}")
 
         # Log the cell count for this grid size
@@ -138,8 +138,8 @@ def process_city(city_name, urban_extent, search_buffer_distance=500, grid_sizes
 
 def main():
     cities = ["Belo Horizonte", "Campinas", "Bogota", "Nairobi", "Bamako", 
-              "Lagos", "Accra", "Abidjan", "Cape Town", 
-              "Maputo", "Mogadishu", "Luanda"] # 
+              "Lagos", "Accra", "Abidjan", "Cape Town", "Mogadishu", 
+              "Maputo", "Luanda"] #, 
     #cities = ["Belo Horizonte"]
 
     # List to store resolution data for all cities
