@@ -307,7 +307,7 @@ def process_city(city_name, sample_prop=1.0, override_processed=False):
     """
     try:
         # Read city grid
-        city_grid = gpd.read_parquet(f'{GRIDS_PATH}/{city_name}/{city_name}_{str(grid_size)}m_grid.parquet').reset_index()
+        city_grid = gpd.read_parquet(f'{GRIDS_PATH}/{city_name}/{city_name}_{str(grid_size)}m_grid.geoparquet').reset_index()
         city_grid.rename(columns={'index': 'grid_id'}, inplace=True)  # Ensure we have a grid ID column
 
         if city_grid.empty or not 'geometry' in city_grid.columns:
