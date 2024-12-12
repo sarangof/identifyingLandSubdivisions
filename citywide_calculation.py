@@ -295,7 +295,7 @@ def process_cell(cell_id, geod, rectangle, rectangle_projected, buildings, block
                 }
     return result
 
-def process_city(city_name, sample_prop=1.0, override_processed=False):
+def process_city(city_name, sample_prop=1.0, override_processed=False, grid_size=200):
     """
     Processes a city grid, calculates metrics for unprocessed rows, and updates the grid status CSV.
     """
@@ -316,7 +316,7 @@ def process_city(city_name, sample_prop=1.0, override_processed=False):
         # Check if a grid status CSV already exists
         output_dir_csv = f'{OUTPUT_PATH_CSV}/{city_name}'
         os.makedirs(output_dir_csv, exist_ok=True)
-        STATUS_CSV_PATH = f'{output_dir_csv}/{city_name}_grid_status.csv'
+        STATUS_CSV_PATH = f'{output_dir_csv}/{city_name}_grid_status_{grid_size}.csv'
 
         if os.path.exists(STATUS_CSV_PATH) and not override_processed:
             # Load existing status CSV and merge with city grid
@@ -340,13 +340,13 @@ def process_city(city_name, sample_prop=1.0, override_processed=False):
         rectangles = sampled_grid['geometry']
 
         # Read and process required datasets (buildings, roads, intersections)
-        if not os.path.exists(f'{BUILDINGS_PATH}/{city_name}/Overture_building_{city_name}.geojson'):
+        if not os.path.exists(f'{BUILDINGS_PATH}/{city_name}/Overture_building_{city_name}.geoparquet'):
             print(f"Missing buildings data for city {city_name}. Skipping.")
             return
-        Overture_data_all = gpd.read_file(f'{BUILDINGS_PATH}/{city_name}/Overture_building_{city_name}.geojson')
+        Overture_data_all = gpd.read_parquet(f'{BUILDINGS_PATH}/{city_name}/Overture_building_{city_name}.geoparquet')
         print(f"{city_name}: Overture file read")
-        Overture_data_all['confidence'] = Overture_data_all.sources.apply(lambda x: json.loads(x)[0]['confidence'])
-        Overture_data_all['dataset'] = Overture_data_all.sources.apply(lambda x: json.loads(x)[0]['dataset'])
+        Overture_data_all['confidence'] = Overture_data_all.sources.apply(lambda x: x[0]['confidence'])
+        Overture_data_all['dataset'] = Overture_data_all.sources.apply(lambda x: x[0]['dataset'])
         Overture_data_all = Overture_data_all.set_geometry('geometry')[Overture_data_all.dataset != 'OpenStreetMap']
 
         # Read intersections
@@ -410,7 +410,7 @@ def process_city(city_name, sample_prop=1.0, override_processed=False):
 
         #Save results to geoparquet
         os.makedirs(f'{OUTPUT_PATH_RASTER}/{city_name}', exist_ok=True)
-        city_grid.to_parquet(f'{OUTPUT_PATH_RASTER}/{city_name}/{city_name}_results.geoparquet', engine="pyarrow", index=False)
+        city_grid.to_parquet(f'{OUTPUT_PATH_RASTER}/{city_name}/{city_name}_{str(grid_size)}_results.geoparquet', engine="pyarrow", index=False)
 
         # Save updated grid status to CSV
         city_grid[['grid_id', 'processed']].to_csv(STATUS_CSV_PATH, index=False)
@@ -422,10 +422,10 @@ def process_city(city_name, sample_prop=1.0, override_processed=False):
         raise 
 
 def main():
-    #cities = ["Belo Horizonte", "Campinas", "Bogota", "Nairobi", "Bamako", 
-    #          "Lagos", "Accra", "Abidjan", "Mogadishu", "Cape Town", 
-    #          "Maputo", "Luanda"]
-    cities = ["Belo Horizonte"]
+    cities = ["Belo Horizonte", "Campinas", "Bogota", "Nairobi", "Bamako", 
+              "Lagos", "Accra", "Abidjan", "Mogadishu", "Cape Town", 
+              "Maputo", "Luanda"]
+    #cities = ["Belo Horizonte"]
     cities = [city.replace(' ', '_') for city in cities]
     sample_prop = 0.01  # Sample 1% of the grid cells
 
