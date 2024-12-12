@@ -316,7 +316,7 @@ def process_city(city_name, sample_prop=1.0, override_processed=False, grid_size
         # Check if a grid status CSV already exists
         output_dir_csv = f'{OUTPUT_PATH_CSV}/{city_name}'
         os.makedirs(output_dir_csv, exist_ok=True)
-        STATUS_CSV_PATH = f'{output_dir_csv}/{city_name}_grid_status_{grid_size}.csv'
+        STATUS_CSV_PATH = f'{output_dir_csv}/{city_name}_grid_status_{grid_size}m.csv'
 
         if os.path.exists(STATUS_CSV_PATH) and not override_processed:
             # Load existing status CSV and merge with city grid
@@ -410,7 +410,7 @@ def process_city(city_name, sample_prop=1.0, override_processed=False, grid_size
 
         #Save results to geoparquet
         os.makedirs(f'{OUTPUT_PATH_RASTER}/{city_name}', exist_ok=True)
-        city_grid.to_parquet(f'{OUTPUT_PATH_RASTER}/{city_name}/{city_name}_{str(grid_size)}_results.geoparquet', engine="pyarrow", index=False)
+        city_grid.to_parquet(f'{OUTPUT_PATH_RASTER}/{city_name}/{city_name}_{str(grid_size)}m_results.geoparquet', engine="pyarrow", index=False)
 
         # Save updated grid status to CSV
         city_grid[['grid_id', 'processed']].to_csv(STATUS_CSV_PATH, index=False)
