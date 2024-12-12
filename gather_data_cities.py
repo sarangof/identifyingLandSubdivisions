@@ -17,7 +17,7 @@ INTERSECTIONS_PATH = os.path.join(INPUT_PATH, "intersections")
 URBAN_EXTENTS_PATH = os.path.join(INPUT_PATH, "urban_extents")
 OUTPUT_PATH = os.path.join(MAIN_PATH, "output")
 OUTPUT_PATH_CSV = os.path.join(OUTPUT_PATH, "csv")
-SEARCH_BUFFER_PATH = os.path.join(MAIN_PATH, "city_info", "search_buffers")
+SEARCH_BUFFER_PATH = os.path.join(INPUT_PATH, "city_info", "search_buffers")
 
 # Ensure paths exist
 os.makedirs(OUTPUT_PATH_CSV, exist_ok=True)
