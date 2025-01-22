@@ -95,8 +95,8 @@ def process_cell(cell_id, geod, rectangle, rectangle_projected, buildings, block
         if not buildings.empty and buildings.sindex:
             possible_matches_index = list(buildings.sindex.intersection(bounding_box_geom.bounds))
             possible_matches = buildings.iloc[possible_matches_index]
-            buildings_clipped = possible_matches[possible_matches.geometry.intersects(bounding_box_geom)]
-            buildings_clipped = buildings_clipped[(buildings_clipped['confidence'] > 0.75) | buildings_clipped['confidence'].isna()].reset_index()
+            buildings_clipped = gpd.clip(possible_matches, bounding_box_geom)
+            buildings_clipped = buildings_clipped[(buildings_clipped['confidence'] > 0.75) | buildings_clipped['confidence'].isna()].reset_index(drop=True)
             building_area = buildings_clipped.area.sum()
             n_buildings = len(buildings_clipped)
             building_density = (1000.*1000*n_buildings)/rectangle_area
@@ -427,7 +427,7 @@ def main():
               "Maputo", "Luanda"]
     #cities = ["Belo Horizonte"]
     cities = [city.replace(' ', '_') for city in cities]
-    sample_prop = 0.01  # Sample 1% of the grid cells
+    sample_prop = 0.1  # Sample 10% of the grid cells
 
     # City-Level Parallelization
     with ProcessPoolExecutor() as executor:
