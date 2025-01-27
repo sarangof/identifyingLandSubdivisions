@@ -675,32 +675,21 @@ def metric_6_entropy_of_building_azimuth(buildings_clipped, rectangle_id, bin_wi
     return standardized_kl_divergence, buildings_clipped
 
 #7 Average block width
-def metric_7_average_block_width(blocks_clipped, rectangle_projected, rectangle_area):
-#blocks_clipped, rectangle_projected_arg, rectangle_area
-    blocks_within_rectangle = []
-    radius_avg = []
-
+def metric_7_average_block_width(blocks_clipped, blocks_clipped_within_rectangle, rectangle_projected, rectangle_area):
+    #radius_avg = []
+    # Loop through blocks within the rectangle and calculate 
     for block_id, block in blocks_clipped.iterrows():
         optimal_point, max_radius = get_largest_inscribed_circle(block)
-        block_copy = gpd.GeoSeries(block.copy().geometry).set_crs(blocks_clipped.crs)
-        #rectangle_geom = gpd.GeoSeries(rectangle_projected.geometry)
-        block_within_rectangle = (block_copy.intersection(rectangle_projected))
-        block_area_within_rectangle = block_within_rectangle.area.sum()
-        block_weight = block_area_within_rectangle / rectangle_area
+        if block_id in list(blocks_clipped_within_rectangle.index):
+            block_area_within_rectangle = blocks_clipped_within_rectangle.loc[block_id].geometry.area
+        else:
+            block_area_within_rectangle = 0.
+        block_weight = 1.*block_area_within_rectangle / rectangle_area
         weighted_width = block_weight*max_radius
         blocks_clipped.loc[block_id,'weighted_width'] = weighted_width
-        blocks_within_rectangle.append(block_within_rectangle)
-        radius_avg.append(max_radius)
-
-    # blocks_clipped['optimal_point'], blocks_clipped['max_radius'] = zip(*blocks_clipped['geometry'].apply(lambda geom: get_largest_inscribed_circle(gpd.GeoSeries(geom))))
-    # blocks_within_rectangle = blocks_clipped.intersection(rectangle_projected)
-    # block_areas_within_rectangle = blocks_within_rectangle.area
-    # block_weights = block_areas_within_rectangle / rectangle_area
-    # blocks_clipped['weighted_width'] = block_weights * blocks_clipped['max_radius']
+        #radius_avg.append(max_radius)
 
     rectangle_projected_gdf = gpd.GeoSeries(rectangle_projected)
-    #rectangle_projected_gdf = rectangle_projected_gdf.set_crs(blocks_clipped.crs, allow_override=True)
-    #rectangle_projected_gdf = rectangle_projected_gdf.reset_index(drop=True)
     blocks_clipped = blocks_clipped.reset_index(drop=True)
     blocks_union = blocks_clipped.unary_union
     left_over_blocks = gpd.GeoDataFrame(geometry=gpd.GeoDataFrame(geometry=rectangle_projected_gdf).difference(blocks_union).geometry)
@@ -710,7 +699,7 @@ def metric_7_average_block_width(blocks_clipped, rectangle_projected, rectangle_
 
     if left_over_blocks.area.sum() > 0.0:
 
-        # THIS CAN REPLACE THE LOOP -- OJO, NEED TO
+        # OJO -- CAN THIS LOOP BE REPLACED?
         # left_over_blocks['optimal_point'], left_over_blocks['max_radius'] = zip(*left_over_blocks['geometry'].apply(lambda geom: get_largest_inscribed_circle(geom)))
         # left_over_blocks_within_rectangle = left_over_blocks.intersection(rectangle_projected)
         # left_over_blocks['block_weight'] = left_over_blocks_within_rectangle.area / rectangle_area
