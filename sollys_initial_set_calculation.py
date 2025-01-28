@@ -152,11 +152,14 @@ for rectangle_id, rectangle in rectangles.iterrows():
 
     # Metrics 7 and 8
     if not blocks_clipped.empty:
+        minx, miny, maxx, maxy = list(rectangle_projected.bounds.values[0])
+        rectangle_box = box(minx, miny, maxx, maxy)
         rectangle_projected_arg = rectangle_projected.geometry
-        m7, blocks_clipped = metric_7_average_block_width(blocks_clipped, rectangle_projected_arg, rectangle_area)
+        blocks_clipped_within_rectangle = blocks_clipped.clip(rectangle_box)
+        m7, blocks_clipped = metric_7_average_block_width(blocks_clipped, blocks_clipped_within_rectangle, rectangle_projected_arg, rectangle_area)
         #m7=np.nan
         #plot_largest_inscribed_circle(rectangle_id, rectangle_projected,  blocks_clipped, roads)
-        m8, internal_buffers = metric_8_two_row_blocks(blocks_clipped, buildings, utm_proj_rectangle, row_epsilon=row_epsilon)
+        m8, epsilon_buffers, width_buffers = metric_8_two_row_blocks(blocks_clipped, buildings, utm_proj_rectangle, row_epsilon=row_epsilon)
         
         #plot_two_row_blocks(rectangle_id, rectangle_projected, blocks_clipped, internal_buffers, buildings_clipped, roads, row_epsilon)
     else:
