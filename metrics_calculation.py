@@ -478,19 +478,25 @@ def calculate_azimuth_diff(x,y):
 
 def apply_internal_buffer(blocks_clipped, row_epsilon, tolerance=1e-6):
     def process_block(row):
-        # Calculate the target area based on block area and row_epsilon
         block_area = row.geometry.area
-        target_area = block_area * (1.0 - row_epsilon)
+        
+        # Epsilon buffer: very small internal buffer based on row_epsilon
+        epsilon_target_area = block_area * (1.0 - row_epsilon)
+        epsilon_buffer = get_internal_buffer_with_target_area(row, epsilon_target_area, tolerance)
+        
+        # 50%-width buffer: buffer based on 50% of the block width
+        half_width_buffer = row['radius'] * 0.5
+        width_buffer = row.geometry.buffer(-half_width_buffer)
+        
+        return epsilon_buffer, width_buffer
 
-        # Call the function for this specific block
-        internal_buffer = get_internal_buffer_with_target_area(row, target_area, tolerance)
-
-        return internal_buffer
-
-    # Apply the function to each row and store the results in a new column
-    blocks_clipped['internal_buffer'] = blocks_clipped.apply(process_block, axis=1)
+    # Apply the function to each row and unpack results into two separate GeoDataFrames
+    results = blocks_clipped.apply(process_block, axis=1)
+    blocks_clipped['epsilon_buffer'] = results.apply(lambda x: x[0])
+    blocks_clipped['width_buffer'] = results.apply(lambda x: x[1])
 
     return blocks_clipped
+
 
 def visualize_tortuosity_comparison(roads_clipped, n_samples=5):
     fig, ax = plt.subplots(figsize=(10, 10))
@@ -687,6 +693,7 @@ def metric_7_average_block_width(blocks_clipped, blocks_clipped_within_rectangle
         block_weight = 1.*block_area_within_rectangle / rectangle_area
         weighted_width = block_weight*max_radius
         blocks_clipped.loc[block_id,'weighted_width'] = weighted_width
+        blocks_clipped.loc[block_id,'radius'] = max_radius
         #radius_avg.append(max_radius)
 
     rectangle_projected_gdf = gpd.GeoSeries(rectangle_projected)
@@ -714,6 +721,7 @@ def metric_7_average_block_width(blocks_clipped, blocks_clipped_within_rectangle
             block_weight = block_area_within_rectangle / rectangle_area
             weighted_width = block_weight*max_radius
             left_over_blocks.loc[block_id,'weighted_width'] = weighted_width 
+            left_over_blocks.loc[block_id,'radius'] = max_radius 
             left_over_blocks.loc[block_id,'area'] = leftover_block.geometry.area
         m7 = blocks_clipped['weighted_width'].sum() + left_over_blocks['weighted_width'].sum()
         blocks_clipped = pd.concat([blocks_clipped,left_over_blocks]).reset_index()
@@ -723,27 +731,28 @@ def metric_7_average_block_width(blocks_clipped, blocks_clipped_within_rectangle
 
 #8 Two row blocks
 def metric_8_two_row_blocks(blocks_clipped, buildings, utm_proj_rectangle, row_epsilon):
-    
-    # Calculate share of buildings in blocks
-    buildings_in_blocks = buildings.clip(blocks_clipped.geometry)
-    buildings_in_blocks_area = buildings_in_blocks.area.sum()
-    blocks_area = blocks_clipped.area.sum()
-    building_to_block_share = buildings_in_blocks_area/blocks_area
-
-    # Calculate share of building footprints in internal buffer
+    # Apply internal buffers (both epsilon and width-based buffers)
     blocks_clipped = apply_internal_buffer(blocks_clipped, row_epsilon)
-    internal_buffers = blocks_clipped.internal_buffer
-    buildings_in_buffers = buildings.clip(internal_buffers.geometry)
-    buildings_in_buffer_area = buildings_in_buffers.area.sum()
-    buffer_area = internal_buffers.area.sum()
-    building_to_buffer_share = buildings_in_buffer_area/buffer_area
 
-    #if building_to_block_share <= building_to_buffer_share:
-    #    m8 = 1
-    #else:
-    #    m8 = 1.-(building_to_buffer_share/building_to_block_share)
-    m8 = building_to_buffer_share/building_to_block_share 
-    return m8, internal_buffers
+    # Calculate share of buildings in the 50%-width buffer (building_to_block_share)
+    width_buffers = gpd.GeoDataFrame(blocks_clipped, geometry='width_buffer', crs=blocks_clipped.crs)
+    buildings_in_width_buffers = buildings.clip(width_buffers.geometry.unary_union)
+    buildings_in_width_buffers_area = buildings_in_width_buffers.area.sum()
+    width_buffer_area = width_buffers.geometry.area.sum()
+    building_to_block_share = buildings_in_width_buffers_area / width_buffer_area
+
+    # Calculate share of buildings in epsilon buffer (building_to_buffer_share)
+    epsilon_buffers = gpd.GeoDataFrame(blocks_clipped, geometry='epsilon_buffer', crs=blocks_clipped.crs)
+    buildings_in_epsilon_buffers = buildings.clip(epsilon_buffers.geometry.unary_union)
+    buildings_in_epsilon_buffers_area = buildings_in_epsilon_buffers.area.sum()
+    epsilon_buffer_area = epsilon_buffers.geometry.area.sum()
+    building_to_buffer_share = buildings_in_epsilon_buffers_area / epsilon_buffer_area
+
+    # Calculate m8 metric
+    m8 = building_to_buffer_share / building_to_block_share
+    return m8, epsilon_buffers, width_buffers
+
+
 
 #9 Tortuosity index
 def metric_9_tortuosity_index(roads_clipped):
