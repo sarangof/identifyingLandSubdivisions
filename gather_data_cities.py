@@ -43,7 +43,7 @@ def get_utm_proj(lon, lat):
 def osm_command(city_name, search_area):
     if len(search_area) > 0:
         polygon = search_area.geometry.iloc[0]
-        G = ox.graph_from_polygon(polygon=polygon, custom_filter='["highway"~"trunk|motorway|primary|secondary|tertiary"]')
+        G = ox.graph_from_polygon(polygon=polygon, custom_filter='["highway"~"motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|service|track|path|footway|cycleway|bridleway|steps|pedestrian|corridor|road"]')
     else:
         raise ValueError(f"Search area for {city_name} is empty.")
     

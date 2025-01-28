@@ -186,14 +186,16 @@ def process_cell(cell_id, geod, rectangle, rectangle_projected, buildings, block
             # Metric 7 -- average block width
             # Metric 8 -- two-row blocks
             if not blocks_clipped.empty:
-                m7, blocks_clipped = metric_7_average_block_width(blocks_clipped, rectangle_projected, rectangle_area)
-
                 minx, miny, maxx, maxy = rectangle_projected.bounds
                 rectangle_box = box(minx, miny, maxx, maxy)
                 blocks_clipped_within_rectangle = blocks_clipped.clip(rectangle_box)
 
                 area_tiled_by_blocks = blocks_clipped_within_rectangle.area.sum()
                 share_tiled_by_blocks = area_tiled_by_blocks/rectangle_area
+
+                m7, blocks_clipped = metric_7_average_block_width(blocks_clipped, blocks_clipped_within_rectangle, rectangle_projected, rectangle_area)
+
+
 
                 if not buildings_clipped.empty:
                     m8, internal_buffers = metric_8_two_row_blocks(blocks_clipped, buildings_clipped, utm_proj_city, row_epsilon=row_epsilon)
