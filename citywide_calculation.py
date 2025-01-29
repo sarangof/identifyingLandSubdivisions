@@ -51,7 +51,6 @@ def process_metrics(final_geo_df):
     metrics_original_names = [col+'_original' for col in all_metrics_columns]
     final_geo_df[metrics_original_names] = final_geo_df[all_metrics_columns].copy()
 
-
     metrics_standardized_names = {col:col+'_standardized' for col in all_metrics_columns}
 
     # Apply the standardization functions
@@ -79,6 +78,22 @@ def process_metrics(final_geo_df):
     final_geo_df['regularity_index'] = final_geo_df[all_metrics_columns].mean(axis=0)
 
     return final_geo_df
+
+def output_results(city_grid, city_name, grid_size, sample_prop, OUTPUT_PATH_RASTER, output_dir_csv):
+        #Save results to geoparquet
+        os.makedirs(f'{OUTPUT_PATH_RASTER}/{city_name}', exist_ok=True)
+        city_grid.to_parquet(f'{OUTPUT_PATH_RASTER}/{city_name}/{city_name}_{str(grid_size)}m_results.geoparquet', engine="pyarrow", index=False)
+
+        all_metrics_columns = ['metric_1','metric_2','metric_3','metric_4','metric_5','metric_6','metric_7','metric_8','metric_9','metric_10','metric_11','metric_12','metric_13']
+        metrics_standardized_names = [col+'_standardized' for col in all_metrics_columns]
+        zero_centered_names_list = [col+'_zero-centered' for col in all_metrics_columns]
+
+        city_grid[all_metrics_columns+metrics_standardized_names+zero_centered_names_list].describe().transpose().to_excel(f'{output_dir_csv}/summary_prop={str(sample_prop)}.xlsx')
+
+        output_dir_csv
+
+        
+
 
 
 
@@ -198,7 +213,7 @@ def process_cell(cell_id, geod, rectangle, rectangle_projected, buildings, block
 
 
                 if not buildings_clipped.empty:
-                    m8, internal_buffers = metric_8_two_row_blocks(blocks_clipped, buildings_clipped, utm_proj_city, row_epsilon=row_epsilon)
+                    m8, epsilon_buffers, width_buffers = metric_8_two_row_blocks(blocks_clipped, buildings_clipped, utm_proj_city, row_epsilon=row_epsilon)
                 else:
                     m8 = np.nan
             else:
@@ -207,7 +222,7 @@ def process_cell(cell_id, geod, rectangle, rectangle_projected, buildings, block
                 share_tiled_by_blocks = np.nan
 
             
-            if (not roads_clipped.empty) and (not OSM_intersections.empty):
+            if ((not roads_clipped.empty) and (not OSM_intersections.empty)):
                 # Metric 9 -- tortuosity index
                 m9 = metric_9_tortuosity_index(roads_clipped)
                                                                 
@@ -410,9 +425,7 @@ def process_city(city_name, sample_prop=1.0, override_processed=False, grid_size
         # Merge results back into city_grid
         city_grid = city_grid.merge(final_geo_df, how='left', left_on='grid_id', right_on='index')
 
-        #Save results to geoparquet
-        os.makedirs(f'{OUTPUT_PATH_RASTER}/{city_name}', exist_ok=True)
-        city_grid.to_parquet(f'{OUTPUT_PATH_RASTER}/{city_name}/{city_name}_{str(grid_size)}m_results.geoparquet', engine="pyarrow", index=False)
+        output_results(city_grid, city_name, grid_size, sample_prop, OUTPUT_PATH_RASTER, output_dir_csv)
 
         # Save updated grid status to CSV
         city_grid[['grid_id', 'processed']].to_csv(STATUS_CSV_PATH, index=False)
