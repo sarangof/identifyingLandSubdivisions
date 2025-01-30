@@ -115,7 +115,7 @@ def run_all(cities):
     results_df.to_csv(os.path.join(OUTPUT_PATH_CSV, "data_gather_logs.csv"), index=False)
 
 def main():
-    cities = ["Belo Horizonte", "Campinas", "Bogota", "Nairobi", "Bamako", "Lagos", "Accra", "Abidjan", "Cape Town", "Maputo", "Mogadishu", "Luanda"]
+    cities = ["Belo Horizonte"] #, "Campinas", "Bogota", "Nairobi", "Bamako", "Lagos", "Accra", "Abidjan", "Cape Town", "Maputo", "Mogadishu", "Luanda"
     run_all(cities)
 
 if __name__ == "__main__":
