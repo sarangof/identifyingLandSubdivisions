@@ -4,10 +4,12 @@ import pandas as pd
 from metrics_calculation import *
 #from create_rectangles import *
 from standardize_metrics import *
+import matplotlib.pyplot as plt
 import fiona
 import geopandas as gpd
 import numpy as np
 from shapely.geometry import box
+from datetime import datetime
 #import pyproj
 from pyproj import CRS, Geod
 import json
@@ -27,6 +29,7 @@ INTERSECTIONS_PATH = f'{INPUT_PATH}/intersections'
 GRIDS_PATH = f'{INPUT_PATH}/city_info/grids'
 OUTPUT_PATH_CSV = f'{MAIN_PATH}/output/csv'
 OUTPUT_PATH_RASTER = f'{MAIN_PATH}/output/raster'
+OUTPUT_PATH_PNG = f'{MAIN_PATH}/output/png'
 
 # Define important parameters for this run
 grid_size = 200
@@ -79,16 +82,138 @@ def process_metrics(final_geo_df):
 
     return final_geo_df
 
-def output_results(city_grid, city_name, grid_size, sample_prop, OUTPUT_PATH_RASTER, output_dir_csv):
-        #Save results to geoparquet
+
+def save_city_grid_results(city_grid, sampled_grid, output_dir_csv):
+    """
+    Saves city_grid to results.csv in output_dir_csv.
+    If results.csv exists, it updates 'processed' values for rows present in sampled_grid.
+    Adds a timestamp to track when updates happen.
+    """
+    results_path = os.path.join(output_dir_csv, "results.csv")
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # Ensure sampled_grid has the same index (id) as city_grid
+    sampled_ids = sampled_grid["grid_id"].unique()
+
+    # Add timestamp column to track updates
+    city_grid["timestamp"] = pd.NA  # Set as missing initially
+
+    # Set 'processed' to True for rows in sampled_grid
+    city_grid.loc[city_grid["grid_id"].isin(sampled_ids), "processed"] = True
+
+    # Set timestamp only for rows that were newly processed
+    city_grid.loc[city_grid["grid_id"].isin(sampled_ids), "timestamp"] = timestamp
+
+    if os.path.exists(results_path):
+        # Load existing results
+        existing_results = pd.read_csv(results_path)
+
+        # Ensure necessary columns exist in existing results
+        if "processed" not in existing_results.columns:
+            existing_results["processed"] = False
+        if "timestamp" not in existing_results.columns:
+            existing_results["timestamp"] = pd.NA
+
+        # Merge new results, updating only 'processed' and 'timestamp' where needed
+        updated_results = existing_results.set_index("grid_id").combine_first(city_grid.set_index("grid_id")).reset_index()
+
+        # Explicitly update 'processed' and 'timestamp' based on sampled_grid
+        updated_results.loc[updated_results["grid_id"].isin(sampled_ids), "processed"] = True
+        updated_results.loc[updated_results["grid_id"].isin(sampled_ids), "timestamp"] = timestamp
+
+    else:
+        # No existing results, just save city_grid as new results
+        updated_results = city_grid
+
+    # Save the updated results
+    updated_results.to_csv(results_path, index=False)
+    print(f"Results saved to {results_path}")
+
+def save_metric_maps(city_grid, output_dir_png):
+    """
+    Generates a matrix of geographic maps for all metrics and the regularity index,
+    and saves each map separately.
+    """
+    os.makedirs(output_dir_png, exist_ok=True)  # Ensure output directory exists
+
+    # Define the metrics and regularity index
+    all_metrics_columns = [
+        'metric_1', 'metric_2', 'metric_3', 'metric_4', 'metric_5',
+        'metric_6', 'metric_7', 'metric_8', 'metric_9', 'metric_10',
+        'metric_11', 'metric_12', 'metric_13'
+    ]
+    plot_columns = all_metrics_columns + ['regularity_index']
+
+    # Ensure city_grid is a valid GeoDataFrame and has a geometry column
+    if not isinstance(city_grid, gpd.GeoDataFrame) or 'geometry' not in city_grid.columns:
+        raise ValueError("city_grid must be a GeoDataFrame with a 'geometry' column.")
+
+    # Ensure city_grid has a valid CRS (coordinate reference system)
+    if city_grid.crs is None:
+        raise ValueError("GeoDataFrame must have a valid CRS. Use city_grid.set_crs('EPSG:XXXX', inplace=True) to set it.")
+
+    # Determine consistent color scale across all maps
+    vmin = city_grid[plot_columns].min().min()
+    vmax = city_grid[plot_columns].max().max()
+
+    # Create a grid of plots (adjust rows & cols for number of metrics)
+    num_cols = 4  # Define how many columns in the figure matrix
+    num_rows = (len(plot_columns) + num_cols - 1) // num_cols  # Compute necessary rows
+
+    fig, axes = plt.subplots(num_rows, num_cols, figsize=(20, num_rows * 5))
+    axes = axes.flatten()  # Convert axes to a 1D list for easy iteration
+
+    # **1. Generate matrix of spatial maps**
+    for i, metric in enumerate(plot_columns):
+        ax = axes[i]
+        city_grid.plot(column=metric, cmap='Reds', linewidth=0.5, ax=ax, edgecolor='black',
+                       legend=True, vmin=vmin, vmax=vmax)
+        ax.set_title(metric)
+        ax.axis("off")  # Hide axis labels
+
+    # Hide any extra subplots if the grid is larger than necessary
+    for j in range(i + 1, len(axes)):
+        axes[j].set_visible(False)
+
+    # Save the matrix of maps
+    matrix_plot_path = os.path.join(output_dir_png, "metrics_map_matrix.png")
+    plt.tight_layout()
+    plt.savefig(matrix_plot_path, dpi=300)
+    plt.close()
+    print(f"Saved matrix plot to {matrix_plot_path}")
+
+    # **2. Generate and save individual maps**
+    for metric in plot_columns:
+        fig, ax = plt.subplots(figsize=(8, 6))
+        city_grid.plot(column=metric, cmap='viridis', linewidth=0.5, ax=ax, edgecolor='black',
+                       legend=True, vmin=vmin, vmax=vmax)
+        ax.set_title(metric)
+        ax.axis("off")
+
+        # Save individual map
+        metric_plot_path = os.path.join(output_dir_png, f"{metric}_map.png")
+        plt.savefig(metric_plot_path, dpi=300)
+        plt.close()
+        print(f"Saved {metric} map to {metric_plot_path}")
+
+    print("All spatial maps have been saved.")
+
+def output_results(city_grid, sampled_grid, city_name, grid_size, sample_prop, OUTPUT_PATH_RASTER, output_dir_csv, output_dir_png):
+        #Save raste results to geoparquet
         os.makedirs(f'{OUTPUT_PATH_RASTER}/{city_name}', exist_ok=True)
         city_grid.to_parquet(f'{OUTPUT_PATH_RASTER}/{city_name}/{city_name}_{str(grid_size)}m_results.geoparquet', engine="pyarrow", index=False)
 
+        # Save summaries
         all_metrics_columns = ['metric_1','metric_2','metric_3','metric_4','metric_5','metric_6','metric_7','metric_8','metric_9','metric_10','metric_11','metric_12','metric_13']
         metrics_standardized_names = [col+'_standardized' for col in all_metrics_columns]
         zero_centered_names_list = [col+'_zero-centered' for col in all_metrics_columns]
-
         city_grid[all_metrics_columns+metrics_standardized_names+zero_centered_names_list].describe().transpose().to_excel(f'{output_dir_csv}/summary_prop={str(sample_prop)}.xlsx')
+
+        # Save raw data
+        save_city_grid_results(city_grid, sampled_grid, output_dir_csv)
+
+        # Save PNG files
+        save_metric_maps(city_grid, output_dir_png)
 
         output_dir_csv
 
@@ -424,8 +549,8 @@ def process_city(city_name, sample_prop=1.0, override_processed=False, grid_size
 
         # Merge results back into city_grid
         city_grid = city_grid.merge(final_geo_df, how='left', left_on='grid_id', right_on='index')
-
-        output_results(city_grid, city_name, grid_size, sample_prop, OUTPUT_PATH_RASTER, output_dir_csv)
+        output_dir_png = f'{OUTPUT_PATH_PNG}/{city_name}'
+        output_results(city_grid, sampled_grid, city_name, grid_size, sample_prop, OUTPUT_PATH_RASTER, output_dir_csv, output_dir_png)
 
         # Save updated grid status to CSV
         city_grid[['grid_id', 'processed']].to_csv(STATUS_CSV_PATH, index=False)
@@ -440,14 +565,14 @@ def main():
     cities = ["Belo Horizonte", "Campinas", "Bogota", "Nairobi", "Bamako", 
               "Lagos", "Accra", "Abidjan", "Mogadishu", "Cape Town", 
               "Maputo", "Luanda"]
-    #cities = ["Belo Horizonte"]
+    cities = ["Belo Horizonte"]
     cities = [city.replace(' ', '_') for city in cities]
     sample_prop = 0.1  # Sample 10% of the grid cells
 
     # City-Level Parallelization
     with ProcessPoolExecutor() as executor:
         try:
-            executor.map(partial(process_city, sample_prop=sample_prop, override_processed=False), cities)
+            executor.map(partial(process_city, sample_prop=sample_prop, override_processed=True), cities)
         except Exception as e:
             print(f"Error in ProcessPoolExecutor: {e}")
 
