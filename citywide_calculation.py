@@ -23,6 +23,9 @@ from functools import partial
 
 MAIN_PATH = '../data'
 INPUT_PATH = f'{MAIN_PATH}/input'
+CITY_INFO_PATH = os.path.join(INPUT_PATH, "city_info")
+
+ANALYSIS_BUFFERS_PATH = os.path.join(CITY_INFO_PATH, "analysis_buffers")
 BUILDINGS_PATH = f'{INPUT_PATH}/buildings'
 ROADS_PATH = f'{INPUT_PATH}/roads'
 INTERSECTIONS_PATH = f'{INPUT_PATH}/intersections'
@@ -30,6 +33,7 @@ GRIDS_PATH = f'{INPUT_PATH}/city_info/grids'
 OUTPUT_PATH_CSV = f'{MAIN_PATH}/output/csv'
 OUTPUT_PATH_RASTER = f'{MAIN_PATH}/output/raster'
 OUTPUT_PATH_PNG = f'{MAIN_PATH}/output/png'
+
 
 # Define important parameters for this run
 grid_size = 200
@@ -83,13 +87,13 @@ def process_metrics(final_geo_df):
     return final_geo_df
 
 
-def save_city_grid_results(city_grid, sampled_grid, output_dir_csv):
+def save_city_grid_results(city_grid, sampled_grid, output_dir_csv, grid_size):
     """
     Saves city_grid to results.csv in output_dir_csv.
     If results.csv exists, it updates 'processed' values for rows present in sampled_grid.
     Adds a timestamp to track when updates happen.
     """
-    results_path = os.path.join(output_dir_csv, "results.csv")
+    results_path = os.path.join(output_dir_csv, f"results_{grid_size}m.csv")
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     # Ensure sampled_grid has the same index (id) as city_grid
@@ -129,74 +133,118 @@ def save_city_grid_results(city_grid, sampled_grid, output_dir_csv):
     updated_results.to_csv(results_path, index=False)
     print(f"Results saved to {results_path}")
 
-def save_metric_maps(city_grid, output_dir_png):
+
+
+def save_metric_maps(city_grid, output_dir_png, grid_size, analysis_buffer_path):
     """
-    Generates a matrix of geographic maps for all metrics and the regularity index,
-    and saves each map separately.
+    Generates geographic maps for all metric sets and the regularity index,
+    overlaying analysis buffers to indicate areas not calculated.
     """
     os.makedirs(output_dir_png, exist_ok=True)  # Ensure output directory exists
 
-    # Define the metrics and regularity index
+    # Define all metric sets
     all_metrics_columns = [
         'metric_1', 'metric_2', 'metric_3', 'metric_4', 'metric_5',
         'metric_6', 'metric_7', 'metric_8', 'metric_9', 'metric_10',
         'metric_11', 'metric_12', 'metric_13'
     ]
-    plot_columns = all_metrics_columns + ['regularity_index']
+    metrics_standardized_names = [col + '_standardized' for col in all_metrics_columns]
+    zero_centered_names_list = [col + '_zero-centered' for col in all_metrics_columns]
+    original_metrics = [col + '_original' for col in all_metrics_columns]
+
+    # Include regularity index
+    metric_sets = {
+        "Final Metrics": all_metrics_columns + ['regularity_index'],
+        "Standardized Metrics": metrics_standardized_names + ['regularity_index_standardized'],
+        "Zero-Centered Metrics": zero_centered_names_list + ['regularity_index_zero-centered'],
+        "Original Metrics": original_metrics + ['regularity_index_original']
+    }
+
+    # Load analysis buffer (areas not calculated) if available
+    if os.path.exists(analysis_buffer_path):
+        try:
+            analysis_buffers = gpd.read_file(analysis_buffer_path)
+            print(f"Loaded analysis buffers for {city_name}")
+        except Exception as e:
+            print(f"Error loading analysis buffers for {city_name}: {e}")
+            analysis_buffers = None
+    else:
+        analysis_buffers = None
 
     # Ensure city_grid is a valid GeoDataFrame and has a geometry column
     if not isinstance(city_grid, gpd.GeoDataFrame) or 'geometry' not in city_grid.columns:
         raise ValueError("city_grid must be a GeoDataFrame with a 'geometry' column.")
 
-    # Ensure city_grid has a valid CRS (coordinate reference system)
+    # Ensure city_grid has a valid CRS
     if city_grid.crs is None:
-        raise ValueError("GeoDataFrame must have a valid CRS. Use city_grid.set_crs('EPSG:XXXX', inplace=True) to set it.")
+        raise ValueError("GeoDataFrame must have a valid CRS.")
 
-    # Determine consistent color scale across all maps
-    vmin = city_grid[plot_columns].min().min()
-    vmax = city_grid[plot_columns].max().max()
+    # Ensure analysis buffers match the same CRS as city_grid
+    if analysis_buffers is not None and analysis_buffers.crs != city_grid.crs:
+        analysis_buffers = analysis_buffers.to_crs(city_grid.crs)
 
-    # Create a grid of plots (adjust rows & cols for number of metrics)
-    num_cols = 4  # Define how many columns in the figure matrix
-    num_rows = (len(plot_columns) + num_cols - 1) // num_cols  # Compute necessary rows
+    # **Loop over metric sets**
+    for set_name, plot_columns in metric_sets.items():
+        plot_columns = [col for col in plot_columns if col in city_grid.columns]  # Ensure columns exist
 
-    fig, axes = plt.subplots(num_rows, num_cols, figsize=(20, num_rows * 5))
-    axes = axes.flatten()  # Convert axes to a 1D list for easy iteration
+        if not plot_columns:
+            continue  # Skip if no valid columns
 
-    # **1. Generate matrix of spatial maps**
-    for i, metric in enumerate(plot_columns):
-        ax = axes[i]
-        city_grid.plot(column=metric, cmap='Reds', linewidth=0.5, ax=ax, edgecolor='black',
-                       legend=True, vmin=vmin, vmax=vmax)
-        ax.set_title(metric)
-        ax.axis("off")  # Hide axis labels
+        print(f"Generating maps for {set_name}")
 
-    # Hide any extra subplots if the grid is larger than necessary
-    for j in range(i + 1, len(axes)):
-        axes[j].set_visible(False)
+        # Determine consistent color scale across all maps
+        vmin = city_grid[plot_columns].min().min()
+        vmax = city_grid[plot_columns].max().max()
 
-    # Save the matrix of maps
-    matrix_plot_path = os.path.join(output_dir_png, "metrics_map_matrix.png")
-    plt.tight_layout()
-    plt.savefig(matrix_plot_path, dpi=300)
-    plt.close()
-    print(f"Saved matrix plot to {matrix_plot_path}")
+        # Define grid layout
+        num_cols = 4
+        num_rows = (len(plot_columns) + num_cols - 1) // num_cols
 
-    # **2. Generate and save individual maps**
-    for metric in plot_columns:
-        fig, ax = plt.subplots(figsize=(8, 6))
-        city_grid.plot(column=metric, cmap='viridis', linewidth=0.5, ax=ax, edgecolor='black',
-                       legend=True, vmin=vmin, vmax=vmax)
-        ax.set_title(metric)
-        ax.axis("off")
+        # **1. Generate matrix of spatial maps**
+        fig, axes = plt.subplots(num_rows, num_cols, figsize=(20, num_rows * 5))
+        axes = axes.flatten()
 
-        # Save individual map
-        metric_plot_path = os.path.join(output_dir_png, f"{metric}_map.png")
-        plt.savefig(metric_plot_path, dpi=300)
+        for i, metric in enumerate(plot_columns):
+            ax = axes[i]
+            city_grid.plot(column=metric, cmap='Reds', linewidth=0.1, ax=ax, edgecolor='black',
+                           legend=True, vmin=vmin, vmax=vmax)
+            if analysis_buffers is not None:
+                analysis_buffers.plot(ax=ax, color='yellow', alpha=0.3, edgecolor='black', linewidth=0.5)
+
+            ax.set_title(f"{metric} ({set_name})")
+            ax.axis("off")
+
+        # Hide any extra subplots
+        for j in range(i + 1, len(axes)):
+            axes[j].set_visible(False)
+
+        # Save the matrix of maps
+        matrix_plot_path = os.path.join(output_dir_png, f"{set_name.replace(' ', '_')}_metrics_map_matrix_{grid_size}m.png")
+        plt.tight_layout()
+        plt.savefig(matrix_plot_path, dpi=300)
         plt.close()
-        print(f"Saved {metric} map to {metric_plot_path}")
+        print(f"Saved {set_name} matrix plot to {matrix_plot_path}")
+
+        # **2. Generate and save individual maps**
+        for metric in plot_columns:
+            fig, ax = plt.subplots(figsize=(8, 6))
+            city_grid.plot(column=metric, cmap='Reds', linewidth=0.1, ax=ax, edgecolor='black',
+                           legend=True, vmin=vmin, vmax=vmax)
+
+            if analysis_buffers is not None:
+                analysis_buffers.plot(ax=ax, color='yellow', alpha=0.3, edgecolor='black', linewidth=0.5)
+
+            ax.set_title(f"{metric} ({set_name})")
+            ax.axis("off")
+
+            # Save individual map
+            metric_plot_path = os.path.join(output_dir_png, f"{metric}_{set_name.replace(' ', '_')}_map_{grid_size}m.png")
+            plt.savefig(metric_plot_path, dpi=300)
+            plt.close()
+            print(f"Saved {metric} ({set_name}) map to {metric_plot_path}")
 
     print("All spatial maps have been saved.")
+
 
 def output_results(city_grid, sampled_grid, city_name, grid_size, sample_prop, OUTPUT_PATH_RASTER, output_dir_csv, output_dir_png):
         #Save raste results to geoparquet
@@ -210,17 +258,13 @@ def output_results(city_grid, sampled_grid, city_name, grid_size, sample_prop, O
         city_grid[all_metrics_columns+metrics_standardized_names+zero_centered_names_list].describe().transpose().to_excel(f'{output_dir_csv}/summary_prop={str(sample_prop)}.xlsx')
 
         # Save raw data
-        save_city_grid_results(city_grid, sampled_grid, output_dir_csv)
+        save_city_grid_results(city_grid, sampled_grid, output_dir_csv, grid_size)
 
         # Save PNG files
-        save_metric_maps(city_grid, output_dir_png)
+        analysis_buffer_path = f'{ANALYSIS_BUFFERS_PATH}/{city_name}.gpkg'
+        save_metric_maps(city_grid, output_dir_png, grid_size, analysis_buffer_path)
 
         output_dir_csv
-
-        
-
-
-
 
 def process_cell(cell_id, geod, rectangle, rectangle_projected, buildings, blocks_all, OSM_roads_all_projected, OSM_intersections_all_projected, road_union, utm_proj_city):
     print(f"cell_id: {cell_id}")
@@ -469,6 +513,9 @@ def process_city(city_name, sample_prop=1.0, override_processed=False, grid_size
 
         # Filter for unprocessed rows
         unprocessed_grid = city_grid[~city_grid['processed']]
+        if unprocessed_grid.empty:
+            print(f"All cells in {city_name} have already been processed (override_processed possibly also set to False). Skipping.")
+            return
 
         # Apply sampling to unprocessed rows
         if sample_prop < 1.0:
@@ -572,7 +619,7 @@ def main():
     # City-Level Parallelization
     with ProcessPoolExecutor() as executor:
         try:
-            executor.map(partial(process_city, sample_prop=sample_prop, override_processed=True), cities)
+            executor.map(partial(process_city, sample_prop=sample_prop, override_processed=False), cities)
         except Exception as e:
             print(f"Error in ProcessPoolExecutor: {e}")
 
