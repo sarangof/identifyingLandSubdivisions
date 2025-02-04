@@ -23,9 +23,7 @@ from functools import partial
 
 MAIN_PATH = '../data'
 INPUT_PATH = f'{MAIN_PATH}/input'
-CITY_INFO_PATH = os.path.join(INPUT_PATH, "city_info")
 
-ANALYSIS_BUFFERS_PATH = os.path.join(CITY_INFO_PATH, "analysis_buffers")
 BUILDINGS_PATH = f'{INPUT_PATH}/buildings'
 ROADS_PATH = f'{INPUT_PATH}/roads'
 INTERSECTIONS_PATH = f'{INPUT_PATH}/intersections'
@@ -135,7 +133,7 @@ def save_city_grid_results(city_grid, sampled_grid, output_dir_csv, grid_size):
 
 
 
-def save_metric_maps(city_grid, output_dir_png, grid_size, analysis_buffer_path):
+def save_metric_maps(city_grid, output_dir_png, grid_size, grid_path, city_name, sample_prop):
     """
     Generates geographic maps for all metric sets and the regularity index,
     overlaying analysis buffers to indicate areas not calculated.
@@ -161,15 +159,15 @@ def save_metric_maps(city_grid, output_dir_png, grid_size, analysis_buffer_path)
     }
 
     # Load analysis buffer (areas not calculated) if available
-    if os.path.exists(analysis_buffer_path):
+    if os.path.exists(grid_path):
         try:
-            analysis_buffers = gpd.read_file(analysis_buffer_path)
-            print(f"Loaded analysis buffers for {city_name}")
+            grid = gpd.read_file(f'{grid_path}/{city_name}_{grid_size}m_grid.geoparquet')
+            print(f"Loaded grid for {city_name}")
         except Exception as e:
-            print(f"Error loading analysis buffers for {city_name}: {e}")
-            analysis_buffers = None
+            print(f"Error loading grid for {city_name}: {e}")
+            grid = None
     else:
-        analysis_buffers = None
+        grid = None
 
     # Ensure city_grid is a valid GeoDataFrame and has a geometry column
     if not isinstance(city_grid, gpd.GeoDataFrame) or 'geometry' not in city_grid.columns:
@@ -179,9 +177,9 @@ def save_metric_maps(city_grid, output_dir_png, grid_size, analysis_buffer_path)
     if city_grid.crs is None:
         raise ValueError("GeoDataFrame must have a valid CRS.")
 
-    # Ensure analysis buffers match the same CRS as city_grid
-    if analysis_buffers is not None and analysis_buffers.crs != city_grid.crs:
-        analysis_buffers = analysis_buffers.to_crs(city_grid.crs)
+    # Ensure grid matches the same CRS as city_grid
+    if grid is not None and grid.crs != city_grid.crs:
+        grid = grid.to_crs(city_grid.crs)
 
     # **Loop over metric sets**
     for set_name, plot_columns in metric_sets.items():
@@ -206,11 +204,10 @@ def save_metric_maps(city_grid, output_dir_png, grid_size, analysis_buffer_path)
 
         for i, metric in enumerate(plot_columns):
             ax = axes[i]
-            city_grid.plot(column=metric, cmap='Reds', linewidth=0.1, ax=ax, edgecolor='black',
+            if grid is not None:
+                grid.plot(ax=ax, color='khaki', edgecolor='black', linewidth=0.05) #alpha=0.3, 
+            city_grid.plot(column=metric, cmap='Reds', linewidth=0.05, ax=ax, edgecolor='black',
                            legend=True, vmin=vmin, vmax=vmax)
-            if analysis_buffers is not None:
-                analysis_buffers.plot(ax=ax, color='yellow', alpha=0.3, edgecolor='black', linewidth=0.5)
-
             ax.set_title(f"{metric} ({set_name})")
             ax.axis("off")
 
@@ -219,7 +216,7 @@ def save_metric_maps(city_grid, output_dir_png, grid_size, analysis_buffer_path)
             axes[j].set_visible(False)
 
         # Save the matrix of maps
-        matrix_plot_path = os.path.join(output_dir_png, f"{set_name.replace(' ', '_')}_metrics_map_matrix_{grid_size}m.png")
+        matrix_plot_path = os.path.join(output_dir_png, f"{set_name.replace(' ', '_')}_metrics_map_matrix_{grid_size}m_sample_prop_{sample_prop}.png")
         plt.tight_layout()
         plt.savefig(matrix_plot_path, dpi=300)
         plt.close()
@@ -228,17 +225,18 @@ def save_metric_maps(city_grid, output_dir_png, grid_size, analysis_buffer_path)
         # **2. Generate and save individual maps**
         for metric in plot_columns:
             fig, ax = plt.subplots(figsize=(8, 6))
-            city_grid.plot(column=metric, cmap='Reds', linewidth=0.1, ax=ax, edgecolor='black',
-                           legend=True, vmin=vmin, vmax=vmax)
 
-            if analysis_buffers is not None:
-                analysis_buffers.plot(ax=ax, color='yellow', alpha=0.3, edgecolor='black', linewidth=0.5)
+            if grid is not None:
+                grid.plot(ax=ax, color='khaki', edgecolor='black', linewidth=0.05) #
+
+            city_grid.plot(column=metric, cmap='Reds', linewidth=0.05, ax=ax, edgecolor='black',
+                legend=True, vmin=vmin, vmax=vmax)
 
             ax.set_title(f"{metric} ({set_name})")
             ax.axis("off")
 
             # Save individual map
-            metric_plot_path = os.path.join(output_dir_png, f"{metric}_{set_name.replace(' ', '_')}_map_{grid_size}m.png")
+            metric_plot_path = os.path.join(output_dir_png, f"{metric}_{set_name.replace(' ', '_')}_map_{grid_size}m_sample_prop_{sample_prop}.png")
             plt.savefig(metric_plot_path, dpi=300)
             plt.close()
             print(f"Saved {metric} ({set_name}) map to {metric_plot_path}")
@@ -261,8 +259,8 @@ def output_results(city_grid, sampled_grid, city_name, grid_size, sample_prop, O
         save_city_grid_results(city_grid, sampled_grid, output_dir_csv, grid_size)
 
         # Save PNG files
-        analysis_buffer_path = f'{ANALYSIS_BUFFERS_PATH}/{city_name}.gpkg'
-        save_metric_maps(city_grid, output_dir_png, grid_size, analysis_buffer_path)
+        grid_path = f'{GRIDS_PATH}/{city_name}'
+        save_metric_maps(city_grid, output_dir_png, grid_size, grid_path, city_name, sample_prop)
 
         output_dir_csv
 
@@ -612,9 +610,9 @@ def main():
     cities = ["Belo Horizonte", "Campinas", "Bogota", "Nairobi", "Bamako", 
               "Lagos", "Accra", "Abidjan", "Mogadishu", "Cape Town", 
               "Maputo", "Luanda"]
-    cities = ["Belo Horizonte"]
+    #cities = ["Belo Horizonte"]
     cities = [city.replace(' ', '_') for city in cities]
-    sample_prop = 0.1  # Sample 10% of the grid cells
+    sample_prop = 0.05  # Sample 10% of the grid cells
 
     # City-Level Parallelization
     with ProcessPoolExecutor() as executor:
