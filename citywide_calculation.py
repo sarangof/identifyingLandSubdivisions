@@ -253,7 +253,8 @@ def output_results(city_grid, sampled_grid, city_name, grid_size, sample_prop, O
         all_metrics_columns = ['metric_1','metric_2','metric_3','metric_4','metric_5','metric_6','metric_7','metric_8','metric_9','metric_10','metric_11','metric_12','metric_13']
         metrics_standardized_names = [col+'_standardized' for col in all_metrics_columns]
         zero_centered_names_list = [col+'_zero-centered' for col in all_metrics_columns]
-        city_grid[all_metrics_columns+metrics_standardized_names+zero_centered_names_list].describe().transpose().to_excel(f'{output_dir_csv}/summary_prop={str(sample_prop)}.xlsx')
+        metrics_original_names = [col+'_original' for col in all_metrics_columns]
+        city_grid[metrics_original_names+metrics_standardized_names+zero_centered_names_list+all_metrics_columns].describe().transpose().to_excel(f'{output_dir_csv}/summary_prop={str(sample_prop)}.xlsx')
 
         # Save raw data
         save_city_grid_results(city_grid, sampled_grid, output_dir_csv, grid_size)
@@ -530,6 +531,7 @@ def process_city(city_name, sample_prop=1.0, override_processed=False, grid_size
         if not os.path.exists(f'{BUILDINGS_PATH}/{city_name}/Overture_building_{city_name}.geoparquet'):
             print(f"Missing buildings data for city {city_name}. Skipping.")
             return
+
         Overture_data_all = gpd.read_parquet(f'{BUILDINGS_PATH}/{city_name}/Overture_building_{city_name}.geoparquet')
         print(f"{city_name}: Overture file read")
         Overture_data_all['confidence'] = Overture_data_all.sources.apply(lambda x: x[0]['confidence'])
@@ -612,7 +614,7 @@ def main():
               "Maputo", "Luanda"]
     #cities = ["Belo Horizonte"]
     cities = [city.replace(' ', '_') for city in cities]
-    sample_prop = 0.05  # Sample 10% of the grid cells
+    sample_prop = 0.001  # Sample 10% of the grid cells
 
     # City-Level Parallelization
     with ProcessPoolExecutor() as executor:
