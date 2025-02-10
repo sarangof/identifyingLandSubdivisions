@@ -80,8 +80,8 @@ def process_metrics(final_geo_df):
     )
 
     # Calculate equal-weights irregularity index
-    final_geo_df['regularity_index'] = final_geo_df[all_metrics_columns].mean(axis=0)
-
+    final_geo_df['regularity_index'] = final_geo_df[all_metrics_columns].mean(axis=1, skipna=True)
+    final_geo_df["missing_metrics_count"] = final_geo_df[all_metrics_columns].isna().sum(axis=1)
     return final_geo_df
 
 
@@ -98,7 +98,12 @@ def save_city_grid_results(city_grid, sampled_grid, output_dir_csv, grid_size):
     sampled_ids = sampled_grid["grid_id"].unique()
 
     # Add timestamp column to track updates
-    city_grid["timestamp"] = pd.NA  # Set as missing initially
+    if "timestamp" not in city_grid.columns:
+        city_grid["timestamp"] = pd.NA  # Set as missing initially
+
+    # Ensure 'processed' column exists
+    if "processed" not in city_grid.columns:
+        city_grid["processed"] = False
 
     # Set 'processed' to True for rows in sampled_grid
     city_grid.loc[city_grid["grid_id"].isin(sampled_ids), "processed"] = True
@@ -107,14 +112,13 @@ def save_city_grid_results(city_grid, sampled_grid, output_dir_csv, grid_size):
     city_grid.loc[city_grid["grid_id"].isin(sampled_ids), "timestamp"] = timestamp
 
     if os.path.exists(results_path):
-        # Load existing results
-        existing_results = pd.read_csv(results_path)
+        # Load existing results with semicolon delimiter
+        existing_results = pd.read_csv(results_path, delimiter=";", skip_blank_lines=True, dtype=str)
 
         # Ensure necessary columns exist in existing results
-        if "processed" not in existing_results.columns:
-            existing_results["processed"] = False
-        if "timestamp" not in existing_results.columns:
-            existing_results["timestamp"] = pd.NA
+        for col in ["processed", "timestamp"]:
+            if col not in existing_results.columns:
+                existing_results[col] = pd.NA
 
         # Merge new results, updating only 'processed' and 'timestamp' where needed
         updated_results = existing_results.set_index("grid_id").combine_first(city_grid.set_index("grid_id")).reset_index()
@@ -127,10 +131,9 @@ def save_city_grid_results(city_grid, sampled_grid, output_dir_csv, grid_size):
         # No existing results, just save city_grid as new results
         updated_results = city_grid
 
-    # Save the updated results
-    updated_results.to_csv(results_path, index=False)
+    # Save the updated results using semicolon as the separator
+    updated_results.to_csv(results_path, sep=";", index=False, na_rep="NA")
     print(f"Results saved to {results_path}")
-
 
 
 def save_metric_maps(city_grid, output_dir_png, grid_size, grid_path, city_name, sample_prop):
@@ -292,7 +295,7 @@ def process_cell(cell_id, geod, rectangle, rectangle_projected, buildings, block
 
         print(building_density)
         # Only execute calculations above a certain building density
-        if building_density > 64:
+        if building_density >=0 :
             blocks_clipped = blocks_all[blocks_all.geometry.intersects(bounding_box_geom)]
             OSM_buildings_bool = False
             
@@ -378,12 +381,7 @@ def process_cell(cell_id, geod, rectangle, rectangle_projected, buildings, block
 
                 m7, blocks_clipped = metric_7_average_block_width(blocks_clipped, blocks_clipped_within_rectangle, rectangle_projected, rectangle_area)
 
-
-
-                if not buildings_clipped.empty:
-                    m8, epsilon_buffers, width_buffers = metric_8_two_row_blocks(blocks_clipped, buildings_clipped, utm_proj_city, row_epsilon=row_epsilon)
-                else:
-                    m8 = np.nan
+                m8, epsilon_buffers, width_buffers = metric_8_two_row_blocks(blocks_clipped, buildings_clipped, utm_proj_city, row_epsilon=row_epsilon)
             else:
                 m7 = np.nan
                 m8 = np.nan
@@ -612,14 +610,14 @@ def main():
     cities = ["Belo Horizonte", "Campinas", "Bogota", "Nairobi", "Bamako", 
               "Lagos", "Accra", "Abidjan", "Mogadishu", "Cape Town", 
               "Maputo", "Luanda"]
-    #cities = ["Belo Horizonte"]
+    cities = ["Belo Horizonte"]
     cities = [city.replace(' ', '_') for city in cities]
-    sample_prop = 0.001  # Sample 10% of the grid cells
+    sample_prop = 1.0  # Sample 10% of the grid cells
 
     # City-Level Parallelization
     with ProcessPoolExecutor() as executor:
         try:
-            executor.map(partial(process_city, sample_prop=sample_prop, override_processed=False), cities)
+            executor.map(partial(process_city, sample_prop=sample_prop, override_processed=True), cities)
         except Exception as e:
             print(f"Error in ProcessPoolExecutor: {e}")
 
