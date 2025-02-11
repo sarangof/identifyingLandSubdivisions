@@ -9,15 +9,17 @@ import pyproj
 from shapely.ops import transform
 
 # Paths Configuration
-MAIN_PATH = "/Users/sarangof/Documents/Identifying Land Subdivisions/data"
+#MAIN_PATH = "/Users/sarangof/Documents/Identifying Land Subdivisions/data"
+MAIN_PATH = "../data/"
 INPUT_PATH = os.path.join(MAIN_PATH, "input")
 BUILDINGS_PATH = os.path.join(INPUT_PATH, "buildings")
 ROADS_PATH = os.path.join(INPUT_PATH, "roads")
 INTERSECTIONS_PATH = os.path.join(INPUT_PATH, "intersections")
 URBAN_EXTENTS_PATH = os.path.join(INPUT_PATH, "urban_extents")
+SEARCH_BUFFER_PATH = os.path.join(INPUT_PATH, "city_info", "search_buffers")
 OUTPUT_PATH = os.path.join(MAIN_PATH, "output")
 OUTPUT_PATH_CSV = os.path.join(OUTPUT_PATH, "csv")
-SEARCH_BUFFER_PATH = os.path.join(INPUT_PATH, "city_info", "search_buffers")
+
 
 # Ensure paths exist
 os.makedirs(OUTPUT_PATH_CSV, exist_ok=True)
