@@ -71,13 +71,9 @@ def osm_command(city_name, search_area):
     # delete temporary file
     ###
 
+    #INTERSECTIONS
 
-
-    # Save intersections
-    output_dir_intersections = os.path.join(INTERSECTIONS_PATH, city_name)
-    os.makedirs(output_dir_intersections, exist_ok=True)
-    osm_intersections.to_file(os.path.join(output_dir_intersections, f"{city_name}_OSM_intersections.gpkg"), driver="GPKG")
-
+    # Create output file paths
     intersections_output_file = f"{city_name}_OSM_intersections.gpkg"
     intersections_output_tmp_path = f"{intersections_output_file}" #if this works, create the right path
 
@@ -89,8 +85,11 @@ def osm_command(city_name, search_area):
     ###
     output_dir_intersections = os.path.join(INTERSECTIONS_PATH, city_name)
     intersections_output_path = f"{output_dir_intersections}/{intersections_output_file}"
-    output_path = S3Path(intersections_output_path)
-    output_path.upload_from(intersections_output_tmp_path)
+    output_path_intersections = S3Path(intersections_output_path)
+    output_path_intersections.upload_from(intersections_output_tmp_path)
+    # delete temporary file
+
+
 
 
 
