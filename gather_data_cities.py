@@ -7,6 +7,7 @@ import dask.dataframe as dd
 import os
 import pyproj
 from shapely.ops import transform
+from cloudpathlib import S3Path
 
 # Paths Configuration
 MAIN_PATH = "s3://wri-cities-sandbox/identifyingLandSubdivisions/data"
@@ -61,14 +62,11 @@ def osm_command(city_name, search_area):
     osm_roads.to_file(road_output_tmp_path, driver="GPKG")
 
     # Upload to S3
-    from cloudpathlib import S3Path
+    
     ###
     output_dir_roads = os.path.join(ROADS_PATH, city_name)
-    
     road_output_path = f"{output_dir_roads}/{road_output_file}"
-
     output_path = S3Path(road_output_path)
-
     output_path.upload_from(road_output_tmp_path)
     # delete temporary file
     ###
@@ -129,8 +127,18 @@ def run_all(cities):
     results = cities_set_ddf.map_partitions(make_requests, meta=meta)
     results_df = results.compute()
 
-    # Save logs to a CSV file
-    results_df.to_csv(os.path.join(OUTPUT_PATH_CSV, "data_gather_logs.csv"), index=False)
+    # Create output file paths
+    data_gathering_logs_file = f"data_gather_logs.csv"
+    data_gathering_logs_tmp_path = f"{data_gathering_logs_file}" #if this works, create the right path
+
+    # Save logs to temp CSV file
+    results_df.to_csv(f'{data_gathering_logs_tmp_path}', index=False)
+
+    # Upload to S3
+    ###
+    road_output_path = f"{OUTPUT_PATH_CSV}/{data_gathering_logs_file}"
+    output_path = S3Path(road_output_path)
+    output_path.upload_from(data_gathering_logs_tmp_path)
 
 def main():
     cities = ["Belo Horizonte"] #, "Campinas", "Bogota", "Nairobi", "Bamako", "Lagos", "Accra", "Abidjan", "Cape Town", "Maputo", "Mogadishu", "Luanda"
