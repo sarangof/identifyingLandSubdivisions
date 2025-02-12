@@ -88,9 +88,9 @@ def make_requests(partition):
     for city_name in partition.city:
         try:
             search_area = gpd.read_parquet(os.path.join(SEARCH_BUFFER_PATH, city_name, f"{city_name}_search_buffer.geoparquet"))
-            utm_proj_city = get_utm_proj(float(search_area.geometry.centroid.x.iloc[0]), float(search_area.geometry.centroid.y.iloc[0]))
+            rep_point = search_area.geometry.representative_point().iloc[0]
+            utm_proj_city = get_utm_proj(float(rep_point.x), float(rep_point.y))
             transformer = pyproj.Transformer.from_crs(pyproj.CRS('EPSG:4326'), utm_proj_city, always_xy=True)
-
             osm_command(city_name, search_area)
 
             search_area_bounds = search_area.bounds
