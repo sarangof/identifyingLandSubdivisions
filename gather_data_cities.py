@@ -78,6 +78,22 @@ def osm_command(city_name, search_area):
     os.makedirs(output_dir_intersections, exist_ok=True)
     osm_intersections.to_file(os.path.join(output_dir_intersections, f"{city_name}_OSM_intersections.gpkg"), driver="GPKG")
 
+    intersections_output_file = f"{city_name}_OSM_intersections.gpkg"
+    intersections_output_tmp_path = f"{intersections_output_file}" #if this works, create the right path
+
+    # Write to tmp file
+    osm_intersections.to_file(intersections_output_tmp_path, driver="GPKG")
+
+    # Upload to S3
+    
+    ###
+    output_dir_intersections = os.path.join(INTERSECTIONS_PATH, city_name)
+    intersections_output_path = f"{output_dir_intersections}/{intersections_output_file}"
+    output_path = S3Path(intersections_output_path)
+    output_path.upload_from(intersections_output_tmp_path)
+
+
+
 def overturemaps_download_and_save(bbox_str, request_type: str, output_dir, city_name: str):
     os.makedirs(output_dir, exist_ok=True)
     OUTPUT_PATH_OVERTURE = os.path.join(output_dir, f'Overture_{request_type}_{city_name}.geoparquet')
