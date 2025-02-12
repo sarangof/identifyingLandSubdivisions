@@ -42,9 +42,6 @@ def get_utm_proj(lon, lat):
     return f"+proj=utm +zone={utm_zone} +{'north' if is_northern else 'south'} +ellps=WGS84 +datum=WGS84 +units=m +no_defs"
 
 def s3_save(file, output_file, output_temp_path, remote_path):
-    # Define the actual temporary path (keeping flexibility)
-    output_temp_path = os.path.join(output_temp_path, output_file)
-
     # Save the file based on its extension
     if output_file.endswith(".gpkg"):
         file.to_file(f'{output_temp_path}/{output_file}', driver="GPKG")
