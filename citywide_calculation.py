@@ -282,7 +282,7 @@ def process_cell(cell_id, geod, rectangle, rectangle_projected, buildings, block
             possible_matches_index = list(buildings.sindex.intersection(bounding_box_geom.bounds))
             possible_matches = buildings.iloc[possible_matches_index]
             buildings_clipped = gpd.clip(possible_matches, bounding_box_geom)
-            buildings_clipped = buildings_clipped[(buildings_clipped['confidence'] > 0.75) | buildings_clipped['confidence'].isna()].reset_index(drop=True)
+            #buildings_clipped = buildings_clipped[(buildings_clipped['confidence'] > 0.75) | buildings_clipped['confidence'].isna()].reset_index(drop=True)
             building_area = buildings_clipped.area.sum()
             n_buildings = len(buildings_clipped)
             building_density = (1000.*1000*n_buildings)/rectangle_area
