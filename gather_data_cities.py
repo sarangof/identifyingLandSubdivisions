@@ -51,11 +51,28 @@ def osm_command(city_name, search_area):
 
     # Process and save roads
     osm_roads = remove_duplicate_roads(osm_roads)
-    output_dir_roads = os.path.join(ROADS_PATH, city_name)
-    os.makedirs(output_dir_roads, exist_ok=True)
-    road_output_file = os.path.join(output_dir_roads, f"{city_name}_OSM_roads.gpkg")
     osm_roads = remove_list_columns(osm_roads)
-    osm_roads.to_file(road_output_file, driver="GPKG")
+
+    # Create output file paths
+    road_output_file = f"{city_name}_OSM_roads.gpkg"
+    road_output_tmp_path = f"../data/{road_output_file}"
+
+    # Write to tmp file
+    osm_roads.to_file(road_output_tmp_path, driver="GPKG")
+
+    # Upload to S3
+    from cloudpathlib import S3Path
+    output_dir_roads = os.path.join(ROADS_PATH, city_name)
+    
+    road_output_path = f"{output_dir_roads}/{road_output_file}"
+
+    output_path = S3Path(road_output_path)
+
+    output_path.upload_from(road_output_tmp_path)
+
+
+
+
 
     # Save intersections
     output_dir_intersections = os.path.join(INTERSECTIONS_PATH, city_name)
