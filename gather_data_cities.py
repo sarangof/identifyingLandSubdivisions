@@ -46,9 +46,9 @@ def s3_save(file, output_file, output_temp_path, remote_path):
     output_temp_path = os.path.join(output_temp_path, output_file)
 
     # Save the file based on its extension
-    if output_temp_path.endswith(".gpkg"):
+    if output_file.endswith(".gpkg"):
         file.to_file(f'{output_temp_path}/{output_file}', driver="GPKG")
-    elif output_temp_path.endswith(".csv"):
+    elif output_file.endswith(".csv"):
         file.to_csv(f'{output_temp_path}/{output_file}', index=False)
     else:
         raise ValueError("Unsupported file format. Only .gpkg and .csv are supported.")
@@ -75,12 +75,11 @@ def osm_command(city_name, search_area):
     osm_roads = remove_list_columns(osm_roads)
 
     # Save roads
-    road_output_file = f"{city_name}_OSM_roads.gpkg"
+    road_output_file_name = f"{city_name}_OSM_roads.gpkg"
     road_output_tmp_path = "." #if this works, create the right path
-    output_dir_roads_remote = os.path.join(ROADS_PATH, city_name)
-    road_output_path_remote = f"{output_dir_roads_remote}/{road_output_file}"
+    road_output_path_remote = f"{ROADS_PATH}/{city_name}/{road_output_file_name}"
     s3_save(file = osm_roads, 
-            output_file = road_output_file, 
+            output_file = road_output_file_name, 
             output_temp_path = road_output_tmp_path, 
             remote_path = road_output_path_remote)
 
