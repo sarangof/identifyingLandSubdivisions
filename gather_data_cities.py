@@ -9,7 +9,7 @@ import pyproj
 from shapely.ops import transform
 
 # Paths Configuration
-MAIN_PATH = "/Users/sarangof/Documents/Identifying Land Subdivisions/data"
+MAIN_PATH = "s3://wri-cities-sandbox/identifyingLandSubdivisions/data"
 INPUT_PATH = os.path.join(MAIN_PATH, "input")
 BUILDINGS_PATH = os.path.join(INPUT_PATH, "buildings")
 ROADS_PATH = os.path.join(INPUT_PATH, "roads")
@@ -55,13 +55,14 @@ def osm_command(city_name, search_area):
 
     # Create output file paths
     road_output_file = f"{city_name}_OSM_roads.gpkg"
-    road_output_tmp_path = f"../data/{road_output_file}"
+    road_output_tmp_path = f"{road_output_file}" #if this works, create the right path
 
     # Write to tmp file
     osm_roads.to_file(road_output_tmp_path, driver="GPKG")
 
     # Upload to S3
     from cloudpathlib import S3Path
+    ###
     output_dir_roads = os.path.join(ROADS_PATH, city_name)
     
     road_output_path = f"{output_dir_roads}/{road_output_file}"
@@ -69,8 +70,8 @@ def osm_command(city_name, search_area):
     output_path = S3Path(road_output_path)
 
     output_path.upload_from(road_output_tmp_path)
-
-
+    # delete temporary file
+    ###
 
 
 
