@@ -41,6 +41,26 @@ def get_utm_proj(lon, lat):
     is_northern = lat >= 0
     return f"+proj=utm +zone={utm_zone} +{'north' if is_northern else 'south'} +ellps=WGS84 +datum=WGS84 +units=m +no_defs"
 
+def s3_save(file, output_file, output_temp_path, remote_path):
+    # Define the actual temporary path (keeping flexibility)
+    output_temp_path = os.path.join(output_temp_path, output_file)
+
+    # Save the file based on its extension
+    if output_temp_path.endswith(".gpkg"):
+        file.to_file(output_temp_path, driver="GPKG")
+    elif output_temp_path.endswith(".csv"):
+        file.to_csv(output_temp_path, index=False)
+    else:
+        raise ValueError("Unsupported file format. Only .gpkg and .csv are supported.")
+
+    # Upload to S3
+    output_path = S3Path(remote_path)
+    output_path.upload_from(output_temp_path)
+
+    # Delete the local file after upload
+    if os.path.exists(output_temp_path):
+        os.remove(output_temp_path)
+
 def osm_command(city_name, search_area):
     if len(search_area) > 0:
         polygon = search_area.geometry.iloc[0]
@@ -54,22 +74,12 @@ def osm_command(city_name, search_area):
     osm_roads = remove_duplicate_roads(osm_roads)
     osm_roads = remove_list_columns(osm_roads)
 
-    # Create output file paths
+    # Save roads
     road_output_file = f"{city_name}_OSM_roads.gpkg"
     road_output_tmp_path = f"{road_output_file}" #if this works, create the right path
-
-    # Write to tmp file
-    osm_roads.to_file(road_output_tmp_path, driver="GPKG")
-
-    # Upload to S3
-    
-    ###
     output_dir_roads = os.path.join(ROADS_PATH, city_name)
     road_output_path = f"{output_dir_roads}/{road_output_file}"
-    output_path = S3Path(road_output_path)
-    output_path.upload_from(road_output_tmp_path)
-    # delete temporary file
-    ###
+    s3_save(osm_roads, road_output_file, road_output_tmp_path, road_output_path)
 
     #INTERSECTIONS
 
