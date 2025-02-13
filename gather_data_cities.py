@@ -42,21 +42,25 @@ def get_utm_proj(lon, lat):
     return f"+proj=utm +zone={utm_zone} +{'north' if is_northern else 'south'} +ellps=WGS84 +datum=WGS84 +units=m +no_defs"
 
 def s3_save(file, output_file, output_temp_path, remote_path):
+
+    os.makedirs(output_temp_path, exist_ok=True)
+
+    local_temporary_file = f"{output_temp_path}/{output_file}"
     # Save the file based on its extension
     if output_file.endswith(".gpkg"):
-        file.to_file(f'{output_temp_path}/{output_file}', driver="GPKG")
+        file.to_file(local_temporary_file, driver="GPKG")
     elif output_file.endswith(".csv"):
-        file.to_csv(f'{output_temp_path}/{output_file}', index=False)
+        file.to_csv(local_temporary_file, index=False)
     else:
         raise ValueError("Unsupported file format. Only .gpkg and .csv are supported.")
 
     # Upload to S3
     output_path = S3Path(remote_path)
-    output_path.upload_from(output_temp_path)
+    output_path.upload_from(local_temporary_file)
 
     # Delete the local file after upload
-    if os.path.exists(output_temp_path):
-        os.remove(output_temp_path)
+    if os.path.exists(local_temporary_file):
+        os.remove(local_temporary_file)
 
 def osm_command(city_name, search_area):
     if len(search_area) > 0:
@@ -73,31 +77,21 @@ def osm_command(city_name, search_area):
 
     # Save roads
     road_output_file_name = f"{city_name}_OSM_roads.gpkg"
-    road_output_tmp_path = "." #if this works, create the right path
+    road_output_tmp_path = f"." #if this works, create the right path
     road_output_path_remote = f"{ROADS_PATH}/{city_name}/{road_output_file_name}"
     s3_save(file = osm_roads, 
             output_file = road_output_file_name, 
             output_temp_path = road_output_tmp_path, 
             remote_path = road_output_path_remote)
 
-    #INTERSECTIONS
-
-    # Create output file paths
-    intersections_output_file = f"{city_name}_OSM_intersections.gpkg"
-    intersections_output_tmp_path = f"{intersections_output_file}" #if this works, create the right path
-
-    # Write to tmp file
-    osm_intersections.to_file(intersections_output_tmp_path, driver="GPKG")
-
-    # Upload to S3
-    
-    ###
-    output_dir_intersections = os.path.join(INTERSECTIONS_PATH, city_name)
-    intersections_output_path = f"{output_dir_intersections}/{intersections_output_file}"
-    output_path_intersections = S3Path(intersections_output_path)
-    output_path_intersections.upload_from(intersections_output_tmp_path)
-    # delete temporary file
-
+    # Save intersections
+    intersections_output_file_name = f"{city_name}_OSM_intersections.gpkg"
+    intersections_output_tmp_path = f"." #if this works, create the right path
+    intersections_output_path_remote = f"{INTERSECTIONS_PATH}/{city_name}/{intersections_output_file_name}"
+    s3_save(file = osm_intersections, 
+            output_file = intersections_output_file_name, 
+            output_temp_path = intersections_output_tmp_path, 
+            remote_path = intersections_output_path_remote)
 
 
 
