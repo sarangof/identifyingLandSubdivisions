@@ -86,6 +86,26 @@ def process_metrics(final_geo_df):
 
     return final_geo_df
 
+def s3_save(file, output_file, output_temp_path, remote_path):
+
+    os.makedirs(output_temp_path, exist_ok=True)
+
+    local_temporary_file = f"{output_temp_path}/{output_file}"
+    # Save the file based on its extension
+    if output_file.endswith(".gpkg"):
+        file.to_file(local_temporary_file, driver="GPKG")
+    elif output_file.endswith(".csv"):
+        file.to_csv(local_temporary_file, index=False)
+    else:
+        raise ValueError("Unsupported file format. Only .gpkg and .csv are supported.")
+
+    # Upload to S3
+    output_path = S3Path(remote_path)
+    output_path.upload_from(local_temporary_file)
+
+    # Delete the local file after upload
+    if os.path.exists(local_temporary_file):
+        os.remove(local_temporary_file)
 
 def save_city_grid_results(city_grid, sampled_grid, output_dir_csv):
     """
@@ -131,6 +151,7 @@ def save_city_grid_results(city_grid, sampled_grid, output_dir_csv):
 
     # Save the updated results
     updated_results.to_csv(results_path, index=False)
+    
     print(f"Results saved to {results_path}")
 
 def save_metric_maps(city_grid, output_dir_png):
@@ -205,7 +226,13 @@ def save_metric_maps(city_grid, output_dir_png):
 def output_results(city_grid, sampled_grid, city_name, grid_size, sample_prop, OUTPUT_PATH_RASTER, output_dir_csv, output_dir_png):
         #Save raste results to geoparquet
         os.makedirs(f'{OUTPUT_PATH_RASTER}/{city_name}', exist_ok=True)
-        city_grid.to_parquet(f'{OUTPUT_PATH_RASTER}/{city_name}/{city_name}_{str(grid_size)}m_results.geoparquet', engine="pyarrow", index=False)
+
+        output_file = f'{city_name}_{str(grid_size)}m_results.geoparquet'
+        remote_path = f'{OUTPUT_PATH_RASTER}/{city_name}/'
+        output_temp_path = '.'
+        s3_save(city_grid, output_file, output_temp_path, remote_path)
+
+        #city_grid.to_parquet(f'{OUTPUT_PATH_RASTER}/{city_name}/{city_name}_{str(grid_size)}m_results.geoparquet', engine="pyarrow", index=False)
 
         # Save summaries
         all_metrics_columns = ['metric_1','metric_2','metric_3','metric_4','metric_5','metric_6','metric_7','metric_8','metric_9','metric_10','metric_11','metric_12','metric_13']
@@ -557,7 +584,12 @@ def process_city(city_name, sample_prop=1.0, override_processed=False, grid_size
         output_results(city_grid, sampled_grid, city_name, grid_size, sample_prop, OUTPUT_PATH_RASTER, output_dir_csv, output_dir_png)
 
         # Save updated grid status to CSV
-        city_grid[['grid_id', 'processed']].to_csv(STATUS_CSV_PATH, index=False)
+        #city_grid[['grid_id', 'processed']].to_csv(STATUS_CSV_PATH, index=False)
+        city_grid_file = city_grid[['grid_id', 'processed']]
+        remote_path = f'{output_dir_csv}/'
+        output_temp_path = '.'
+        output_file_name = f'{city_name}_grid_status_{grid_size}m.csv'
+        s3_save(city_grid_file, output_file_name, output_temp_path, remote_path)
 
         print(f"{city_name}: Processing complete. Grid status updated in {STATUS_CSV_PATH}.")
 
@@ -565,7 +597,7 @@ def process_city(city_name, sample_prop=1.0, override_processed=False, grid_size
         print(f"Error processing {city_name}: {e}")
         raise 
 
-def run_all(cities, sample_prop=1.0, grid_size=200):
+def run_all(cities, sample_prop=0.001, grid_size=200):
     with ProcessPoolExecutor() as executor:
         executor.map(partial(process_city, sample_prop=sample_prop, grid_size=grid_size), cities)
 
