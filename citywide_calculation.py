@@ -19,9 +19,11 @@ import rasterio
 from rasterio.features import rasterize
 from rasterio.warp import calculate_default_transform, reproject, Resampling
 from functools import partial
+from cloudpathlib import S3Path
+import s3fs
 
 
-MAIN_PATH = '../data'
+MAIN_PATH = "s3://wri-cities-sandbox/identifyingLandSubdivisions/data"
 INPUT_PATH = f'{MAIN_PATH}/input'
 BUILDINGS_PATH = f'{INPUT_PATH}/buildings'
 ROADS_PATH = f'{INPUT_PATH}/roads'
@@ -30,6 +32,8 @@ GRIDS_PATH = f'{INPUT_PATH}/city_info/grids'
 OUTPUT_PATH_CSV = f'{MAIN_PATH}/output/csv'
 OUTPUT_PATH_RASTER = f'{MAIN_PATH}/output/raster'
 OUTPUT_PATH_PNG = f'{MAIN_PATH}/output/png'
+
+fs = s3fs.S3FileSystem(anon=False)
 
 # Define important parameters for this run
 grid_size = 200
@@ -104,7 +108,7 @@ def save_city_grid_results(city_grid, sampled_grid, output_dir_csv):
     # Set timestamp only for rows that were newly processed
     city_grid.loc[city_grid["grid_id"].isin(sampled_ids), "timestamp"] = timestamp
 
-    if os.path.exists(results_path):
+    if fs.exists(results_path):
         # Load existing results
         existing_results = pd.read_csv(results_path)
 
@@ -460,7 +464,7 @@ def process_city(city_name, sample_prop=1.0, override_processed=False, grid_size
         os.makedirs(output_dir_csv, exist_ok=True)
         STATUS_CSV_PATH = f'{output_dir_csv}/{city_name}_grid_status_{grid_size}m.csv'
 
-        if os.path.exists(STATUS_CSV_PATH) and not override_processed:
+        if fs.exists(STATUS_CSV_PATH) and not override_processed:
             # Load existing status CSV and merge with city grid
             status_df = pd.read_csv(STATUS_CSV_PATH)
             city_grid = city_grid.merge(status_df, on='grid_id', how='left', suffixes=('', '_existing'))
@@ -482,7 +486,7 @@ def process_city(city_name, sample_prop=1.0, override_processed=False, grid_size
         rectangles = sampled_grid['geometry']
 
         # Read and process required datasets (buildings, roads, intersections)
-        if not os.path.exists(f'{BUILDINGS_PATH}/{city_name}/Overture_building_{city_name}.geoparquet'):
+        if not fs.exists(f'{BUILDINGS_PATH}/{city_name}/Overture_building_{city_name}.geoparquet'):
             print(f"Missing buildings data for city {city_name}. Skipping.")
             return
         Overture_data_all = gpd.read_parquet(f'{BUILDINGS_PATH}/{city_name}/Overture_building_{city_name}.geoparquet')
@@ -492,13 +496,13 @@ def process_city(city_name, sample_prop=1.0, override_processed=False, grid_size
         Overture_data_all = Overture_data_all.set_geometry('geometry')[Overture_data_all.dataset != 'OpenStreetMap']
 
         # Read intersections
-        if not os.path.exists(f'{INTERSECTIONS_PATH}/{city_name}/{city_name}_OSM_intersections.gpkg'):
+        if not fs.exists(f'{INTERSECTIONS_PATH}/{city_name}/{city_name}_OSM_intersections.gpkg'):
             print(f"Missing intersections data for city {city_name}. Skipping.")
             return
         OSM_intersections_all = gpd.read_file(f'{INTERSECTIONS_PATH}/{city_name}/{city_name}_OSM_intersections.gpkg')
 
         # Read roads
-        if not os.path.exists(f'{ROADS_PATH}/{city_name}/{city_name}_OSM_roads.gpkg'):
+        if not fs.exists(f'{ROADS_PATH}/{city_name}/{city_name}_OSM_roads.gpkg'):
             print(f"Missing roads data for city {city_name}. Skipping.")
             return
         OSM_roads_all = gpd.read_file(f'{ROADS_PATH}/{city_name}/{city_name}_OSM_roads.gpkg')
@@ -561,21 +565,11 @@ def process_city(city_name, sample_prop=1.0, override_processed=False, grid_size
         print(f"Error processing {city_name}: {e}")
         raise 
 
-def main():
-    cities = ["Belo Horizonte", "Campinas", "Bogota", "Nairobi", "Bamako", 
-              "Lagos", "Accra", "Abidjan", "Mogadishu", "Cape Town", 
-              "Maputo", "Luanda"]
-    cities = ["Belo Horizonte"]
-    cities = [city.replace(' ', '_') for city in cities]
-    sample_prop = 0.1  # Sample 10% of the grid cells
-
-    # City-Level Parallelization
+def run_all(cities, sample_prop=1.0, grid_size=200):
     with ProcessPoolExecutor() as executor:
-        try:
-            executor.map(partial(process_city, sample_prop=sample_prop, override_processed=True), cities)
-        except Exception as e:
-            print(f"Error in ProcessPoolExecutor: {e}")
+        executor.map(partial(process_city, sample_prop=sample_prop, grid_size=grid_size), cities)
 
-
+# This function allows external cluster calls like Code C.
 if __name__ == "__main__":
-    main()
+    cities = ["Belo Horizonte", "Campinas", "Bogota"]
+    run_all(cities)
