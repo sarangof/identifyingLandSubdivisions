@@ -294,49 +294,50 @@ def process_cell(cell_id, geod, rectangle, rectangle_projected, buildings, block
             n_buildings = np.nan
 
         print(building_density)
+
+        blocks_clipped = blocks_all[blocks_all.geometry.intersects(bounding_box_geom)]
+        OSM_buildings_bool = False
+            
+        # Roads
+        try:
+            roads_clipped = OSM_roads_all_projected[OSM_roads_all_projected.geometry.intersects(bounding_box_geom)]
+            roads_intersection = OSM_roads_all_projected[OSM_roads_all_projected.geometry.intersects(bounding_box_geom)]
+            OSM_roads_bool = True
+        except (fiona.errors.DriverError, TopologicalError) as e:
+            print(f"Error clipping roads for cell {cell_id}: {e}")
+            roads_clipped = gpd.GeoDataFrame([])
+            OSM_roads_all = gpd.GeoDataFrame([])
+            roads_intersection = gpd.GeoDataFrame([])
+            OSM_roads_bool = False
+
+        # Intersections
+        try:
+            OSM_intersections = OSM_intersections_all_projected[OSM_intersections_all_projected.geometry.intersects(bounding_box_geom)]#OSM_intersections_all_projected.clip(list(rectangle_projected.geometry.bounds.values[0]))
+            OSM_intersections = OSM_intersections[OSM_intersections.street_count>2]
+            OSM_intersections_bool = True
+            n_intersections = len(OSM_intersections.drop_duplicates('osmid'))
+        except fiona.errors.DriverError:
+            OSM_intersections = gpd.GeoDataFrame([])
+            OSM_intersections_bool = False
+            n_intersections = np.nan
+
+        print(buildings.head(), buildings.crs)
+        print(OSM_roads_all_projected.head(), OSM_roads_all_projected.crs)
+        print(OSM_intersections_all_projected.head(), OSM_intersections_all_projected.crs)
+
+        print(f"Buildings intersecting cell {cell_id}: {len(buildings_clipped)}")
+        print(f"Roads intersecting cell {cell_id}: {len(roads_clipped)}")
+        print(f"Intersections intersecting cell {cell_id}: {len(OSM_intersections)}")
+
+        #Overture_data = Overture_data_all_projected[Overture_data_all_projected.geometry.intersects(rectangle_projected[0])]
+        #if not Overture_data.empty:
+        #    Overture_buildings_bool = True
+        #else:
+        #    Overture_buildings_bool = False
+
         # Only execute calculations above a certain building density
         if ((not buildings_clipped.empty) and (not roads_clipped.empty)):
-            blocks_clipped = blocks_all[blocks_all.geometry.intersects(bounding_box_geom)]
-            OSM_buildings_bool = False
             
-            # Roads
-            try:
-                roads_clipped = OSM_roads_all_projected[OSM_roads_all_projected.geometry.intersects(bounding_box_geom)]
-                roads_intersection = OSM_roads_all_projected[OSM_roads_all_projected.geometry.intersects(bounding_box_geom)]
-                OSM_roads_bool = True
-            except (fiona.errors.DriverError, TopologicalError) as e:
-                print(f"Error clipping roads for cell {cell_id}: {e}")
-                roads_clipped = gpd.GeoDataFrame([])
-                OSM_roads_all = gpd.GeoDataFrame([])
-                roads_intersection = gpd.GeoDataFrame([])
-                OSM_roads_bool = False
-
-            # Intersections
-            try:
-                OSM_intersections = OSM_intersections_all_projected[OSM_intersections_all_projected.geometry.intersects(bounding_box_geom)]#OSM_intersections_all_projected.clip(list(rectangle_projected.geometry.bounds.values[0]))
-                OSM_intersections = OSM_intersections[OSM_intersections.street_count>2]
-                OSM_intersections_bool = True
-                n_intersections = len(OSM_intersections.drop_duplicates('osmid'))
-            except fiona.errors.DriverError:
-                OSM_intersections = gpd.GeoDataFrame([])
-                OSM_intersections_bool = False
-                n_intersections = np.nan
-
-            print(buildings.head(), buildings.crs)
-            print(OSM_roads_all_projected.head(), OSM_roads_all_projected.crs)
-            print(OSM_intersections_all_projected.head(), OSM_intersections_all_projected.crs)
-
-            print(f"Buildings intersecting cell {cell_id}: {len(buildings_clipped)}")
-            print(f"Roads intersecting cell {cell_id}: {len(roads_clipped)}")
-            print(f"Intersections intersecting cell {cell_id}: {len(OSM_intersections)}")
-
-            #Overture_data = Overture_data_all_projected[Overture_data_all_projected.geometry.intersects(rectangle_projected[0])]
-            #if not Overture_data.empty:
-            #    Overture_buildings_bool = True
-            #else:
-            #    Overture_buildings_bool = False
-
-
             if (not buildings_clipped.empty):
                 # Metric 1 -- share of buildings closer than 10 ms from the road
                 m1, buildings_clipped = metric_1_distance_less_than_20m(buildings_clipped, road_union, utm_proj_city)
@@ -347,15 +348,19 @@ def process_cell(cell_id, geod, rectangle, rectangle_projected, buildings, block
             else:
                 m1, m2 = np.nan, np.nan
 
+            # Metric 3 -- road density
             if (not roads_clipped.empty):
-                # Metric 3 -- road density
                 m3 = metric_3_road_density(rectangle_area, roads_clipped)
-                if not OSM_intersections.empty:
-                    m4 = metric_4_share_4way_intersections(OSM_intersections)
-                else:
-                    m4 = np.nan
             else:
-                m3, m4 = 0, 0
+                m3 = 0
+            
+            if not OSM_intersections.empty:
+                m4 = metric_4_share_4way_intersections(OSM_intersections)
+            else:
+                if (not roads_clipped.empty):
+                    m4 = np.nan
+                else:
+                    m4 = 0
 
             # Metrics 4 and 5 -- share of 3 and 4-way intersections
             if not OSM_intersections.empty:
@@ -622,7 +627,7 @@ def main():
               "Maputo", "Luanda"]
     cities = ["Belo Horizonte"]
     cities = [city.replace(' ', '_') for city in cities]
-    sample_prop = 1.0  # Sample 10% of the grid cells
+    sample_prop = 0.01  # Sample 10% of the grid cells
 
     # City-Level Parallelization
     with ProcessPoolExecutor() as executor:
