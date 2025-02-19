@@ -282,47 +282,47 @@ def process_cell(cell_id, geod, rectangle, rectangle_projected, buildings, block
 
         print(building_density)
         # Only execute calculations above a certain building density
-        if building_density > 64:
-            blocks_clipped = blocks_all[blocks_all.geometry.intersects(bounding_box_geom)]
-            OSM_buildings_bool = False
+        blocks_clipped = blocks_all[blocks_all.geometry.intersects(bounding_box_geom)]
+        OSM_buildings_bool = False
+        
+        # Roads
+        try:
+            roads_clipped = OSM_roads_all_projected[OSM_roads_all_projected.geometry.intersects(bounding_box_geom)]
+            roads_intersection = OSM_roads_all_projected[OSM_roads_all_projected.geometry.intersects(bounding_box_geom)]
+            OSM_roads_bool = True
+        except (fiona.errors.DriverError, TopologicalError) as e:
+            print(f"Error clipping roads for cell {cell_id}: {e}")
+            roads_clipped = gpd.GeoDataFrame([])
+            OSM_roads_all = gpd.GeoDataFrame([])
+            roads_intersection = gpd.GeoDataFrame([])
+            OSM_roads_bool = False
+
+        # Intersections
+        try:
+            OSM_intersections = OSM_intersections_all_projected[OSM_intersections_all_projected.geometry.intersects(bounding_box_geom)]#OSM_intersections_all_projected.clip(list(rectangle_projected.geometry.bounds.values[0]))
+            OSM_intersections_bool = True
+            n_intersections = len(OSM_intersections.drop_duplicates('osmid'))
+        except fiona.errors.DriverError:
+            OSM_intersections = gpd.GeoDataFrame([])
+            OSM_intersections_bool = False
+            n_intersections = np.nan
+
+        print(buildings.head(), buildings.crs)
+        print(OSM_roads_all_projected.head(), OSM_roads_all_projected.crs)
+        print(OSM_intersections_all_projected.head(), OSM_intersections_all_projected.crs)
+
+        print(f"Buildings intersecting cell {cell_id}: {len(buildings_clipped)}")
+        print(f"Roads intersecting cell {cell_id}: {len(roads_clipped)}")
+        print(f"Intersections intersecting cell {cell_id}: {len(OSM_intersections)}")
+
+        #Overture_data = Overture_data_all_projected[Overture_data_all_projected.geometry.intersects(rectangle_projected[0])]
+        #if not Overture_data.empty:
+        #    Overture_buildings_bool = True
+        #else:
+        #    Overture_buildings_bool = False
+
+        if ((not buildings_clipped.empty) and (not roads_clipped.empty)):
             
-            # Roads
-            try:
-                roads_clipped = OSM_roads_all_projected[OSM_roads_all_projected.geometry.intersects(bounding_box_geom)]
-                roads_intersection = OSM_roads_all_projected[OSM_roads_all_projected.geometry.intersects(bounding_box_geom)]
-                OSM_roads_bool = True
-            except (fiona.errors.DriverError, TopologicalError) as e:
-                print(f"Error clipping roads for cell {cell_id}: {e}")
-                roads_clipped = gpd.GeoDataFrame([])
-                OSM_roads_all = gpd.GeoDataFrame([])
-                roads_intersection = gpd.GeoDataFrame([])
-                OSM_roads_bool = False
-
-            # Intersections
-            try:
-                OSM_intersections = OSM_intersections_all_projected[OSM_intersections_all_projected.geometry.intersects(bounding_box_geom)]#OSM_intersections_all_projected.clip(list(rectangle_projected.geometry.bounds.values[0]))
-                OSM_intersections_bool = True
-                n_intersections = len(OSM_intersections.drop_duplicates('osmid'))
-            except fiona.errors.DriverError:
-                OSM_intersections = gpd.GeoDataFrame([])
-                OSM_intersections_bool = False
-                n_intersections = np.nan
-
-            print(buildings.head(), buildings.crs)
-            print(OSM_roads_all_projected.head(), OSM_roads_all_projected.crs)
-            print(OSM_intersections_all_projected.head(), OSM_intersections_all_projected.crs)
-
-            print(f"Buildings intersecting cell {cell_id}: {len(buildings_clipped)}")
-            print(f"Roads intersecting cell {cell_id}: {len(roads_clipped)}")
-            print(f"Intersections intersecting cell {cell_id}: {len(OSM_intersections)}")
-
-            #Overture_data = Overture_data_all_projected[Overture_data_all_projected.geometry.intersects(rectangle_projected[0])]
-            #if not Overture_data.empty:
-            #    Overture_buildings_bool = True
-            #else:
-            #    Overture_buildings_bool = False
-
-
             if (not buildings_clipped.empty):
                 # Metric 1 -- share of buildings closer than 10 ms from the road
                 m1, buildings_clipped = metric_1_distance_less_than_20m(buildings_clipped, road_union, utm_proj_city)
@@ -333,24 +333,37 @@ def process_cell(cell_id, geod, rectangle, rectangle_projected, buildings, block
             else:
                 m1, m2 = np.nan, np.nan
 
+            # Metric 3 -- road density
             if (not roads_clipped.empty):
-                # Metric 3 -- road density
                 m3 = metric_3_road_density(rectangle_area, roads_clipped)
             else:
-                m3 = np.nan
+                m3 = 0
+            
+            if not OSM_intersections.empty:
+                m4 = metric_4_share_4way_intersections(OSM_intersections)
+            else:
+                if (not roads_clipped.empty):
+                    m4 = np.nan
+                else:
+                    m4 = 0
 
             # Metrics 4 and 5 -- share of 3 and 4-way intersections
             if not OSM_intersections.empty:
                 if ((4 in OSM_intersections['street_count'].values) or (3 in OSM_intersections['street_count'].values)):
                     m4 = metric_4_share_4way_intersections(OSM_intersections)
                 else:
-                    m4 = np.nan
+                    m4 = np.nan   
+            else:
+                m4 = np.nan
+
+            # Metrics 5 -- intersection density
+            if not OSM_intersections.empty:
                 m5 = metric_5_intersection_density(OSM_intersections, rectangle_area)    
             else:
-                m4, m5 = np.nan, np.nan
+                m5 = 0
 
             # Metric 6 -- building azimuth
-            if (not buildings_clipped.empty) and (len(buildings_clipped)>5):
+            if (not buildings_clipped.empty):
                 n_orientation_groups = 4
                 m6, buildings_clipped = metric_6_entropy_of_building_azimuth(buildings_clipped, rectangle_id=1, bin_width_degrees=5, plot=False)
             else:
@@ -368,16 +381,11 @@ def process_cell(cell_id, geod, rectangle, rectangle_projected, buildings, block
 
                 m7, blocks_clipped = metric_7_average_block_width(blocks_clipped, blocks_clipped_within_rectangle, rectangle_projected, rectangle_area)
 
-
-
-                if not buildings_clipped.empty:
-                    m8, epsilon_buffers, width_buffers = metric_8_two_row_blocks(blocks_clipped, buildings_clipped, utm_proj_city, row_epsilon=row_epsilon)
-                else:
-                    m8 = np.nan
+                m8, epsilon_buffers, width_buffers = metric_8_two_row_blocks(blocks_clipped, buildings_clipped, utm_proj_city, row_epsilon=row_epsilon)
             else:
                 m7 = np.nan
                 m8 = np.nan
-                share_tiled_by_blocks = np.nan
+                share_tiled_by_blocks = 0
 
             
             if ((not roads_clipped.empty) and (not OSM_intersections.empty)):
@@ -403,10 +411,10 @@ def process_cell(cell_id, geod, rectangle, rectangle_projected, buildings, block
                 m12 = metric_12_built_area_share(building_area,rectangle_area)
                 m13 = metric_13_average_building_area(building_area,n_buildings)
             else:
-                n_buildings = np.nan
-                building_area = np.nan
+                n_buildings = 0
+                building_area = 0
                 average_building_area = np.nan
-                m11, m12, m13 = np.nan, np.nan, np.nan
+                m11, m12, m13 = 0, 0, np.nan
 
         else:
             m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13 = np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
