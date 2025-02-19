@@ -471,38 +471,44 @@ def process_cell(cell_id, geod, rectangle, rectangle_projected, buildings, block
     return result
 
 @delayed
-def load_city_data(city_name):
-        # Read and process required datasets (buildings, roads, intersections)
+def load_buildings(city_name):
     if not fs.exists(f'{BUILDINGS_PATH}/{city_name}/Overture_building_{city_name}.geoparquet'):
         print(f"Missing buildings data for city {city_name}. Skipping.")
         return
     Overture_data_all = gpd.read_parquet(f'{BUILDINGS_PATH}/{city_name}/Overture_building_{city_name}.geoparquet')
-    print(f"{city_name}: Overture file read")
     Overture_data_all['confidence'] = Overture_data_all.sources.apply(lambda x: x[0]['confidence'])
     Overture_data_all['dataset'] = Overture_data_all.sources.apply(lambda x: x[0]['dataset'])
-    Overture_data_all = Overture_data_all.set_geometry('geometry')[Overture_data_all.dataset != 'OpenStreetMap']
+    Overture_data_all.set_geometry('geometry')[Overture_data_all.dataset != 'OpenStreetMap']
+    print(f"{city_name}: Overture file loaded")
+    return Overture_data_all
 
-    # Read intersections
+@delayed
+def load_intersections(city_name):
     if not fs.exists(f'{INTERSECTIONS_PATH}/{city_name}/{city_name}_OSM_intersections.gpkg'):
         print(f"Missing intersections data for city {city_name}. Skipping.")
         return
     OSM_intersections_all = gpd.read_file(f'{INTERSECTIONS_PATH}/{city_name}/{city_name}_OSM_intersections.gpkg')
+    print(f"{city_name}: OSM intersections loaded")
+    return OSM_intersections_all
 
-    # Read roads
+@delayed
+def load_roads(city_name):
     if not fs.exists(f'{ROADS_PATH}/{city_name}/{city_name}_OSM_roads.gpkg'):
         print(f"Missing roads data for city {city_name}. Skipping.")
         return
     OSM_roads_all = gpd.read_file(f'{ROADS_PATH}/{city_name}/{city_name}_OSM_roads.gpkg')
+    print(f"{city_name}: OSM roads loaded")
+    return OSM_roads_all
 
-    print(f"{city_name}: OSM files read")
-
+@delayed
+def project_and_process(buildings, roads, intersections):    
     # Get UTM projection for the city
-    utm_proj_city = get_utm_crs(OSM_roads_all.iloc[0].geometry)
+    utm_proj_city = get_utm_crs(roads.iloc[0].geometry)
     if utm_proj_city is not None:
         try:
-            OSM_roads_all_projected = OSM_roads_all.to_crs(epsg=utm_proj_city)
-            OSM_intersections_all_projected = OSM_intersections_all.to_crs(epsg=utm_proj_city)
-            Overture_data_all_projected = Overture_data_all.to_crs(epsg=utm_proj_city)
+            OSM_roads_all_projected = roads.to_crs(epsg=utm_proj_city)
+            OSM_intersections_all_projected = intersections.to_crs(epsg=utm_proj_city)
+            Overture_data_all_projected = buildings.to_crs(epsg=utm_proj_city)
         except Exception as e:
             print(f"Error reprojecting data for city {city_name}: {e}")
             return
@@ -622,10 +628,15 @@ def process_city(city_name, city_data, sample_prop=1.0, override_processed=False
 def run_all_citywide_calculation(cities, sample_prop=0.001, grid_size=200):
     tasks = []
     for city in cities:
-        city_data = load_city_data(city)
-        task = delayed(process_city)(city, city_data, sample_prop=sample_prop, grid_size=grid_size)
+        # Chain loading and processing
+        buildings = load_buildings(city)
+        roads = load_roads(city)
+        intersections = load_intersections(city)
+        task = delayed(project_and_process)(buildings, roads, intersections)
+
         tasks.append(task)
-    compute(*tasks)
+    
+    compute(*tasks, timeout=600)
     
 
 
