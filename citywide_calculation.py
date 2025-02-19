@@ -96,8 +96,10 @@ def s3_save(file, output_file, output_temp_path, remote_path):
         file.to_file(local_temporary_file, driver="GPKG")
     elif output_file.endswith(".csv"):
         file.to_csv(local_temporary_file, index=False)
+    elif output_file.endswith(".geoparquet"):
+        file.to_parquet(local_temporary_file, engine="pyarrow", index=False)
     else:
-        raise ValueError("Unsupported file format. Only .gpkg and .csv are supported.")
+        raise ValueError(f"Unsupported file format. Only .gpkg and .csv are supported but we got {file}.")
 
     # Upload to S3
     output_path = S3Path(remote_path)
@@ -468,7 +470,63 @@ def process_cell(cell_id, geod, rectangle, rectangle_projected, buildings, block
                 }
     return result
 
-def process_city(city_name, sample_prop=1.0, override_processed=False, grid_size=200):
+@delayed
+def load_city_data(city_name):
+        # Read and process required datasets (buildings, roads, intersections)
+    if not fs.exists(f'{BUILDINGS_PATH}/{city_name}/Overture_building_{city_name}.geoparquet'):
+        print(f"Missing buildings data for city {city_name}. Skipping.")
+        return
+    Overture_data_all = gpd.read_parquet(f'{BUILDINGS_PATH}/{city_name}/Overture_building_{city_name}.geoparquet')
+    print(f"{city_name}: Overture file read")
+    Overture_data_all['confidence'] = Overture_data_all.sources.apply(lambda x: x[0]['confidence'])
+    Overture_data_all['dataset'] = Overture_data_all.sources.apply(lambda x: x[0]['dataset'])
+    Overture_data_all = Overture_data_all.set_geometry('geometry')[Overture_data_all.dataset != 'OpenStreetMap']
+
+    # Read intersections
+    if not fs.exists(f'{INTERSECTIONS_PATH}/{city_name}/{city_name}_OSM_intersections.gpkg'):
+        print(f"Missing intersections data for city {city_name}. Skipping.")
+        return
+    OSM_intersections_all = gpd.read_file(f'{INTERSECTIONS_PATH}/{city_name}/{city_name}_OSM_intersections.gpkg')
+
+    # Read roads
+    if not fs.exists(f'{ROADS_PATH}/{city_name}/{city_name}_OSM_roads.gpkg'):
+        print(f"Missing roads data for city {city_name}. Skipping.")
+        return
+    OSM_roads_all = gpd.read_file(f'{ROADS_PATH}/{city_name}/{city_name}_OSM_roads.gpkg')
+
+    print(f"{city_name}: OSM files read")
+
+    # Get UTM projection for the city
+    utm_proj_city = get_utm_crs(OSM_roads_all.iloc[0].geometry)
+    if utm_proj_city is not None:
+        try:
+            OSM_roads_all_projected = OSM_roads_all.to_crs(epsg=utm_proj_city)
+            OSM_intersections_all_projected = OSM_intersections_all.to_crs(epsg=utm_proj_city)
+            Overture_data_all_projected = Overture_data_all.to_crs(epsg=utm_proj_city)
+        except Exception as e:
+            print(f"Error reprojecting data for city {city_name}: {e}")
+            return
+    else:
+        raise ValueError(f"Unable to determine EPSG code for city {city_name}.")
+
+    road_union = OSM_roads_all_projected.unary_union
+
+    if not OSM_roads_all_projected.empty:
+        blocks = get_blocks(road_union, OSM_roads_all_projected)
+    else:
+        blocks = gpd.GeoDataFrame([])
+
+    return {
+        "overture": Overture_data_all_projected,
+        "blocks": blocks,
+        "roads": OSM_roads_all_projected,
+        "intersections": OSM_intersections_all_projected,
+        "road_union": road_union,
+        "utm_proj": utm_proj_city
+    }
+
+@delayed
+def process_city(city_name, city_data, sample_prop=1.0, override_processed=False, grid_size=200):
     """
     Processes a city grid, calculates metrics for unprocessed rows, and updates the grid status CSV.
     """
@@ -512,54 +570,18 @@ def process_city(city_name, sample_prop=1.0, override_processed=False, grid_size
 
         rectangles = sampled_grid['geometry']
 
-        # Read and process required datasets (buildings, roads, intersections)
-        if not fs.exists(f'{BUILDINGS_PATH}/{city_name}/Overture_building_{city_name}.geoparquet'):
-            print(f"Missing buildings data for city {city_name}. Skipping.")
-            return
-        Overture_data_all = gpd.read_parquet(f'{BUILDINGS_PATH}/{city_name}/Overture_building_{city_name}.geoparquet')
-        print(f"{city_name}: Overture file read")
-        Overture_data_all['confidence'] = Overture_data_all.sources.apply(lambda x: x[0]['confidence'])
-        Overture_data_all['dataset'] = Overture_data_all.sources.apply(lambda x: x[0]['dataset'])
-        Overture_data_all = Overture_data_all.set_geometry('geometry')[Overture_data_all.dataset != 'OpenStreetMap']
+        # Extract the necessary city data from the dictionary
+        Overture_data_all_projected = city_data["overture"]
+        blocks = city_data["blocks"]
+        OSM_roads_all_projected = city_data["roads"]
+        OSM_intersections_all_projected = city_data["intersections"]
+        road_union = city_data["road_union"]
+        utm_proj_city = city_data["utm_proj"]
 
-        # Read intersections
-        if not fs.exists(f'{INTERSECTIONS_PATH}/{city_name}/{city_name}_OSM_intersections.gpkg'):
-            print(f"Missing intersections data for city {city_name}. Skipping.")
-            return
-        OSM_intersections_all = gpd.read_file(f'{INTERSECTIONS_PATH}/{city_name}/{city_name}_OSM_intersections.gpkg')
-
-        # Read roads
-        if not fs.exists(f'{ROADS_PATH}/{city_name}/{city_name}_OSM_roads.gpkg'):
-            print(f"Missing roads data for city {city_name}. Skipping.")
-            return
-        OSM_roads_all = gpd.read_file(f'{ROADS_PATH}/{city_name}/{city_name}_OSM_roads.gpkg')
-
-        print(f"{city_name}: OSM files read")
-
-        # Get UTM projection for the city
-        utm_proj_city = get_utm_crs(OSM_roads_all.iloc[0].geometry)
-        if utm_proj_city is not None:
-            try:
-                OSM_roads_all_projected = OSM_roads_all.to_crs(epsg=utm_proj_city)
-                OSM_intersections_all_projected = OSM_intersections_all.to_crs(epsg=utm_proj_city)
-                Overture_data_all_projected = Overture_data_all.to_crs(epsg=utm_proj_city)
-            except Exception as e:
-                print(f"Error reprojecting data for city {city_name}: {e}")
-                return
-        else:
-            raise ValueError(f"Unable to determine EPSG code for city {city_name}.")
-
-        # Prepare delayed processing
+      # Prepare delayed processing
         geod = Geod(ellps="WGS84")
+
         rectangles_projected = sampled_grid['geometry'].to_crs(epsg=utm_proj_city)
-
-        road_union = OSM_roads_all_projected.unary_union
-
-        if not OSM_roads_all_projected.empty:
-            blocks = get_blocks(road_union, OSM_roads_all_projected)
-        else:
-            blocks = gpd.GeoDataFrame([])
-
 
         delayed_results = [
             delayed(process_cell)(
@@ -597,11 +619,20 @@ def process_city(city_name, sample_prop=1.0, override_processed=False, grid_size
         print(f"Error processing {city_name}: {e}")
         raise 
 
-def run_all(cities, sample_prop=0.001, grid_size=200):
-    with ProcessPoolExecutor() as executor:
-        executor.map(partial(process_city, sample_prop=sample_prop, grid_size=grid_size), cities)
+def run_all_citywide_calculation(cities, sample_prop=0.001, grid_size=200):
+    tasks = []
+    for city in cities:
+        city_data = load_city_data(city)
+        task = delayed(process_city)(city, city_data, sample_prop=sample_prop, grid_size=grid_size)
+        tasks.append(task)
+    compute(*tasks)
+    
+
+
+    
+
 
 # This function allows external cluster calls like Code C.
 if __name__ == "__main__":
     cities = ["Belo Horizonte", "Campinas", "Bogota"]
-    run_all(cities)
+    run_all_citywide_calculation(cities)

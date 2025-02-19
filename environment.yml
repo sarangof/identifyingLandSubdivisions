@@ -13,3 +13,5 @@ dependencies:
   - overturemaps
   - earthengine-api
   - google-cloud-sdk
+  - s3fs
+  - openpyxl
