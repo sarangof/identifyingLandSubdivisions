@@ -55,14 +55,16 @@ def osm_command(city_name, search_area):
     osm_roads = remove_duplicate_roads(osm_roads)
     output_dir_roads = os.path.join(ROADS_PATH, city_name)
     os.makedirs(output_dir_roads, exist_ok=True)
-    road_output_file = os.path.join(output_dir_roads, f"{city_name}_OSM_roads.gpkg")
+    road_output_file = os.path.join(output_dir_roads, f"{city_name}_OSM_roads.geoparquet")
     osm_roads = remove_list_columns(osm_roads)
-    osm_roads.to_file(road_output_file, driver="GPKG")
+    osm_roads.to_parquet(road_output_file, engine="pyarrow", index=False)
 
     # Save intersections
     output_dir_intersections = os.path.join(INTERSECTIONS_PATH, city_name)
     os.makedirs(output_dir_intersections, exist_ok=True)
-    osm_intersections.to_file(os.path.join(output_dir_intersections, f"{city_name}_OSM_intersections.gpkg"), driver="GPKG")
+    intersection_output_file = os.path.join(output_dir_intersections, f"{city_name}_OSM_intersections.geoparquet")
+    osm_intersections.to_parquet(intersection_output_file, engine="pyarrow", index=False)
+
 
 def overturemaps_download_and_save(bbox_str, request_type: str, output_dir, city_name: str):
     os.makedirs(output_dir, exist_ok=True)
