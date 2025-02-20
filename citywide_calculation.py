@@ -285,7 +285,8 @@ def process_cell(cell_id, geod, rectangle, rectangle_projected, buildings, block
 
                 building_area = buildings_clipped.area.sum()
                 n_buildings = len(buildings_clipped)
-                building_density = (1000.0 * 1000 * n_buildings) / rectangle_area
+                building_density = (1000.0 * 1000 * n_buildings) / rectangle_area if rectangle_area > 0 else np.nan
+
             else:
                 buildings_clipped = gpd.GeoDataFrame([])
                 building_area, building_density, n_buildings = np.nan, np.nan, np.nan
@@ -384,12 +385,14 @@ def process_cell(cell_id, geod, rectangle, rectangle_projected, buildings, block
                 'road_length': road_length, 'n_intersections': n_intersections,
                 'n_buildings': n_buildings, 'building_density': building_density
             }
+            result_df = pd.DataFrame([result])
 
-        return result
+        return result_df
 
     except Exception as e:
         print(f"Error processing cell {cell_id}: {e}")
         return None  # Avoid returning invalid rows on errors
+    
 
 def extract_confidence_and_dataset(df):
     """Extract confidence and dataset from the sources column."""
@@ -415,7 +418,7 @@ def load_buildings(city_name):
         return None  
 
     # Load as Dask GeoDataFrame
-    Overture_data_all = dgpd.read_parquet(path)
+    Overture_data_all = dd.read_parquet(path)
 
     # Get existing metadata to prevent mismatches
     meta = Overture_data_all._meta.copy()
@@ -667,9 +670,22 @@ def process_city(city_name, city_data, sample_prop=1.0, override_processed=False
         # Compute results
         #final_geo_df = compute(*delayed_results)
         # Compute results
+        print(f"Number of delayed process_cell tasks: {len(delayed_results)}")
+        delayed_results[0].visualize(filename="process_cell_graph_delayed_results.svg", format="svg")
+
+        sample_task = delayed_results[0].compute()
+        print("sample_task")
+        print(sample_task)
+        # Do not eagerly persist this DataFrame yet
         final_geo_df = dd.from_delayed(delayed_results, meta=pd.DataFrame(columns=['index'] + all_metrics_columns))
+
+        # Only persist *after* the dataframe has been created
         final_geo_df = final_geo_df.persist()
-        final_geo_df = pd.DataFrame(final_geo_df)
+
+        # Convert to Pandas (but this might still be large)
+        final_geo_df = final_geo_df.compute()
+
+        # Process the metrics
         final_geo_df = process_metrics(final_geo_df)
 
         print("Final DataFrame columns:", final_geo_df.columns)
@@ -694,7 +710,7 @@ def process_city(city_name, city_data, sample_prop=1.0, override_processed=False
         raise
 
 
-def run_all_citywide_calculation(cities, sample_prop=0.001, grid_size=200):
+def run_all_citywide_calculation(cities, sample_prop=0.05, grid_size=200):
     tasks = []
     for city in cities:
         buildings = load_buildings(city)
