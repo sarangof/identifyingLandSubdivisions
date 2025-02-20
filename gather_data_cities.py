@@ -8,9 +8,14 @@ import os
 import pyproj
 from shapely.ops import transform
 from cloudpathlib import S3Path
+import s3fs
+import fsspec
+import traceback
+
+fs = s3fs.S3FileSystem(anon=False)
 
 # Paths Configuration
-MAIN_PATH = "s3://wri-cities-sandbox/identifyingLandSubdivisions/data"
+MAIN_PATH = "s3://wri-cities-sandbox/identifyingLandSubdivisions/data" #
 INPUT_PATH = os.path.join(MAIN_PATH, "input")
 BUILDINGS_PATH = os.path.join(INPUT_PATH, "buildings")
 ROADS_PATH = os.path.join(INPUT_PATH, "roads")
@@ -33,7 +38,9 @@ def remove_duplicate_roads(osm_roads):
 def remove_list_columns(gdf):
     for col in gdf.columns:
         if gdf[col].apply(lambda x: isinstance(x, list)).any():
-            gdf[col] = gdf[col].apply(lambda x: ', '.join(map(str, x)) if isinstance(x, list) else x)
+            gdf[col] = gdf[col].apply(lambda x: ', '.join(map(str, x)) if isinstance(x, list) else str(x))
+        elif gdf[col].dtype == 'object':  # Convert all object columns to string
+            gdf[col] = gdf[col].astype(str)
     return gdf
 
 def get_utm_proj(lon, lat):
@@ -46,13 +53,20 @@ def s3_save(file, output_file, output_temp_path, remote_path):
     os.makedirs(output_temp_path, exist_ok=True)
 
     local_temporary_file = f"{output_temp_path}/{output_file}"
+
+    # Ensure osmid is a string before saving
+    if "osmid" in file.columns:
+        file["osmid"] = file["osmid"].astype(str)
+
     # Save the file based on its extension
     if output_file.endswith(".gpkg"):
         file.to_file(local_temporary_file, driver="GPKG")
     elif output_file.endswith(".csv"):
         file.to_csv(local_temporary_file, index=False)
+    elif output_file.endswith(".geoparquet"):
+        file.to_parquet(local_temporary_file, index=False)
     else:
-        raise ValueError("Unsupported file format. Only .gpkg and .csv are supported.")
+        raise ValueError("Unsupported file format. Only .gpkg, .geoparquet and .csv are supported.")
 
     # Upload to S3
     output_path = S3Path(remote_path)
@@ -71,29 +85,38 @@ def osm_command(city_name, search_area):
     
     osm_intersections, osm_roads = ox.graph_to_gdfs(G)
 
-    # Process and save roads
-    osm_roads = remove_duplicate_roads(osm_roads)
+    # Ensure 'osmid' exists in intersections
+    if "osmid" not in osm_intersections.columns:
+        #print(f"⚠️ WARNING: 'osmid' column missing in intersections for {city_name}")
+        osm_intersections["osmid"] = None  # Assign None as placeholder
+
+    # Convert lists in roads and intersections to strings
     osm_roads = remove_list_columns(osm_roads)
+    osm_intersections = remove_list_columns(osm_intersections)
+
+    # Convert 'osmid' to string before saving
+    if "osmid" in osm_intersections.columns:
+        osm_intersections["osmid"] = osm_intersections["osmid"].astype(str)
+    if "osmid" in osm_roads.columns:
+        osm_roads["osmid"] = osm_roads["osmid"].astype(str)
 
     # Save roads
-    road_output_file_name = f"{city_name}_OSM_roads.gpkg"
-    road_output_tmp_path = f"." #if this works, create the right path
+    road_output_file_name = f"{city_name}_OSM_roads.geoparquet"
+    road_output_tmp_path = f"."
     road_output_path_remote = f"{ROADS_PATH}/{city_name}/{road_output_file_name}"
-    s3_save(file = osm_roads, 
-            output_file = road_output_file_name, 
-            output_temp_path = road_output_tmp_path, 
-            remote_path = road_output_path_remote)
+    s3_save(file=osm_roads, 
+            output_file=road_output_file_name, 
+            output_temp_path=road_output_tmp_path, 
+            remote_path=road_output_path_remote)
 
     # Save intersections
-    intersections_output_file_name = f"{city_name}_OSM_intersections.gpkg"
-    intersections_output_tmp_path = f"." #if this works, create the right path
+    intersections_output_file_name = f"{city_name}_OSM_intersections.geoparquet"
+    intersections_output_tmp_path = f"."
     intersections_output_path_remote = f"{INTERSECTIONS_PATH}/{city_name}/{intersections_output_file_name}"
-    s3_save(file = osm_intersections, 
-            output_file = intersections_output_file_name, 
-            output_temp_path = intersections_output_tmp_path, 
-            remote_path = intersections_output_path_remote)
-
-
+    s3_save(file=osm_intersections, 
+            output_file=intersections_output_file_name, 
+            output_temp_path=intersections_output_tmp_path, 
+            remote_path=intersections_output_path_remote)
 
 
 def overturemaps_download_and_save(bbox_str, request_type: str, output_dir, city_name: str):
@@ -121,7 +144,20 @@ def make_requests(partition):
     results = []
     for city_name in partition.city:
         try:
-            search_area = gpd.read_parquet(os.path.join(SEARCH_BUFFER_PATH, city_name, f"{city_name}_search_buffer.geoparquet"))
+            search_area_path = f"{SEARCH_BUFFER_PATH}/{city_name}/{city_name}_search_buffer.geoparquet"
+            #print(f"🔍 Checking S3 Path: {search_area_path}")
+
+            if not fs.exists(search_area_path):
+                raise FileNotFoundError(f"❌ ERROR: File does not exist in S3: {search_area_path}")
+            else:
+                print(f"✅ File exists in S3: {search_area_path}")
+
+            with fs.open(search_area_path, mode="rb", anon=False) as f:
+                search_area = gpd.read_parquet(f)
+
+            print(f"✅ Successfully read file for {city_name}: {search_area.shape[0]} rows")
+
+
             rep_point = search_area.geometry.representative_point().iloc[0]
             utm_proj_city = get_utm_proj(float(rep_point.x), float(rep_point.y))
             transformer = pyproj.Transformer.from_crs(pyproj.CRS('EPSG:4326'), utm_proj_city, always_xy=True)
@@ -131,7 +167,8 @@ def make_requests(partition):
             bbox_str = ','.join(search_area_bounds[['minx', 'miny', 'maxx', 'maxy']].values[0].astype(str))
             results.append(overturemaps_download_and_save(bbox_str, "building", os.path.join(BUILDINGS_PATH, city_name), city_name))
         except Exception as e:
-            error_message = str(e).split("\n")[0]  # Extract only the first line of the error
+            error_message = "".join(traceback.format_exception(None, e, e.__traceback__))  # Get full traceback
+
             print(f"Error for {city_name}: {e}")  # Print full error to terminal
             results.append({"city": city_name, "type": "general", "status": f"error: {error_message}"})
     return pd.DataFrame(results)
