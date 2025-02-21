@@ -454,12 +454,8 @@ def load_buildings(city_name):
     print(f"✅ {city_name}: Successfully loaded Overture buildings.")
     return Overture_data_all
 
-
-
-
-
 def load_intersections(city_name):
-    path = f'{INTERSECTIONS_PATH}/{city_name}/{city_name}_OSM_intersections.gpkg'
+    path = f'{INTERSECTIONS_PATH}/{city_name}/{city_name}_OSM_intersections.geoparquet'
 
     if not fs.exists(path):
         print(f"Missing intersections data for city {city_name}. Skipping.")
@@ -469,7 +465,7 @@ def load_intersections(city_name):
         # Check file extension before reading
         if path.endswith(".gpkg"):
             return gpd.read_file(path)  # Use geopandas for GPKG
-        elif path.endswith(".parquet"):
+        elif path.endswith(".geoparquet"):
             return dgpd.read_parquet(path).persist()  # Use Dask for Parquet
         else:
             raise ValueError(f"Unsupported file format for {path}")
@@ -481,15 +477,10 @@ def load_intersections(city_name):
 
 def load_roads(city_name):
     path_parquet = f'{ROADS_PATH}/{city_name}/{city_name}_OSM_roads.geoparquet'
-    path_gpkg = f'{ROADS_PATH}/{city_name}/{city_name}_OSM_roads.gpkg'  # Check for GPKG format
-
-    # Debugging: Check if either file exists
     file_exists_parquet = fs.exists(path_parquet)
-    file_exists_gpkg = fs.exists(path_gpkg)
 
     print(f"🛠️ Checking roads file for {city_name}:")
     print(f"   - Parquet file exists: {file_exists_parquet}")
-    print(f"   - GPKG file exists: {file_exists_gpkg}")
 
     if file_exists_parquet:
         try:
@@ -498,27 +489,24 @@ def load_roads(city_name):
         except Exception as e:
             print(f"❌ Error loading Parquet roads data for {city_name}: {e}")
             roads = None
-    elif file_exists_gpkg:
-        try:
-            print(f"📂 Found GPKG roads data for {city_name}. Loading...")
-            roads = gpd.read_file(path_gpkg)  # Use GeoPandas for GPKG
-        except Exception as e:
-            print(f"❌ Error loading GPKG roads data for {city_name}: {e}")
-            roads = None
     else:
         print(f"⚠️ No roads data found for {city_name}. Skipping.")
         return None
 
-    # Debugging: Check data after loading
-    if roads is not None and not roads.empty:
+    # **✅ Compute a small part of the DataFrame to check if it's empty**
+    if roads is not None:
+        sample = roads.head(1)  # Load only the first row
+        if sample.empty:
+            print(f"⚠️ Roads data for {city_name} is empty after loading.")
+            return None
+
         print(f"✅ Successfully loaded roads data for {city_name}")
         print(f"   - Columns: {list(roads.columns)}")
-        print(f"   - Number of rows: {len(roads)}")
+        print(f"   - Number of rows (approximate): {len(roads)}")
         print(f"   - CRS: {roads.crs}")
-    else:
-        print(f"⚠️ Roads data for {city_name} is empty after loading.")
 
     return roads
+
 
 
 @delayed
@@ -539,7 +527,8 @@ def project_and_process(buildings, roads, intersections):
         OSM_intersections_all_projected = gpd.GeoDataFrame(columns=["geometry"])  # Empty GeoDataFrame
 
     # Get UTM projection for the city
-    utm_proj_city = get_utm_crs(roads.iloc[0].geometry)
+    first_row = roads.head(1).iloc[0]  # Convert to Pandas
+    utm_proj_city = get_utm_crs(first_row.geometry)  # Now access correctly
 
     if utm_proj_city is None:
         print("❌ Error: Unable to determine EPSG code for city. Skipping projection.")
