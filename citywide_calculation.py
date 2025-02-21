@@ -80,7 +80,8 @@ def process_metrics(final_geo_df):
     )
 
     # Calculate equal-weights irregularity index
-    final_geo_df['regularity_index'] = final_geo_df[all_metrics_columns].mean(axis=1, skipna=True)
+    final_geo_df['regularity_index'] = final_geo_df[['metric_1','metric_2','metric_3','metric_4','metric_5','metric_6','metric_7','metric_8','metric_9','metric_10']].mean(axis=1, skipna=True)
+    final_geo_df['regularity_index_13'] = final_geo_df[all_metrics_columns].mean(axis=1, skipna=True)
     final_geo_df["missing_metrics_count"] = final_geo_df[all_metrics_columns].isna().sum(axis=1)
     return final_geo_df
 
@@ -627,7 +628,7 @@ def main():
               "Maputo", "Luanda"]
     cities = ["Belo Horizonte"]
     cities = [city.replace(' ', '_') for city in cities]
-    sample_prop = 0.01  # Sample 10% of the grid cells
+    sample_prop = 1.0  # Sample 10% of the grid cells
 
     # City-Level Parallelization
     with ProcessPoolExecutor() as executor:
