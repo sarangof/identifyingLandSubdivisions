@@ -24,6 +24,8 @@ from rasterio.warp import calculate_default_transform, reproject, Resampling
 from functools import partial
 from cloudpathlib import S3Path
 import s3fs
+from shapely.strtree import STRtree  
+from dask.distributed import CancelledError
 
 
 MAIN_PATH = "s3://wri-cities-sandbox/identifyingLandSubdivisions/data"
@@ -32,6 +34,7 @@ BUILDINGS_PATH = f'{INPUT_PATH}/buildings'
 ROADS_PATH = f'{INPUT_PATH}/roads'
 INTERSECTIONS_PATH = f'{INPUT_PATH}/intersections'
 GRIDS_PATH = f'{INPUT_PATH}/city_info/grids'
+OUTPUT_PATH = f'{MAIN_PATH}/output'
 OUTPUT_PATH_CSV = f'{MAIN_PATH}/output/csv'
 OUTPUT_PATH_RASTER = f'{MAIN_PATH}/output/raster'
 OUTPUT_PATH_PNG = f'{MAIN_PATH}/output/png'
@@ -53,346 +56,181 @@ def get_utm_crs(geometry):
         epsg_code = None
     return epsg_code
     
-
-def process_metrics(final_geo_df):
-    all_metrics_columns = ['metric_1','metric_2','metric_3','metric_4','metric_5','metric_6','metric_7','metric_8','metric_9','metric_10','metric_11','metric_12','metric_13']
-
-    # Save original values before transformations
-    metrics_original_names = [col+'_original' for col in all_metrics_columns]
-    final_geo_df[metrics_original_names] = final_geo_df[all_metrics_columns].copy()
-
-    metrics_standardized_names = {col:col+'_standardized' for col in all_metrics_columns}
-
-    # Apply the standardization functions
-    for metric, func in standardization_functions.items():
-        final_geo_df[metrics_standardized_names[metric]] = func(final_geo_df[metric])
-
-    zero_centered_names_list = [col+'_zero-centered' for col in all_metrics_columns]
-    final_geo_df[zero_centered_names_list] = final_geo_df[list(metrics_standardized_names.values())].copy()
-
-    # Center at zero and maximize information
-    final_geo_df.loc[:, zero_centered_names_list] = (
-        final_geo_df.loc[:,zero_centered_names_list]
-        .apply(lambda x: (x - x.mean()) / (x.std()))
-    )
-
-    final_geo_df[all_metrics_columns] = final_geo_df[zero_centered_names_list].copy()
-
-    # Center at zero and maximize information
-    final_geo_df.loc[:, all_metrics_columns] = (
-        final_geo_df[all_metrics_columns]
-        .apply(lambda x: (x - x.min()) / (x.max() - x.min()))
-    )
-
-    # Calculate equal-weights irregularity index
-    final_geo_df['regularity_index'] = final_geo_df[all_metrics_columns].mean(axis=0)
-
-    return final_geo_df
-
-def s3_save(file, output_file, output_temp_path, remote_path):
-
-    os.makedirs(output_temp_path, exist_ok=True)
-
-    local_temporary_file = f"{output_temp_path}/{output_file}"
-    # Save the file based on its extension
-    if output_file.endswith(".gpkg"):
-        file.to_file(local_temporary_file, driver="GPKG")
-    elif output_file.endswith(".csv"):
-        file.to_csv(local_temporary_file, index=False)
-    elif output_file.endswith(".geoparquet"):
-        file.to_parquet(local_temporary_file, engine="pyarrow", index=False)
-    else:
-        raise ValueError(f"Unsupported file format. Only .gpkg and .csv are supported but we got {file}.")
-
-    # Upload to S3
-    output_path = S3Path(remote_path)
-    output_path.upload_from(local_temporary_file)
-
-    # Delete the local file after upload
-    if os.path.exists(local_temporary_file):
-        os.remove(local_temporary_file)
-
-def save_city_grid_results(city_grid, sampled_grid, output_dir_csv):
-    """
-    Saves city_grid to results.csv in output_dir_csv.
-    If results.csv exists, it updates 'processed' values for rows present in sampled_grid.
-    Adds a timestamp to track when updates happen.
-    """
-    results_path = os.path.join(output_dir_csv, "results.csv")
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    # Ensure sampled_grid has the same index (id) as city_grid
-    sampled_ids = sampled_grid["grid_id"].unique()
-
-    # Add timestamp column to track updates
-    city_grid["timestamp"] = pd.NA  # Set as missing initially
-
-    # Set 'processed' to True for rows in sampled_grid
-    city_grid.loc[city_grid["grid_id"].isin(sampled_ids), "processed"] = True
-
-    # Set timestamp only for rows that were newly processed
-    city_grid.loc[city_grid["grid_id"].isin(sampled_ids), "timestamp"] = timestamp
-
-    if fs.exists(results_path):
-        # Load existing results
-        existing_results = pd.read_csv(results_path)
-
-        # Ensure necessary columns exist in existing results
-        if "processed" not in existing_results.columns:
-            existing_results["processed"] = False
-        if "timestamp" not in existing_results.columns:
-            existing_results["timestamp"] = pd.NA
-
-        # Merge new results, updating only 'processed' and 'timestamp' where needed
-        updated_results = existing_results.set_index("grid_id").combine_first(city_grid.set_index("grid_id")).reset_index()
-
-        # Explicitly update 'processed' and 'timestamp' based on sampled_grid
-        updated_results.loc[updated_results["grid_id"].isin(sampled_ids), "processed"] = True
-        updated_results.loc[updated_results["grid_id"].isin(sampled_ids), "timestamp"] = timestamp
-
-    else:
-        # No existing results, just save city_grid as new results
-        updated_results = city_grid
-
-    # Save the updated results
-    updated_results.to_csv(results_path, index=False)
-    
-    print(f"Results saved to {results_path}")
-
-def save_metric_maps(city_grid, output_dir_png):
-    """
-    Generates a matrix of geographic maps for all metrics and the regularity index,
-    and saves each map separately.
-    """
-    os.makedirs(output_dir_png, exist_ok=True)  # Ensure output directory exists
-
-    # Define the metrics and regularity index
-    all_metrics_columns = [
-        'metric_1', 'metric_2', 'metric_3', 'metric_4', 'metric_5',
-        'metric_6', 'metric_7', 'metric_8', 'metric_9', 'metric_10',
-        'metric_11', 'metric_12', 'metric_13'
-    ]
-    plot_columns = all_metrics_columns + ['regularity_index']
-
-    # Ensure city_grid is a valid GeoDataFrame and has a geometry column
-    if not isinstance(city_grid, gpd.GeoDataFrame) or 'geometry' not in city_grid.columns:
-        raise ValueError("city_grid must be a GeoDataFrame with a 'geometry' column.")
-
-    # Ensure city_grid has a valid CRS (coordinate reference system)
-    if city_grid.crs is None:
-        raise ValueError("GeoDataFrame must have a valid CRS. Use city_grid.set_crs('EPSG:XXXX', inplace=True) to set it.")
-
-    # Determine consistent color scale across all maps
-    vmin = city_grid[plot_columns].min().min()
-    vmax = city_grid[plot_columns].max().max()
-
-    # Create a grid of plots (adjust rows & cols for number of metrics)
-    num_cols = 4  # Define how many columns in the figure matrix
-    num_rows = (len(plot_columns) + num_cols - 1) // num_cols  # Compute necessary rows
-
-    fig, axes = plt.subplots(num_rows, num_cols, figsize=(20, num_rows * 5))
-    axes = axes.flatten()  # Convert axes to a 1D list for easy iteration
-
-    # **1. Generate matrix of spatial maps**
-    for i, metric in enumerate(plot_columns):
-        ax = axes[i]
-        city_grid.plot(column=metric, cmap='Reds', linewidth=0.5, ax=ax, edgecolor='black',
-                       legend=True, vmin=vmin, vmax=vmax)
-        ax.set_title(metric)
-        ax.axis("off")  # Hide axis labels
-
-    # Hide any extra subplots if the grid is larger than necessary
-    for j in range(i + 1, len(axes)):
-        axes[j].set_visible(False)
-
-    # Save the matrix of maps
-    matrix_plot_path = os.path.join(output_dir_png, "metrics_map_matrix.png")
-    plt.tight_layout()
-    plt.savefig(matrix_plot_path, dpi=300)
-    plt.close()
-    print(f"Saved matrix plot to {matrix_plot_path}")
-
-    # **2. Generate and save individual maps**
-    for metric in plot_columns:
-        fig, ax = plt.subplots(figsize=(8, 6))
-        city_grid.plot(column=metric, cmap='viridis', linewidth=0.5, ax=ax, edgecolor='black',
-                       legend=True, vmin=vmin, vmax=vmax)
-        ax.set_title(metric)
-        ax.axis("off")
-
-        # Save individual map
-        metric_plot_path = os.path.join(output_dir_png, f"{metric}_map.png")
-        plt.savefig(metric_plot_path, dpi=300)
-        plt.close()
-        print(f"Saved {metric} map to {metric_plot_path}")
-
-    print("All spatial maps have been saved.")
-
-def output_results(city_grid, sampled_grid, city_name, grid_size, sample_prop, OUTPUT_PATH_RASTER, output_dir_csv, output_dir_png):
-        #Save raste results to geoparquet
-        os.makedirs(f'{OUTPUT_PATH_RASTER}/{city_name}', exist_ok=True)
-
-        output_file = f'{city_name}_{str(grid_size)}m_results.geoparquet'
-        remote_path = f'{OUTPUT_PATH_RASTER}/{city_name}/'
-        output_temp_path = '.'
-        s3_save(city_grid, output_file, output_temp_path, remote_path)
-
-        #city_grid.to_parquet(f'{OUTPUT_PATH_RASTER}/{city_name}/{city_name}_{str(grid_size)}m_results.geoparquet', engine="pyarrow", index=False)
-
-        # Save summaries
-        all_metrics_columns = ['metric_1','metric_2','metric_3','metric_4','metric_5','metric_6','metric_7','metric_8','metric_9','metric_10','metric_11','metric_12','metric_13']
-        metrics_standardized_names = [col+'_standardized' for col in all_metrics_columns]
-        zero_centered_names_list = [col+'_zero-centered' for col in all_metrics_columns]
-        city_grid[all_metrics_columns+metrics_standardized_names+zero_centered_names_list].describe().transpose().to_excel(f'{output_dir_csv}/summary_prop={str(sample_prop)}.xlsx')
-
-        # Save raw data
-        save_city_grid_results(city_grid, sampled_grid, output_dir_csv)
-
-        # Save PNG files
-        save_metric_maps(city_grid, output_dir_png)
-
-        output_dir_csv
-
-        
-
-
-
 @delayed
-def process_cell(cell_id, geod, rectangle, rectangle_projected, buildings, blocks_all, 
-                 OSM_roads_all_projected, OSM_intersections_all_projected, road_union, utm_proj_city):
-
+def process_cell(grid_id, geod, rectangle, rectangle_projected, buildings, blocks_intersecting, blocks_clipped, roads, roads_union_extended, intersections, utm_proj_city):
     """
     Processes a single cell using Dask Delayed.
     """
+    print(f"\U0001F539 Processing cell {grid_id} with {len(buildings)} buildings, {len(roads)} roads, {len(intersections)} intersections")
+
+    # CASE 2: Invalid rectangle → Completely remove from dataset (exit early)
+    if rectangle is None or rectangle.is_empty or not rectangle.is_valid:
+        print(f"\U0001F6A8 Skipping cell {grid_id}: Invalid rectangle {rectangle}")
+        return  # <<< No return value at all (Dask ignores it)
+
+    if rectangle_projected.is_empty or not rectangle_projected.is_valid:
+        print(f"\U0001F6A8 Cell {grid_id} has an invalid rectangle_projected! Geometry: {rectangle_projected}")
+        return  # <<< No return value at all (Dask ignores it)
+
+    print(f"📌 DEBUG: Converting rectangle {grid_id} to WGS84")
+    rectangle_wgs84 = gpd.GeoSeries(rectangle_projected, crs=f"EPSG:{utm_proj_city}").to_crs(epsg=4326).iloc[0]
+    print(f"📌 DEBUG: rectangle_wgs84 for cell {grid_id}: {rectangle_wgs84}")
+
+    rectangle_area, _ = geod.geometry_area_perimeter(rectangle_wgs84)
+    print(f"📌 DEBUG: rectangle_area for cell {grid_id}: {rectangle_area}")
+
+    if np.isnan(rectangle_area) or rectangle_area <= 0:
+        print(f"\U0001F6D1 Cell {grid_id} has invalid area {rectangle_area}, skipping.")
+        return  # <<< No return value at all (Dask ignores it)
 
     try:
-        # Ensure result is always initialized
-        result = None
+        # Preparatory calculations
+        if not buildings.empty:
+            building_area = buildings.area.sum()
+            n_buildings = len(buildings)
+            building_density = (1000.0 * 1000 * n_buildings) / rectangle_area if rectangle_area > 0 else np.nan
+        else:
+            building_area, building_density, n_buildings = np.nan, np.nan, np.nan
 
-        bounding_box = rectangle_projected.bounds
-        bounding_box_geom = box(*bounding_box)
-        rectangle_area, _ = geod.geometry_area_perimeter(rectangle)
+        # Clip intersections
+        if not intersections.empty:
+            intersections_bool = True
+            n_intersections = len(intersections.drop_duplicates('osmid'))
+        else:
+            intersections_bool = False
+            n_intersections = 0
 
-        if rectangle_area > 0: 
-            # Preparatory calculations
-            if not buildings.empty and buildings.sindex:
-                possible_matches_index = list(buildings.sindex.intersection(bounding_box_geom.bounds))
-                possible_matches = buildings.iloc[possible_matches_index]
-                buildings_clipped = gpd.clip(possible_matches, bounding_box_geom)
-                buildings_clipped = buildings_clipped[
-                    (buildings_clipped['confidence'] > 0.75) | buildings_clipped['confidence'].isna()
-                ].reset_index(drop=True)
+        roads_bool = not roads.empty
 
-                building_area = buildings_clipped.area.sum()
-                n_buildings = len(buildings_clipped)
-                building_density = (1000.0 * 1000 * n_buildings) / rectangle_area if rectangle_area > 0 else np.nan
+        # CASE 1: Valid but empty cell → Return DataFrame filled with NaNs
+        if not roads_bool and not intersections_bool:
+            print(f"⚠️ Assigning NAs to {grid_id}: No roads or intersections present.")
+            return pd.DataFrame([{
+                'index': grid_id,
+                'metric_1': np.nan, 'metric_2': np.nan, 'metric_3': np.nan,
+                'metric_4': np.nan, 'metric_5': np.nan, 'metric_6': np.nan,
+                'metric_7': np.nan, 'metric_8': np.nan, 'metric_9': np.nan,
+                'metric_10': np.nan, 'metric_11': np.nan, 'metric_12': np.nan,
+                'metric_13': np.nan,
+                'buildings_bool': False,
+                'intersections_bool': False,
+                'roads_bool': False,
+                'rectangle_area': rectangle_area,
+                'building_area': np.nan,
+                'share_tiled_by_blocks': np.nan,
+                'road_length': np.nan,
+                'n_intersections': np.nan,
+                'n_buildings': np.nan,
+                'building_density': np.nan
+            }])
 
-            else:
-                buildings_clipped = gpd.GeoDataFrame([])
-                building_area, building_density, n_buildings = np.nan, np.nan, np.nan
+        # Otherwise, proceed with normal metric calculations
+        if not buildings.empty and not roads.empty:
+            print(f"📌 DEBUG: Running metric_1 for cell {grid_id}")
+            print(f"📌 DEBUG: buildings DataFrame shape: {buildings.shape}")
+            print(f"📌 DEBUG: buildings DataFrame columns: {list(buildings.columns)}")
+            print(f"📌 DEBUG: Sample buildings geometries: {buildings['geometry'].head().tolist() if 'geometry' in buildings else 'MISSING'}")
+            print(f"📌 DEBUG: Checking road_union before metric_1 for cell {grid_id}")
+            print(f"📌 DEBUG: road_union type: {type(roads_union_extended)}")
 
-            # Clip roads
-            try:
-                roads_clipped = OSM_roads_all_projected[
-                    OSM_roads_all_projected.geometry.intersects(bounding_box_geom)
-                ]
-                OSM_roads_bool = not roads_clipped.empty
-            except (fiona.errors.DriverError, TopologicalError) as e:
-                print(f"Error clipping roads for cell {cell_id}: {e}")
-                roads_clipped = gpd.GeoDataFrame([])
-                OSM_roads_bool = False
+            print(f"📌 DEBUG: road_union geometry: {roads_union_extended if isinstance(roads_union_extended, gpd.GeoSeries) else 'Not a GeoSeries'}")
 
-            # Clip intersections
-            try:
-                OSM_intersections = OSM_intersections_all_projected[
-                    OSM_intersections_all_projected.geometry.intersects(bounding_box_geom)
-                ]
-                OSM_intersections_bool = not OSM_intersections.empty
-                n_intersections = len(OSM_intersections.drop_duplicates('osmid'))
-            except fiona.errors.DriverError:
-                OSM_intersections = gpd.GeoDataFrame([])
-                OSM_intersections_bool = False
-                n_intersections = np.nan
 
-            # If NO roads and NO intersections → return NaNs
-            if not OSM_roads_bool and not OSM_intersections_bool:
-                return {
-                    'index': cell_id, 'metric_1': np.nan, 'metric_2': np.nan, 'metric_3': np.nan, 'metric_4': np.nan,
-                    'metric_5': np.nan, 'metric_6': np.nan, 'metric_7': np.nan, 'metric_8': np.nan,
-                    'metric_9': np.nan, 'metric_10': np.nan, 'metric_11': np.nan, 'metric_12': np.nan, 'metric_13': np.nan,
-                    'OSM_buildings_available': np.nan, 'OSM_intersections_available': np.nan,
-                    'OSM_roads_available': np.nan, 'rectangle_area': rectangle_area,
-                    'building_area': np.nan, 'share_tiled_by_blocks': np.nan,
-                    'road_length': np.nan, 'n_intersections': np.nan, 'n_buildings': np.nan,
-                    'building_density': np.nan
-                }
+            m1, buildings = metric_1_distance_less_than_20m(buildings, roads_union_extended, utm_proj_city)
+            print(f"📌 DEBUG: Running metric_2 for cell {grid_id}")
+            m2 = metric_2_average_distance_to_roads(buildings)
+        else:
+            m1, m2 = np.nan, np.nan
 
-            # Otherwise, proceed with normal metric calculations
-            if not buildings_clipped.empty and not roads_clipped.empty:
-                m1, buildings_clipped = metric_1_distance_less_than_20m(buildings_clipped, road_union, utm_proj_city)
-                m2 = metric_2_average_distance_to_roads(buildings_clipped)
-            else:
-                m1, m2 = np.nan, np.nan
+        print(f"📌 DEBUG: metric_1 for cell {grid_id} = {m1}")
+        print(f"📌 DEBUG: metric_2 for cell {grid_id} = {m2}")
 
-            m3 = metric_3_road_density(rectangle_area, roads_clipped) if not roads_clipped.empty else 0
+        print(f"📌 DEBUG: Running metric_3 for cell {grid_id}")
+        m3 = metric_3_road_density(rectangle_area, roads) if not roads.empty else 0
+        print(f"📌 DEBUG: metric_3 for cell {grid_id} = {m3}")
 
-            if not OSM_intersections.empty:
-                m4 = metric_4_share_4way_intersections(OSM_intersections)
-                m5 = metric_5_intersection_density(OSM_intersections, rectangle_area)
-            else:
-                m4, m5 = (np.nan if not roads_clipped.empty else 0), 0
+        if not intersections.empty:
+            print(f"📌 DEBUG: Running metric_4 for cell {grid_id}")
+            m4 = metric_4_share_4way_intersections(intersections)
+            print(f"📌 DEBUG: Running metric_5 for cell {grid_id}")
+            m5 = metric_5_intersection_density(intersections, rectangle_area)
+        else:
+            m4, m5 = (np.nan if not roads.empty else 0), 0
 
-            m6 = (
-                metric_6_entropy_of_building_azimuth(buildings_clipped, rectangle_id=1, bin_width_degrees=5, plot=False)[0]
-                if not buildings_clipped.empty else np.nan
-            )
+        print(f"📌 DEBUG: metric_4 for cell {grid_id} = {m4}")
+        print(f"📌 DEBUG: metric_5 for cell {grid_id} = {m5}")
+        print(f"📌 DEBUG: Running metric_6 for cell {grid_id}")
+        m6 = (
+            metric_6_entropy_of_building_azimuth(buildings, rectangle_id=1, bin_width_degrees=5, plot=False)[0]
+            if not buildings.empty else np.nan
+        )
+        print(f"📌 DEBUG: metric_6 for cell {grid_id} = {m6}")
 
-            if not blocks_all.empty:
-                minx, miny, maxx, maxy = rectangle_projected.bounds
-                rectangle_box = box(minx, miny, maxx, maxy)
-                blocks_clipped_within_rectangle = blocks_all.clip(rectangle_box)
+        if not blocks_intersecting.empty:
+            area_tiled_by_blocks = blocks_clipped.area.sum()
+            share_tiled_by_blocks = area_tiled_by_blocks / rectangle_area
+            print(f"📌 DEBUG: Running metric_7 for cell {grid_id}")
+            m7, blocks_clipped = metric_7_average_block_width(blocks_intersecting, blocks_clipped, rectangle_projected, rectangle_area)
+            print(f"📌 DEBUG: Running metric_8 for cell {grid_id}")
+            m8, _, _ = metric_8_two_row_blocks(blocks_intersecting, buildings, utm_proj_city, row_epsilon=row_epsilon)
+        else:
+            m7, m8, share_tiled_by_blocks = np.nan, np.nan, 0
 
-                area_tiled_by_blocks = blocks_clipped_within_rectangle.area.sum()
-                share_tiled_by_blocks = area_tiled_by_blocks / rectangle_area
+        print(f"📌 DEBUG: metric_7 for cell {grid_id} = {m7}")
+        print(f"📌 DEBUG: metric_8 for cell {grid_id} = {m8}")
+        print(f"📌 DEBUG: Running metric_9 for cell {grid_id}")
+        m9 = metric_9_tortuosity_index(roads) if not roads.empty else np.nan
+        print(f"📌 DEBUG: metric_9 for cell {grid_id} = {m9}")
+        print(f"📌 DEBUG: Running metric_10 for cell {grid_id}")
+        m10 = metric_10_average_angle_between_road_segments(intersections, roads) if not roads.empty and not intersections.empty else np.nan
+        print(f"📌 DEBUG: metric_10 for cell {grid_id} = {m10}")
 
-                m7, blocks_clipped = metric_7_average_block_width(blocks_all, blocks_clipped_within_rectangle, rectangle_projected, rectangle_area)
-                m8, _, _ = metric_8_two_row_blocks(blocks_all, buildings_clipped, utm_proj_city, row_epsilon=row_epsilon)
-            else:
-                m7, m8, share_tiled_by_blocks = np.nan, np.nan, 0
+        road_length = roads.length.sum() if not roads.empty else np.nan
 
-            m9 = metric_9_tortuosity_index(roads_clipped) if not roads_clipped.empty else np.nan
-            m10 = metric_10_average_angle_between_road_segments(OSM_intersections, roads_clipped) if not roads_clipped.empty and not OSM_intersections.empty else np.nan
+        if not buildings.empty:
+            print(f"📌 DEBUG: Running metric_11 for cell {grid_id}")
+            m11 = metric_11_building_density(n_buildings, rectangle_area)
+            print(f"📌 DEBUG: metric_11 for cell {grid_id} = {m11}")
+            print(f"📌 DEBUG: Running metric_12 for cell {grid_id}")
+            m12 = metric_12_built_area_share(building_area, rectangle_area)
+            print(f"📌 DEBUG: metric_12 for cell {grid_id} = {m12}")
+            print(f"📌 DEBUG: Running metric_13 for cell {grid_id}")
+            m13 = metric_13_average_building_area(building_area, n_buildings)
+            print(f"📌 DEBUG: metric_13 for cell {grid_id} = {m13}")
+        else:
+            m11, m12, m13 = 0, 0, np.nan
 
-            road_length = roads_clipped.length.sum() if not roads_clipped.empty else np.nan
-
-            if not buildings_clipped.empty:
-                m11 = metric_11_building_density(n_buildings, rectangle_area)
-                m12 = metric_12_built_area_share(building_area, rectangle_area)
-                m13 = metric_13_average_building_area(building_area, n_buildings)
-            else:
-                m11, m12, m13 = 0, 0, np.nan
-
-            # Final result
-            result = {
-                'index': cell_id, 'metric_1': m1, 'metric_2': m2, 'metric_3': m3, 'metric_4': m4,
-                'metric_5': m5, 'metric_6': m6, 'metric_7': m7, 'metric_8': m8,
-                'metric_9': m9, 'metric_10': m10, 'metric_11': m11, 'metric_12': m12, 'metric_13': m13,
-                'OSM_buildings_available': not buildings_clipped.empty,
-                'OSM_intersections_available': OSM_intersections_bool,
-                'OSM_roads_available': OSM_roads_bool,
-                'rectangle_area': rectangle_area, 'building_area': building_area,
-                'share_tiled_by_blocks': share_tiled_by_blocks,
-                'road_length': road_length, 'n_intersections': n_intersections,
-                'n_buildings': n_buildings, 'building_density': building_density
-            }
-            result_df = pd.DataFrame([result])
-
+        # Final result
+        result_df = pd.DataFrame([{
+            'grid_id': grid_id,
+            'metric_1': float(m1), 'metric_2': float(m2), 'metric_3': float(m3),
+            'metric_4': float(m4), 'metric_5': float(m5), 'metric_6': float(m6),
+            'metric_7': float(m7), 'metric_8': float(m8), 'metric_9': float(m9),
+            'metric_10': float(m10), 'metric_11': float(m11), 'metric_12': float(m12),
+            'metric_13': float(m13),
+            'buildings_bool': bool(not buildings.empty),
+            'intersections_bool': bool(intersections_bool),
+            'roads_bool': bool(roads_bool),
+            'rectangle_area': float(rectangle_area) if not np.isnan(rectangle_area) else 0.0,
+            'building_area': float(building_area) if not np.isnan(building_area) else 0.0,
+            'share_tiled_by_blocks': float(share_tiled_by_blocks) if not np.isnan(share_tiled_by_blocks) else 0.0,
+            'road_length': float(road_length) if not np.isnan(road_length) else 0.0,
+            'n_intersections': int(n_intersections) if not np.isnan(n_intersections) else 0,
+            'n_buildings': int(n_buildings) if not np.isnan(n_buildings) else 0,
+            'building_density': float(building_density) if not np.isnan(building_density) else 0.0
+        }])
+        print(f"📌 DEBUG: Preparing final DataFrame for cell {grid_id}")
+        print(f"✅ Successfully calculated all metrics for cell {grid_id}")
+        print(f"📌 DEBUG: Returning final DataFrame for cell {grid_id}:")
+        print(result_df)
         return result_df
 
     except Exception as e:
-        print(f"Error processing cell {cell_id}: {e}")
-        return None  # Avoid returning invalid rows on errors
-    
+        import traceback
+        print(f"❌ Error processing cell {grid_id}: {e}")
+        print(f"🔍 Debug Info: rectangle={rectangle}, rectangle_projected={rectangle_projected}")
+        traceback.print_exc()
+        raise  # <<< No return value at all (Dask ignores it)
 
 def extract_confidence_and_dataset(df):
     """Extract confidence and dataset from the sources column."""
@@ -415,141 +253,126 @@ def load_buildings(city_name):
 
     if not fs.exists(path):
         print(f"Missing buildings data for city {city_name}. Skipping.")
-        return None  
-
-    # Load as Dask GeoDataFrame
-    Overture_data_all = dd.read_parquet(path)
-
-    # Get existing metadata to prevent mismatches
-    meta = Overture_data_all._meta.copy()
-
-    # **Ensure metadata includes confidence and dataset**
-    meta["confidence"] = "float64"
-    meta["dataset"] = "object"
-
-    # Ensure 'sources' exists before processing
-    if "sources" not in Overture_data_all.columns:
-        print(f"⚠️ Warning: 'sources' column missing in {city_name}, skipping extraction.")
-        return Overture_data_all  # Return without transformation
-
-    # Apply transformation using map_partitions while preserving all original columns
-    def safe_extract(df):
-        df = extract_confidence_and_dataset(df)
-        return df  # Ensure function does not remove existing columns
-
-    Overture_data_all = Overture_data_all.map_partitions(safe_extract, meta=meta)
-
-    # **Check if 'dataset' column exists**
-    print(f"🔍 Columns after extraction in {city_name}: {Overture_data_all.columns}")
-
-    if "dataset" not in Overture_data_all.columns:
-        print(f"⚠️ Warning: 'dataset' column missing in {city_name}! Skipping filter.")
+        buildings = None
     else:
-        # Filter out OpenStreetMap entries if the column exists
-        Overture_data_all = Overture_data_all[Overture_data_all["dataset"] != "OpenStreetMap"]
+        # Load directly as a GeoDataFrame
+        buildings = gpd.read_parquet(path)
 
-    # Persist the modified DataFrame
-    Overture_data_all = Overture_data_all.persist()
+        if "sources" in buildings.columns:
+            buildings = extract_confidence_and_dataset(buildings)
 
-    print(f"✅ {city_name}: Successfully loaded Overture buildings.")
-    return Overture_data_all
+            if "dataset" in buildings.columns:
+                buildings = buildings[buildings["dataset"] != "OpenStreetMap"]
+
+        print(f"✅ {city_name}: Successfully loaded Overture buildings.")
+    return buildings
+
+def load_roads(city_name):
+    path_parquet = f'{ROADS_PATH}/{city_name}/{city_name}_OSM_roads.geoparquet'
+
+    if not fs.exists(path_parquet):
+        print(f"⚠️ No roads data found for {city_name}. Skipping.")
+        roads = None
+    else:
+        try:
+            print(f"📂 Loading Parquet roads data for {city_name}...")
+            roads = gpd.read_parquet(path_parquet)  # Directly load as GeoDataFrame
+            print(f"✅ Successfully loaded roads data for {city_name}")
+            print(f"   - Columns: {list(roads.columns)}")
+            #print(f"   - CRS: {roads.crs}")
+
+        except Exception as e:
+            print(f"❌ Error loading Parquet roads data for {city_name}: {e}")
+            roads = None
+
+    return roads
 
 def load_intersections(city_name):
+    
     path = f'{INTERSECTIONS_PATH}/{city_name}/{city_name}_OSM_intersections.geoparquet'
 
     if not fs.exists(path):
         print(f"Missing intersections data for city {city_name}. Skipping.")
-        return None
-
-    try:
-        # Check file extension before reading
-        if path.endswith(".gpkg"):
-            return gpd.read_file(path)  # Use geopandas for GPKG
-        elif path.endswith(".geoparquet"):
-            return dgpd.read_parquet(path).persist()  # Use Dask for Parquet
-        else:
-            raise ValueError(f"Unsupported file format for {path}")
-
-    except Exception as e:
-        print(f"Error loading intersections data for {city_name}: {e}")
-        return None
- 
-
-def load_roads(city_name):
-    path_parquet = f'{ROADS_PATH}/{city_name}/{city_name}_OSM_roads.geoparquet'
-    file_exists_parquet = fs.exists(path_parquet)
-
-    print(f"🛠️ Checking roads file for {city_name}:")
-    print(f"   - Parquet file exists: {file_exists_parquet}")
-
-    if file_exists_parquet:
-        try:
-            print(f"📂 Found Parquet roads data for {city_name}. Loading...")
-            roads = dgpd.read_parquet(path_parquet).persist()
-        except Exception as e:
-            print(f"❌ Error loading Parquet roads data for {city_name}: {e}")
-            roads = None
+        intersections = None
     else:
-        print(f"⚠️ No roads data found for {city_name}. Skipping.")
-        return None
-
-    # **✅ Compute a small part of the DataFrame to check if it's empty**
-    if roads is not None:
-        sample = roads.head(1)  # Load only the first row
-        if sample.empty:
-            print(f"⚠️ Roads data for {city_name} is empty after loading.")
-            return None
-
-        print(f"✅ Successfully loaded roads data for {city_name}")
-        print(f"   - Columns: {list(roads.columns)}")
-        print(f"   - Number of rows (approximate): {len(roads)}")
-        print(f"   - CRS: {roads.crs}")
-
-    return roads
-
-
+        try:
+           intersections = gpd.read_parquet(path)  # Directly load as GeoDataFrame
+           intersections['osmid'] = intersections['osmid'].astype('int64')
+           print(f"✅ Successfully loaded intersections data for {city_name}")
+        except Exception as e:
+            print(f"❌ Error loading intersections data for {city_name}: {e}")
+            intersections = None
+    return intersections
 
 @delayed
 def project_and_process(buildings, roads, intersections):    
-    # **Check if any data is missing**
-    if buildings is None:
-        print("⚠️ No buildings data available. Skipping buildings projection.")
-        Overture_data_all_projected = None
+    # Check if any data are missing
+    if buildings is None or buildings.empty:
+        print("❌ Error: No building data available.")
+        return None
     else:
         print(f"✅ Buildings data loaded with {len(buildings)} records.")
     
-    if roads is None:
-        print("⚠️ No roads data available. Skipping roads projection.")
-        return None  # No point in continuing without roads
+    if roads is None or roads.empty:
+        print("❌ Error: No road data available.")
+        return None
+    else:
+        # Get UTM projection for the city
+        first_row_df = roads.head(1)  # This may return a Series if only one column exists
+        if isinstance(first_row_df, pd.Series):
+            first_row_df = first_row_df.to_frame().T  # Convert Series to DataFrame
 
-    if intersections is None:
-        print("⚠️ No intersections data available. Skipping intersections projection.")
-        OSM_intersections_all_projected = gpd.GeoDataFrame(columns=["geometry"])  # Empty GeoDataFrame
+        if not first_row_df.empty:
+            first_row = first_row_df.iloc[0]  # Safely access first row
+        else:
+            print("❌ Error: Unable to determine projection based on road network")
+            return None
 
-    # Get UTM projection for the city
-    first_row = roads.head(1).iloc[0]  # Convert to Pandas
-    utm_proj_city = get_utm_crs(first_row.geometry)  # Now access correctly
+        utm_proj_city = get_utm_crs(first_row.geometry)  
+        if utm_proj_city is None:
+            print("❌ Error: Unable to determine EPSG code for city.")
+            return None  # Fail early if we can't determine the UTM CRS
 
-    if utm_proj_city is None:
-        print("❌ Error: Unable to determine EPSG code for city. Skipping projection.")
-        return None  # Fail early if we can't determine the UTM CRS
+    if intersections is None or intersections.empty:
+        print("❌ Error: No intersections data available.")
+        return None
 
     try:
         OSM_roads_all_projected = roads.to_crs(epsg=utm_proj_city)
         OSM_intersections_all_projected = intersections.to_crs(epsg=utm_proj_city) if intersections is not None else None
         Overture_data_all_projected = buildings.to_crs(epsg=utm_proj_city) if buildings is not None else None
+        print(f"✅ Succesfuly projected buildings, roads and intersections.")
     except Exception as e:
         print(f"❌ Error reprojecting data for city: {e}")
         return None
 
-    road_union = OSM_roads_all_projected.unary_union
+    try: 
+        road_union = OSM_roads_all_projected.unary_union
+        if road_union.is_empty:
+            print(f"❌ Road union is empty.")
+            return None
+        else:
+            print(f"✅ Succesfully performed unary union on road network.")
+    except:
+        print(f"❌ Error performing unary unary union on road network.")
+        return None
 
-    if not OSM_roads_all_projected.empty:
-        blocks = get_blocks(road_union, OSM_roads_all_projected)
-    else:
-        blocks = gpd.GeoDataFrame([])
+    try:
+        if not OSM_roads_all_projected.empty:
+            blocks = get_blocks(road_union, OSM_roads_all_projected)
+            if blocks.empty:
+                print(f"❌ Resulting blocks are empty.")
+                return None
+            else:
+                print(f"✅ Succesfully calculated blocks.")
+        else:
+            print(f"❌ Roads were not correctly projected and blocks cannot be built.")
+            return None
+    except:
+        print(f"❌ Error calculating blocks: {e}")
+        return None
 
-    # **Debugging: Print What is Being Returned**
+    # Debugging: Print What is Being Returned
     print(f"📦 Returning from project_and_process() for city:")
     print(f"   - Overture: {type(Overture_data_all_projected)}")
     print(f"   - Blocks: {type(blocks)}")
@@ -560,155 +383,333 @@ def project_and_process(buildings, roads, intersections):
 
     # **Ensure all dictionary keys exist**
     result = {
-        "overture": Overture_data_all_projected if Overture_data_all_projected is not None else gpd.GeoDataFrame([]),
+        "overture": Overture_data_all_projected,
         "blocks": blocks,
         "roads": OSM_roads_all_projected,
-        "intersections": OSM_intersections_all_projected if OSM_intersections_all_projected is not None else gpd.GeoDataFrame([]),
+        "intersections": OSM_intersections_all_projected,
         "road_union": road_union,
         "utm_proj": utm_proj_city
     }
 
-    # **Check if "overture" exists before returning**
-    if "overture" not in result:
-        raise KeyError("🚨 'overture' key is missing from project_and_process() return value!")
-
     return result
 
+def clip_features_to_rectangles(city_data, rectangles, buffer_size=300):
+    """
+    Clips buildings, roads, and intersections to each rectangle.
+    Returns a dictionary associating each rectangle ID with its features.
+    """
+
+    buildings, roads, intersections, blocks, road_union = (
+        city_data['overture'], city_data['roads'], city_data['intersections'], city_data['blocks'], city_data['road_union']
+    )
+
+    # Create spatial indexes for efficient lookup
+    building_index = STRtree(buildings.geometry) if not buildings.empty else None
+    road_index = STRtree(roads.geometry) if not roads.empty else None
+    intersection_index = STRtree(intersections.geometry) if not intersections.empty else None
+    blocks_index = STRtree(blocks.geometry) if not blocks.empty else None
+
+    rectangle_features = {}
+
+    for rect_id, rect_geom in zip(rectangles.index, rectangles.geometry):
+        print(f"🟡 Clipping features for rectangle {rect_id}")
+        rect_id = int(rect_id)
+
+        rect_box = rect_geom.bounds  # Bounding box for spatial index lookup
+        rect_buffered = rect_geom.buffer(buffer_size)  # Expanded area for roads
+
+        # **Buildings: Retrieve all buildings that intersect the rectangle**
+        if building_index:
+            building_candidates_idx = building_index.query(rect_geom)
+            buildings_in_rect = buildings.iloc[building_candidates_idx]
+            print(f"📊 Before Clipping: {len(buildings_in_rect)} buildings in rectangle {rect_id}")
+
+        else:
+            buildings_in_rect = gpd.GeoDataFrame(columns=buildings.columns, crs=buildings.crs)
+
+        # **Blocks: Retrieve all blocks that intersect the rectangle**
+        if blocks_index:
+            blocks_candidates_idx = blocks_index.query(rect_geom)
+            blocks_intersecting_rect = blocks.iloc[blocks_candidates_idx]
+            print(f"📊 Before Clipping: {len(blocks_intersecting_rect)} blocks in rectangle {rect_id}")
+        else:
+            blocks_intersecting_rect = gpd.GeoDataFrame(columns=blocks.columns, crs=blocks.crs)
+
+        # **Blocks: Retrieve cookie-cutter blocks inside the rectangle**
+        if blocks_index: 
+            blocks_candidates_idx = blocks_index.query(rect_geom)
+            blocks_within_rect = gpd.clip(blocks.iloc[blocks_candidates_idx], rect_geom)
+            print(f"📊 After Clipping: {len(blocks_within_rect)} blocks in rectangle {rect_id}")
+        else:
+            blocks_within_rect = gpd.GeoDataFrame(columns=blocks.columns, crs=blocks.crs)
+
+        # **Roads: Retrieve and clip roads inside the rectangle**
+        if road_index:
+            road_candidates_idx = road_index.query(rect_geom)
+            roads_in_rect = roads.iloc[road_candidates_idx]
+            print(f"📊 Before Clipping: {len(roads_in_rect)} roads in rectangle {rect_id}")
+            
+            roads_in_rect = gpd.clip(roads_in_rect, rect_geom)
+            print(f"📊 After Clipping: {len(roads_in_rect)} roads in rectangle {rect_id}")
+        else:
+            roads_in_rect = gpd.GeoDataFrame(columns=roads.columns, crs=roads.crs)
+
+        # **Expanded Roads: Retrieve and clip roads in the buffered region**
+        roads_union_extended = road_union.intersection(rect_buffered)
+        if not roads_union_extended.is_empty:
+            roads_union_extended = roads_union_extended  # Keep as MultiLineString
+        else:
+            roads_union_extended = None
+
+        # **Intersections: Retrieve and clip intersections inside the rectangle**
+        if intersection_index:
+            intersection_candidates_idx = intersection_index.query(rect_geom)
+            intersections_in_rect = intersections.iloc[intersection_candidates_idx]
+            print(f"📊 Before Clipping: {len(intersections_in_rect)} intersections in rectangle {rect_id}")
+            
+            intersections_in_rect = gpd.clip(intersections_in_rect, rect_geom)
+            print(f"📊 After Clipping: {len(intersections_in_rect)} intersections in rectangle {rect_id}")
+        else:
+            intersections_in_rect = gpd.GeoDataFrame(columns=intersections.columns, crs=intersections.crs)
+
+        # Store the results
+        rectangle_features[rect_id] = {
+            "buildings": buildings_in_rect if not buildings_in_rect.empty else gpd.GeoDataFrame(columns=['geometry'], geometry='geometry', crs=buildings.crs),
+            "roads": roads_in_rect if not roads_in_rect.empty else gpd.GeoDataFrame(columns=['geometry'], geometry='geometry', crs=roads.crs),
+            "roads_union_extended": roads_union_extended,  # Now correctly stored as a geometry
+            "intersections": intersections_in_rect if not intersections_in_rect.empty else gpd.GeoDataFrame(columns=['geometry'], geometry='geometry', crs=intersections.crs),
+            "blocks_clipped": blocks_within_rect if not blocks_within_rect.empty else gpd.GeoDataFrame(columns=['geometry'], geometry='geometry', crs=blocks.crs),
+            "blocks_intersecting": blocks_intersecting_rect if not blocks_intersecting_rect.empty else gpd.GeoDataFrame(columns=['geometry'], geometry='geometry', crs=blocks.crs)
+        }
+
+
+    print(f"🧐 Clipped {len(rectangle_features)} cells")
+
+    return rectangle_features
 
 @delayed
-def process_city(city_name, city_data, sample_prop=1.0, override_processed=False, grid_size=200):
-    try:
-        # Define metric column names
-        all_metrics_columns = [
-            'metric_1', 'metric_2', 'metric_3', 'metric_4', 'metric_5',
-            'metric_6', 'metric_7', 'metric_8', 'metric_9', 'metric_10',
-            'metric_11', 'metric_12', 'metric_13'
-        ]
-        
-        # Read city grid
-        city_grid = gpd.read_parquet(f'{GRIDS_PATH}/{city_name}/{city_name}_{str(grid_size)}m_grid.geoparquet').reset_index()
-        city_grid.rename(columns={'index': 'grid_id'}, inplace=True)
+def process_city(city_name, city_data, sample_prop, override_processed=False, grid_size=200):
+    if city_data is not None:
+        try:
+            print(f"📌 Starting processing for {city_name}")
 
-        if city_grid.empty or 'geometry' not in city_grid.columns:
-            print(f"No grid cells available for {city_name}. Skipping.")
-            return
+            # Load city grid as Dask GeoDataFrame
+            city_grid = dgpd.read_parquet(f'{GRIDS_PATH}/{city_name}/{city_name}_{str(grid_size)}m_grid.geoparquet')
 
-        # Initialize 'processed' column
-        city_grid['processed'] = city_grid.get('processed', False)
+            # Debug: Print initial columns and index
+            print(f"📂 {city_name} city grid columns: {list(city_grid.columns)}")
+            print(f"🆔 {city_name} city grid index name: {city_grid.index.name}")
 
-        # **Filter Unprocessed Cells & Apply Sampling**
-        unprocessed_grid = city_grid[~city_grid['processed']]
-        sampled_grid = unprocessed_grid.sample(frac=sample_prop, random_state=42) if sample_prop < 1.0 else unprocessed_grid
+            # Convert index to column if 'grid_id' is missing
+            if "grid_id" not in city_grid.columns:
+                print(f"🔄 Assigning index as 'grid_id' for {city_name}")
+                city_grid = city_grid.reset_index().rename(columns={'index': 'grid_id'})
 
-        if sampled_grid.empty:
-            print(f"Skipping {city_name}: No unprocessed cells left after sampling.")
-            return
-        
-        print(f"🧐 Debug city_data before persisting: {list(city_data.keys())}")
+            # Ensure `city_grid` is not empty
+            if city_grid.compute().empty:
+                raise ValueError(f"🚨 No grid data found for {city_name}. Check if the file exists or is corrupt.")
 
-        # Compute the delayed dictionary so we get actual objects
-        city_data_computed = compute(city_data)[0]  # Extract the actual dictionary
-        print(f"✅ Computed city_data: {list(city_data_computed.keys())}")
+            print(f"🗺 CRS Check for {city_name}:")
+            print(f"   📌 Grid CRS: {city_grid.crs}")
+            print(f"   🏢 Buildings CRS: {city_data['overture'].crs if 'overture' in city_data else 'Missing'}")
+            print(f"   🛣 Roads CRS: {city_data['roads'].crs if 'roads' in city_data else 'Missing'}")
+            print(f"   🚦 Intersections CRS: {city_data['intersections'].crs if 'intersections' in city_data else 'Missing'}")
 
-        # Only persist if the value is a Dask GeoDataFrame
-        city_data_persisted = {
-            key: val.persist() if isinstance(val, dgpd.GeoDataFrame) else val
-            for key, val in city_data_computed.items()
-        }
-        print(f"🔍 Debug city_data_persisted: {list(city_data_persisted.keys())}")
+            # If CRS is inconsistent, convert everything to UTM
+            utm_proj_city = city_data.get("utm_proj", None)
+            if utm_proj_city and city_grid.crs and city_grid.crs.to_epsg() != utm_proj_city:
+                print(f"🔄 Reprojecting {city_name} to {utm_proj_city}")
+                city_grid = city_grid.to_crs(epsg=utm_proj_city)
 
-        
-        # Extract processed city data
-        Overture_data_all_projected = city_data_persisted["overture"]
-        blocks = city_data_persisted["blocks"]
-        OSM_roads_all_projected = city_data_persisted["roads"]
-        OSM_intersections_all_projected = city_data_persisted["intersections"]
-        road_union = city_data_persisted["road_union"]
-        utm_proj_city = city_data_persisted["utm_proj"]
+            # Ensure city_grid has a geometry column
+            if 'geometry' not in city_grid.columns:
+                raise ValueError(f"🚨 {city_name}: 'geometry' column is missing in city grid!")
 
-        # **Check if any object is still a Dask GeoDataFrame and needs computation**
-        if isinstance(Overture_data_all_projected, dgpd.GeoDataFrame):
-            Overture_data_all_projected = Overture_data_all_projected.compute()
-        if isinstance(blocks, dgpd.GeoDataFrame):
-            blocks = blocks.compute()
-        if isinstance(OSM_roads_all_projected, dgpd.GeoDataFrame):
-            OSM_roads_all_projected = OSM_roads_all_projected.compute()
-        if isinstance(OSM_intersections_all_projected, dgpd.GeoDataFrame):
-            OSM_intersections_all_projected = OSM_intersections_all_projected.compute()
+            # Initialize 'processed' column in a Dask-friendly way
+            city_grid = city_grid.assign(processed=False)
 
-        print(f"✅ Final extracted city data: {type(Overture_data_all_projected)}, {type(blocks)}, {type(OSM_roads_all_projected)}, {type(OSM_intersections_all_projected)}")
+            # Sample unprocessed cells
+            unprocessed_grid = city_grid[~city_grid['processed']]
+            sampled_grid = unprocessed_grid.sample(frac=sample_prop, random_state=42) if sample_prop < 1.0 else unprocessed_grid
 
+            # Ensure sampled_grid is not empty
+            if sampled_grid.npartitions == 0:
+                print(f"⚠️ Skipping {city_name}: No unprocessed cells left after sampling.")
+                return
 
-        # **Transform grid geometries into UTM CRS**
-        geod = Geod(ellps="WGS84")
-        sampled_grid["geometry_projected"] = sampled_grid["geometry"].to_crs(epsg=utm_proj_city)
+            # Ensure sampled_grid has `grid_id`
+            if "grid_id" not in sampled_grid.columns:
+                raise ValueError(f"🚨 'grid_id' column missing after sampling in {city_name}. Columns present: {list(sampled_grid.columns)}")
 
-        # **Parallelize Cell Processing**
-        delayed_results = []
-        for cell_id, rectangle_projected in zip(sampled_grid['grid_id'], sampled_grid['geometry_projected']):
-            rectangle = sampled_grid.loc[sampled_grid['grid_id'] == cell_id, 'geometry'].iloc[0]  # FIXED
+            # Mark sampled cells as processed
+            city_grid = city_grid.assign(processed=city_grid['grid_id'].isin(sampled_grid['grid_id']))
 
-            delayed_results.append(
-                delayed(process_cell)(
-                    cell_id, geod, rectangle, rectangle_projected,
-                    Overture_data_all_projected, blocks,
-                    OSM_roads_all_projected, OSM_intersections_all_projected, road_union, utm_proj_city
-                )
-            )
+            sampled_grid = sampled_grid.set_index("grid_id")
 
-        # Compute results
-        #final_geo_df = compute(*delayed_results)
-        # Compute results
-        print(f"Number of delayed process_cell tasks: {len(delayed_results)}")
-        delayed_results[0].visualize(filename="process_cell_graph_delayed_results.svg", format="svg")
+            # Clip features for each rectangle
+            print(f"✂️ Clipping features for {city_name}...")
+            rectangle_features = clip_features_to_rectangles(city_data, rectangles=sampled_grid, buffer_size=300)
 
-        sample_task = delayed_results[0].compute()
-        print("sample_task")
-        print(sample_task)
-        # Do not eagerly persist this DataFrame yet
-        final_geo_df = dd.from_delayed(delayed_results, meta=pd.DataFrame(columns=['index'] + all_metrics_columns))
+            # Ensure clipping worked correctly
+            if not rectangle_features:
+                raise ValueError(f"🚨 Clipping returned empty results for {city_name}. Check input data.")
+            
+            print(f"🔍 city_grid['grid_id'] sample: {list(city_grid['grid_id'].compute()[:10])}")
+            print(f"🔍 rectangle_features.keys(): {list(rectangle_features.keys())[:10]}")
 
-        # Only persist *after* the dataframe has been created
-        final_geo_df = final_geo_df.persist()
+            # Extract processed city data
+            geod = Geod(ellps="WGS84")
+            sampled_grid["geometry_projected"] = sampled_grid["geometry"].to_crs(epsg=utm_proj_city)
 
-        # Convert to Pandas (but this might still be large)
-        final_geo_df = final_geo_df.compute()
+            print(f"🧐 Available rectangle_features keys: {list(rectangle_features.keys())[:10]}")
+            print(f"🧐 Sampled grid IDs: {list(sampled_grid.reset_index()['grid_id'].compute()[:10])}")
+            print(f"🧐 Sampled grid index: {sampled_grid.index}, grid_id: {sampled_grid.reset_index()['grid_id'].unique()}")
 
-        # Process the metrics
-        final_geo_df = process_metrics(final_geo_df)
+            # Parallelize Cell Processing
 
-        print("Final DataFrame columns:", final_geo_df.columns)
-        print(final_geo_df.head())
+            sampled_grid.index = sampled_grid.index.astype(int)  # Ensure it's an integer index
+            rectangle_features = {int(k): v for k, v in rectangle_features.items()}  # Match types
 
-        # Merge results back into city_grid
-        final_geo_df['index'] = sampled_grid['grid_id'].values
-        city_grid = city_grid.merge(final_geo_df, how='left', left_on='grid_id', right_on='index')
+            print(f"🧐 Rectangle feature keys: {list(rectangle_features.keys())[:10]}")
 
-        # Save outputs
-        output_dir_csv = f'{OUTPUT_PATH_CSV}/{city_name}'
-        output_dir_png = f'{OUTPUT_PATH_PNG}/{city_name}'
-        output_results(city_grid, sampled_grid, city_name, grid_size, sample_prop, OUTPUT_PATH_RASTER, output_dir_csv, output_dir_png)
+            delayed_results = []
+            for grid_id, row in sampled_grid.iterrows():
+                if grid_id in rectangle_features:
+                    rectangle_projected = gpd.GeoSeries([row["geometry_projected"]], crs=f"EPSG:{utm_proj_city}").iloc[0]
+                    rectangle = row["geometry"]
+                    rectangle = sampled_grid.loc[grid_id, 'geometry'].compute()
+                    if isinstance(rectangle, pd.Series):
+                        rectangle = rectangle.iloc[0]
+                    cell_features = rectangle_features.get(grid_id, {})
 
-        # Save updated grid status to CSV
-        s3_save(city_grid[['grid_id', 'processed']], f'{city_name}_grid_status_{grid_size}m.csv', '.', output_dir_csv)
+                    print(f"🔍 Checking cell {grid_id}: Features found? {bool(cell_features)}")
 
-        print(f"{city_name}: Processing complete.")
+                    if not cell_features:
+                        print(f"⚠️ No features found for cell {grid_id} in {city_name}. Skipping.")
+                        continue  # Skip empty cells
 
-    except Exception as e:
-        print(f"Error processing {city_name}: {e}")
-        raise
+                    print(f"✅ Adding cell {grid_id} to delayed_results for {city_name}")
 
+                    if rectangle is None or rectangle.is_empty or not rectangle.is_valid:
+                        print(f"🚨 Skipping cell {grid_id}: Invalid rectangle {rectangle}")
+                        continue  # Skip this cell
 
-def run_all_citywide_calculation(cities, sample_prop=0.05, grid_size=200):
+                    print(f"📏 Checking cell {grid_id}: rectangle={rectangle}")
+                    if rectangle is None or rectangle.is_empty:
+                        print(f"🚨 Skipping cell {grid_id}: Invalid or empty rectangle")
+                        continue
+                    else:
+                        processed_cell = delayed(process_cell)(
+                            grid_id, geod, rectangle, rectangle_projected,
+                            cell_features.get("buildings", gpd.GeoDataFrame()),
+                            cell_features.get("blocks_intersecting", gpd.GeoDataFrame()),
+                            cell_features.get("blocks_clipped", gpd.GeoDataFrame()),
+                            cell_features.get("roads", gpd.GeoDataFrame()),
+                            cell_features.get("roads_union_extended", gpd.GeoDataFrame()),
+                            cell_features.get("intersections", gpd.GeoDataFrame()),
+                            utm_proj_city
+                        )
+                        delayed_results.append(processed_cell)
+                else:
+                    print(f" ⚠️ Cell ID NOT in rectangle features")
+
+            # Before calling from_delayed(), print metadata
+            print(f"🔍 DEBUG: Checking delayed_results before creating Dask DataFrame for {city_name}")
+
+            # Ensure that delayed_results is not empty
+            if not delayed_results:
+                print(f"🚨 No valid processed cells for {city_name}. Check if all cells were skipped.")
+                
+            # Print the first few elements to check their types
+            for i, result in enumerate(delayed_results[:5]):  # Checking first 5
+                print(f"   - Cell {i}: Type={type(result)}")
+
+            # DEBUGGING: Check what is inside `delayed_results` before calling `from_delayed()`
+            print(f"🔍 DEBUG: Checking `delayed_results` for {city_name}")
+            if not delayed_results:
+                print(f"🚨 No valid processed cells for {city_name}. Check if all cells were skipped.")
+
+            for i, result in enumerate(delayed_results[:5]):  # Checking first 5
+                print(f"   - Cell {i}: Type={type(result)} Value={result}")
+
+            print(f"🔍 DEBUG: Length of delayed_results before dd.from_delayed(): {len(delayed_results)}")
+
+            first_result = delayed_results[0].compute()
+            print(f"🔍 DEBUG: first_result type = {type(first_result)}")
+            print(f"🔍 DEBUG: first_result content:\n{first_result}")
+
+            # Now, try creating Dask DataFrame with only valid results
+            final_geo_df = dd.from_delayed(delayed_results, meta={
+                'grid_id': int, 'metric_1': float, 'metric_2': float, 'metric_3': float, 'metric_4': float,
+                'metric_5': float, 'metric_6': float, 'metric_7': float, 'metric_8': float,
+                'metric_9': float, 'metric_10': float, 'metric_11': float, 'metric_12': float, 'metric_13': float,
+                'buildings_bool': bool, 'intersections_bool': bool, 'roads_bool': bool,
+                'rectangle_area': float, 'building_area': float, 'share_tiled_by_blocks': float,
+                'road_length': float, 'n_intersections': int, 'n_buildings': int, 'building_density': float
+            })
+
+            final_geo_df = final_geo_df.persist()
+
+            print(f"🧐 DEBUG: Checking `final_geo_df` before merging in {city_name}")
+            print(f"   - Type: {type(final_geo_df)}")
+            #print(f"   - Sample Rows: \n{final_geo_df.head().compute()}")  # Ensure it's valid
+            print(f"   - Columns: {list(final_geo_df.columns)}")
+
+            # Merge back with city grid
+
+            print(f"Columns in city_grid: {set(city_grid.columns)}")
+            print(f"Columns in final_geo_df: {set(final_geo_df.columns)}")
+
+            if not isinstance(final_geo_df, dgpd.GeoDataFrame):
+                print("🔄 Converting final_geo_df to Dask GeoDataFrame")
+                final_geo_df = dgpd.from_dask_dataframe(final_geo_df)
+
+            # Save to S3
+            output_name = f"{city_name}_{grid_size}m_results"
+            remote_path = f"{OUTPUT_PATH}/{city_name}/raw_results"
+            output_temp_path = "."
+
+            # Temporary save for computation
+            temporary_folder_for_computation = f"{output_temp_path}/{output_name}/"
+            final_geo_df.to_parquet(temporary_folder_for_computation, 
+                                    engine="pyarrow", 
+                                    compute=True)
+            print(f"✅ Temporary save for computation for city {city_name} in folder {temporary_folder_for_computation}")
+
+            # Upload to S3
+            output_path = S3Path(remote_path)
+            output_path.upload_from(temporary_folder_for_computation)
+
+            print(f"✅ Successfully processed and saved {city_name} to {output_path}")
+
+            if os.path.exists(temporary_folder_for_computation):
+                os.remove(temporary_folder_for_computation)
+
+            print(f"✅ (And temporary file was deleted) {city_name} to {output_path}")
+
+        except Exception as e:
+            print(f"❌ Error processing {city_name}: {e}")
+            raise
+    else:
+        print(f"❌ Received empty geographic features") 
+
+def run_all_citywide_calculation(cities, sample_prop, grid_size=200):
     tasks = []
     for city in cities:
+        
+        # Load geographic features
         buildings = load_buildings(city)
         roads = load_roads(city)
         intersections = load_intersections(city)
-        city_data = delayed(project_and_process)(buildings, roads, intersections)
 
-        # Process city in parallel
-        task = process_city(city, city_data, sample_prop=sample_prop, grid_size=grid_size)
+        # Project data 
+        city_data = project_and_process(buildings, roads, intersections).compute()
+        if city_data is not None:
+            task = process_city(city, city_data, sample_prop=sample_prop, grid_size=grid_size)
+        else:
+            print(f"❌ Error processing {city}: some geographic features are missing.")
+            continue
+
         tasks.append(task)
     tasks[0].visualize(filename="dask_graph.svg", format="svg")
     with Profiler() as prof, ResourceProfiler(dt=1) as rprof, ProgressBar():
@@ -716,8 +717,7 @@ def run_all_citywide_calculation(cities, sample_prop=0.05, grid_size=200):
         compute(*tasks, timeout=1200)
     prof.visualize(filename="profiler_graph.svg")
 
-
 # This function allows external cluster calls like Code C.
 if __name__ == "__main__":
     cities = ["Belo_Horizonte", "Campinas", "Bogota"]
-    run_all_citywide_calculation(cities)
+    run_all_citywide_calculation(cities, sample_prop=0.05)
