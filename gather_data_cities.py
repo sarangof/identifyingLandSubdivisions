@@ -79,15 +79,20 @@ def s3_save(file, output_file, output_temp_path, remote_path):
 def osm_command(city_name, search_area):
     if len(search_area) > 0:
         polygon = search_area.geometry.iloc[0]
-        G = ox.graph_from_polygon(polygon=polygon, custom_filter='["highway"~"motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|service|track|path|footway|cycleway|bridleway|steps|pedestrian|corridor|road"]')
+        G = ox.graph_from_polygon(polygon=polygon, 
+                                  custom_filter='["highway"~"motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|service|track|path|footway|cycleway|bridleway|steps|pedestrian|corridor|road"]',
+                                  retain_all=True)
     else:
         raise ValueError(f"Search area for {city_name} is empty.")
     
     osm_intersections, osm_roads = ox.graph_to_gdfs(G)
 
+    osm_roads = osm_roads.reset_index()
+    osm_intersections = osm_intersections.reset_index()
+
     # Ensure 'osmid' exists in intersections
     if "osmid" not in osm_intersections.columns:
-        #print(f"⚠️ WARNING: 'osmid' column missing in intersections for {city_name}")
+        print(f"⚠️ WARNING: 'osmid' column missing in intersections for {city_name}")
         osm_intersections["osmid"] = None  # Assign None as placeholder
 
     # Convert lists in roads and intersections to strings
@@ -174,6 +179,7 @@ def make_requests(partition):
     return pd.DataFrame(results)
 
 def run_all(cities):
+    print("Entering run_all")
     cities_set = pd.DataFrame({'city': [city.replace(' ', '_') for city in cities]})
     cities_set_ddf = dd.from_pandas(cities_set, npartitions=12)
     meta = pd.DataFrame({"city": pd.Series(dtype="str"), 
