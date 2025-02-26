@@ -36,9 +36,9 @@ ROADS_PATH = f'{INPUT_PATH}/roads'
 INTERSECTIONS_PATH = f'{INPUT_PATH}/intersections'
 GRIDS_PATH = f'{INPUT_PATH}/city_info/grids'
 OUTPUT_PATH = f'{MAIN_PATH}/output'
-OUTPUT_PATH_CSV = f'{MAIN_PATH}/output/csv'
-OUTPUT_PATH_RASTER = f'{MAIN_PATH}/output/raster'
-OUTPUT_PATH_PNG = f'{MAIN_PATH}/output/png'
+OUTPUT_PATH_CSV = f'{OUTPUT_PATH}/csv'
+OUTPUT_PATH_RASTER = f'{OUTPUT_PATH}/raster'
+OUTPUT_PATH_PNG = f'{OUTPUT_PATH}/png'
 OUTPUT_PATH_RAW = f'{OUTPUT_PATH}/raw_results'
 
 fs = s3fs.S3FileSystem(anon=False)
@@ -63,26 +63,26 @@ def process_cell(grid_id, geod, rectangle, rectangle_projected, buildings, block
     """
     Processes a single cell using Dask Delayed.
     """
-    print(f"\U0001F539 Processing cell {grid_id} with {len(buildings)} buildings, {len(roads)} roads, {len(intersections)} intersections")
+    #print(f"\U0001F539 Processing cell {grid_id} with {len(buildings)} buildings, {len(roads)} roads, {len(intersections)} intersections")
 
     # CASE 2: Invalid rectangle → Completely remove from dataset (exit early)
     if rectangle is None or rectangle.is_empty or not rectangle.is_valid:
-        print(f"\U0001F6A8 Skipping cell {grid_id}: Invalid rectangle {rectangle}")
+        #print(f"\U0001F6A8 Skipping cell {grid_id}: Invalid rectangle {rectangle}")
         return  # <<< No return value at all (Dask ignores it)
 
     if rectangle_projected.is_empty or not rectangle_projected.is_valid:
-        print(f"\U0001F6A8 Cell {grid_id} has an invalid rectangle_projected! Geometry: {rectangle_projected}")
+        #print(f"\U0001F6A8 Cell {grid_id} has an invalid rectangle_projected! Geometry: {rectangle_projected}")
         return  # <<< No return value at all (Dask ignores it)
 
-    print(f"📌 DEBUG: Converting rectangle {grid_id} to WGS84")
+    #print(f"📌 DEBUG: Converting rectangle {grid_id} to WGS84")
     rectangle_wgs84 = gpd.GeoSeries(rectangle_projected, crs=f"EPSG:{utm_proj_city}").to_crs(epsg=4326).iloc[0]
-    print(f"📌 DEBUG: rectangle_wgs84 for cell {grid_id}: {rectangle_wgs84}")
+    #print(f"📌 DEBUG: rectangle_wgs84 for cell {grid_id}: {rectangle_wgs84}")
 
     rectangle_area, _ = geod.geometry_area_perimeter(rectangle_wgs84)
-    print(f"📌 DEBUG: rectangle_area for cell {grid_id}: {rectangle_area}")
+    #print(f"📌 DEBUG: rectangle_area for cell {grid_id}: {rectangle_area}")
 
     if np.isnan(rectangle_area) or rectangle_area <= 0:
-        print(f"\U0001F6D1 Cell {grid_id} has invalid area {rectangle_area}, skipping.")
+        #print(f"\U0001F6D1 Cell {grid_id} has invalid area {rectangle_area}, skipping.")
         return  # <<< No return value at all (Dask ignores it)
 
     try:
@@ -106,7 +106,7 @@ def process_cell(grid_id, geod, rectangle, rectangle_projected, buildings, block
 
         # CASE 1: Valid but empty cell → Return DataFrame filled with NaNs
         if not roads_bool and not intersections_bool:
-            print(f"⚠️ Assigning NAs to {grid_id}: No roads or intersections present.")
+            #print(f"⚠️ Assigning NAs to {grid_id}: No roads or intersections present.")
             return pd.DataFrame([{
                 'grid_id': grid_id,
                 'metric_1': np.nan, 'metric_2': np.nan, 'metric_3': np.nan,
@@ -128,69 +128,69 @@ def process_cell(grid_id, geod, rectangle, rectangle_projected, buildings, block
 
         # Otherwise, proceed with normal metric calculations
         if not buildings.empty and not roads.empty:
-            print(f"📌 DEBUG: Running metric_1 for cell {grid_id}")
-            print(f"📌 DEBUG: road_union geometry: {roads_union_extended if isinstance(roads_union_extended, gpd.GeoSeries) else 'Not a GeoSeries'}")
+            #print(f"📌 DEBUG: Running metric_1 for cell {grid_id}")
+            #print(f"📌 DEBUG: road_union geometry: {roads_union_extended if isinstance(roads_union_extended, gpd.GeoSeries) else 'Not a GeoSeries'}")
             m1, buildings = metric_1_distance_less_than_20m(buildings, roads_union_extended, utm_proj_city)
-            print(f"📌 DEBUG: Running metric_2 for cell {grid_id}")
+            #print(f"📌 DEBUG: Running metric_2 for cell {grid_id}")
             m2 = metric_2_average_distance_to_roads(buildings)
         else:
             m1, m2 = np.nan, np.nan
 
-        print(f"📌 DEBUG: metric_1 for cell {grid_id} = {m1}")
-        print(f"📌 DEBUG: metric_2 for cell {grid_id} = {m2}")
+        #print(f"📌 DEBUG: metric_1 for cell {grid_id} = {m1}")
+        #print(f"📌 DEBUG: metric_2 for cell {grid_id} = {m2}")
 
-        print(f"📌 DEBUG: Running metric_3 for cell {grid_id}")
+        #print(f"📌 DEBUG: Running metric_3 for cell {grid_id}")
         m3 = metric_3_road_density(rectangle_area, roads) if not roads.empty else 0
-        print(f"📌 DEBUG: metric_3 for cell {grid_id} = {m3}")
+        #print(f"📌 DEBUG: metric_3 for cell {grid_id} = {m3}")
 
         if not intersections.empty:
-            print(f"📌 DEBUG: Running metric_4 for cell {grid_id}")
+            #print(f"📌 DEBUG: Running metric_4 for cell {grid_id}")
             m4 = metric_4_share_4way_intersections(intersections)
-            print(f"📌 DEBUG: Running metric_5 for cell {grid_id}")
+            #print(f"📌 DEBUG: Running metric_5 for cell {grid_id}")
             m5 = metric_5_intersection_density(intersections, rectangle_area)
         else:
             m4, m5 = (np.nan if not roads.empty else 0), 0
 
-        print(f"📌 DEBUG: metric_4 for cell {grid_id} = {m4}")
-        print(f"📌 DEBUG: metric_5 for cell {grid_id} = {m5}")
-        print(f"📌 DEBUG: Running metric_6 for cell {grid_id}")
+        #print(f"📌 DEBUG: metric_4 for cell {grid_id} = {m4}")
+        #print(f"📌 DEBUG: metric_5 for cell {grid_id} = {m5}")
+        #print(f"📌 DEBUG: Running metric_6 for cell {grid_id}")
         m6 = (
             metric_6_entropy_of_building_azimuth(buildings, rectangle_id=1, bin_width_degrees=5, plot=False)[0]
             if not buildings.empty else np.nan
         )
-        print(f"📌 DEBUG: metric_6 for cell {grid_id} = {m6}")
+        #print(f"📌 DEBUG: metric_6 for cell {grid_id} = {m6}")
 
         if not blocks_intersecting.empty:
             area_tiled_by_blocks = blocks_clipped.area.sum()
             share_tiled_by_blocks = area_tiled_by_blocks / rectangle_area
-            print(f"📌 DEBUG: Running metric_7 for cell {grid_id}")
+            #print(f"📌 DEBUG: Running metric_7 for cell {grid_id}")
             m7, blocks_clipped = metric_7_average_block_width(blocks_intersecting, blocks_clipped, rectangle_projected, rectangle_area)
-            print(f"📌 DEBUG: Running metric_8 for cell {grid_id}")
+            #print(f"📌 DEBUG: Running metric_8 for cell {grid_id}")
             m8, _, _ = metric_8_two_row_blocks(blocks_intersecting, buildings, utm_proj_city, row_epsilon=row_epsilon)
         else:
             m7, m8, share_tiled_by_blocks = np.nan, np.nan, 0
 
-        print(f"📌 DEBUG: metric_7 for cell {grid_id} = {m7}")
-        print(f"📌 DEBUG: metric_8 for cell {grid_id} = {m8}")
-        print(f"📌 DEBUG: Running metric_9 for cell {grid_id}")
+        #print(f"📌 DEBUG: metric_7 for cell {grid_id} = {m7}")
+        #print(f"📌 DEBUG: metric_8 for cell {grid_id} = {m8}")
+        #print(f"📌 DEBUG: Running metric_9 for cell {grid_id}")
         m9 = metric_9_tortuosity_index(roads) if not roads.empty else np.nan
-        print(f"📌 DEBUG: metric_9 for cell {grid_id} = {m9}")
-        print(f"📌 DEBUG: Running metric_10 for cell {grid_id}")
+        #print(f"📌 DEBUG: metric_9 for cell {grid_id} = {m9}")
+        #print(f"📌 DEBUG: Running metric_10 for cell {grid_id}")
         m10 = metric_10_average_angle_between_road_segments(intersections, roads) if not roads.empty and not intersections.empty else np.nan
-        print(f"📌 DEBUG: metric_10 for cell {grid_id} = {m10}")
+        #print(f"📌 DEBUG: metric_10 for cell {grid_id} = {m10}")
 
         road_length = roads.length.sum() if not roads.empty else np.nan
 
         if not buildings.empty:
-            print(f"📌 DEBUG: Running metric_11 for cell {grid_id}")
+            #print(f"📌 DEBUG: Running metric_11 for cell {grid_id}")
             m11 = metric_11_building_density(n_buildings, rectangle_area)
-            print(f"📌 DEBUG: metric_11 for cell {grid_id} = {m11}")
-            print(f"📌 DEBUG: Running metric_12 for cell {grid_id}")
+            #print(f"📌 DEBUG: metric_11 for cell {grid_id} = {m11}")
+            #print(f"📌 DEBUG: Running metric_12 for cell {grid_id}")
             m12 = metric_12_built_area_share(building_area, rectangle_area)
-            print(f"📌 DEBUG: metric_12 for cell {grid_id} = {m12}")
-            print(f"📌 DEBUG: Running metric_13 for cell {grid_id}")
+            #print(f"📌 DEBUG: metric_12 for cell {grid_id} = {m12}")
+            #print(f"📌 DEBUG: Running metric_13 for cell {grid_id}")
             m13 = metric_13_average_building_area(building_area, n_buildings)
-            print(f"📌 DEBUG: metric_13 for cell {grid_id} = {m13}")
+            #print(f"📌 DEBUG: metric_13 for cell {grid_id} = {m13}")
         else:
             m11, m12, m13 = 0, 0, np.nan
 
@@ -213,10 +213,10 @@ def process_cell(grid_id, geod, rectangle, rectangle_projected, buildings, block
             'n_buildings': int(n_buildings) if not np.isnan(n_buildings) else 0,
             'building_density': float(building_density) if not np.isnan(building_density) else 0.0
         }])
-        print(f"📌 DEBUG: Preparing final DataFrame for cell {grid_id}")
-        print(f"✅ Successfully calculated all metrics for cell {grid_id}")
-        print(f"📌 DEBUG: Returning final DataFrame for cell {grid_id}:")
-        print(result_df)
+        #print(f"📌 DEBUG: Preparing final DataFrame for cell {grid_id}")
+        #print(f"✅ Successfully calculated all metrics for cell {grid_id}")
+        #print(f"📌 DEBUG: Returning final DataFrame for cell {grid_id}:")
+        #print(result_df)
         return result_df
 
     except Exception as e:
@@ -300,7 +300,8 @@ def load_intersections(city_name):
     return intersections
 
 @delayed
-def project_and_process(buildings, roads, intersections):    
+def project_and_process(buildings, roads, intersections):   
+    print(f"👾 Entering project and process.") 
     # Check if any data are missing
     if buildings is None or buildings.empty:
         print("❌ Error: No building data available.")
@@ -394,6 +395,7 @@ def clip_features_to_rectangles(city_data, rectangles, buffer_size=300):
     Returns a dictionary associating each rectangle ID with its features.
     """
 
+    print(f"👾 Entering project and process.") 
     buildings, roads, intersections, blocks, road_union = (
         city_data['overture'], city_data['roads'], city_data['intersections'], city_data['blocks'], city_data['road_union']
     )
@@ -407,7 +409,7 @@ def clip_features_to_rectangles(city_data, rectangles, buffer_size=300):
     rectangle_features = {}
 
     for rect_id, rect_geom in zip(rectangles.index, rectangles.geometry):
-        print(f"🟡 Clipping features for rectangle {rect_id}")
+        #print(f"🟡 Clipping features for rectangle {rect_id}")
         rect_id = int(rect_id)
 
         rect_box = rect_geom.bounds  # Bounding box for spatial index lookup
@@ -417,7 +419,7 @@ def clip_features_to_rectangles(city_data, rectangles, buffer_size=300):
         if building_index:
             building_candidates_idx = building_index.query(rect_geom)
             buildings_in_rect = buildings.iloc[building_candidates_idx]
-            print(f"📊 Before Clipping: {len(buildings_in_rect)} buildings in rectangle {rect_id}")
+            #print(f"📊 Before Clipping: {len(buildings_in_rect)} buildings in rectangle {rect_id}")
 
         else:
             buildings_in_rect = gpd.GeoDataFrame(columns=buildings.columns, crs=buildings.crs)
@@ -426,7 +428,7 @@ def clip_features_to_rectangles(city_data, rectangles, buffer_size=300):
         if blocks_index:
             blocks_candidates_idx = blocks_index.query(rect_geom)
             blocks_intersecting_rect = blocks.iloc[blocks_candidates_idx]
-            print(f"📊 Before Clipping: {len(blocks_intersecting_rect)} blocks in rectangle {rect_id}")
+            #print(f"📊 Before Clipping: {len(blocks_intersecting_rect)} blocks in rectangle {rect_id}")
         else:
             blocks_intersecting_rect = gpd.GeoDataFrame(columns=blocks.columns, crs=blocks.crs)
 
@@ -434,7 +436,7 @@ def clip_features_to_rectangles(city_data, rectangles, buffer_size=300):
         if blocks_index: 
             blocks_candidates_idx = blocks_index.query(rect_geom)
             blocks_within_rect = gpd.clip(blocks.iloc[blocks_candidates_idx], rect_geom)
-            print(f"📊 After Clipping: {len(blocks_within_rect)} blocks in rectangle {rect_id}")
+            #print(f"📊 After Clipping: {len(blocks_within_rect)} blocks in rectangle {rect_id}")
         else:
             blocks_within_rect = gpd.GeoDataFrame(columns=blocks.columns, crs=blocks.crs)
 
@@ -442,10 +444,10 @@ def clip_features_to_rectangles(city_data, rectangles, buffer_size=300):
         if road_index:
             road_candidates_idx = road_index.query(rect_geom)
             roads_in_rect = roads.iloc[road_candidates_idx]
-            print(f"📊 Before Clipping: {len(roads_in_rect)} roads in rectangle {rect_id}")
+            #print(f"📊 Before Clipping: {len(roads_in_rect)} roads in rectangle {rect_id}")
             
             roads_in_rect = gpd.clip(roads_in_rect, rect_geom)
-            print(f"📊 After Clipping: {len(roads_in_rect)} roads in rectangle {rect_id}")
+            #print(f"📊 After Clipping: {len(roads_in_rect)} roads in rectangle {rect_id}")
         else:
             roads_in_rect = gpd.GeoDataFrame(columns=roads.columns, crs=roads.crs)
 
@@ -460,10 +462,10 @@ def clip_features_to_rectangles(city_data, rectangles, buffer_size=300):
         if intersection_index:
             intersection_candidates_idx = intersection_index.query(rect_geom)
             intersections_in_rect = intersections.iloc[intersection_candidates_idx]
-            print(f"📊 Before Clipping: {len(intersections_in_rect)} intersections in rectangle {rect_id}")
+            #print(f"📊 Before Clipping: {len(intersections_in_rect)} intersections in rectangle {rect_id}")
             
             intersections_in_rect = gpd.clip(intersections_in_rect, rect_geom)
-            print(f"📊 After Clipping: {len(intersections_in_rect)} intersections in rectangle {rect_id}")
+            #print(f"📊 After Clipping: {len(intersections_in_rect)} intersections in rectangle {rect_id}")
         else:
             intersections_in_rect = gpd.GeoDataFrame(columns=intersections.columns, crs=intersections.crs)
 
@@ -478,12 +480,13 @@ def clip_features_to_rectangles(city_data, rectangles, buffer_size=300):
         }
 
 
-    print(f"🧐 Clipped {len(rectangle_features)} cells")
+    #print(f"🧐 Clipped {len(rectangle_features)} cells")
 
     return rectangle_features
 
 @delayed
 def process_city(city_name, city_data, sample_prop, override_processed=False, grid_size=200):
+    print(f"👾 Entering process_city in {city_name}.") 
     if city_data is not None:
         try:
             print(f"📌 Starting processing for {city_name}")
@@ -517,7 +520,7 @@ def process_city(city_name, city_data, sample_prop, override_processed=False, gr
             # If CRS is inconsistent, convert everything to UTM
             utm_proj_city = city_data.get("utm_proj", None)
             if utm_proj_city and city_grid.crs and city_grid.crs.to_epsg() != utm_proj_city:
-                print(f"🔄 Reprojecting {city_name} to {utm_proj_city}")
+                #print(f"🔄 Reprojecting {city_name} to {utm_proj_city}")
                 city_grid = city_grid.to_crs(epsg=utm_proj_city)
 
             # Ensure city_grid has a geometry column
@@ -549,30 +552,30 @@ def process_city(city_name, city_data, sample_prop, override_processed=False, gr
             sampled_grid = sampled_grid.set_index("grid_id")
 
             # Clip features for each rectangle
-            print(f"✂️ Clipping features for {city_name}...")
+            #print(f"✂️ Clipping features for {city_name}...")
             rectangle_features = clip_features_to_rectangles(city_data, rectangles=sampled_grid, buffer_size=300)
 
             # Ensure clipping worked correctly
             if not rectangle_features:
                 raise ValueError(f"🚨 Clipping returned empty results for {city_name}. Check input data.")
             
-            print(f"🔍 city_grid['grid_id'] sample: {list(city_grid['grid_id'].compute()[:10])}")
-            print(f"🔍 rectangle_features.keys(): {list(rectangle_features.keys())[:10]}")
+            #print(f"🔍 city_grid['grid_id'] sample: {list(city_grid['grid_id'].compute()[:10])}")
+            #print(f"🔍 rectangle_features.keys(): {list(rectangle_features.keys())[:10]}")
 
             # Extract processed city data
             geod = Geod(ellps="WGS84")
             sampled_grid["geometry_projected"] = sampled_grid["geometry"].to_crs(epsg=utm_proj_city)
 
-            print(f"🧐 Available rectangle_features keys: {list(rectangle_features.keys())[:10]}")
-            print(f"🧐 Sampled grid IDs: {list(sampled_grid.reset_index()['grid_id'].compute()[:10])}")
-            print(f"🧐 Sampled grid index: {sampled_grid.index}, grid_id: {sampled_grid.reset_index()['grid_id'].unique()}")
+            #print(f"🧐 Available rectangle_features keys: {list(rectangle_features.keys())[:10]}")
+            #print(f"🧐 Sampled grid IDs: {list(sampled_grid.reset_index()['grid_id'].compute()[:10])}")
+            #print(f"🧐 Sampled grid index: {sampled_grid.index}, grid_id: {sampled_grid.reset_index()['grid_id'].unique()}")
 
             # Parallelize Cell Processing
 
             sampled_grid.index = sampled_grid.index.astype(int)  # Ensure it's an integer index
             rectangle_features = {int(k): v for k, v in rectangle_features.items()}  # Match types
 
-            print(f"🧐 Rectangle feature keys: {list(rectangle_features.keys())[:10]}")
+            #print(f"🧐 Rectangle feature keys: {list(rectangle_features.keys())[:10]}")
 
             delayed_results = []
             for grid_id, row in sampled_grid.iterrows():
@@ -584,19 +587,19 @@ def process_city(city_name, city_data, sample_prop, override_processed=False, gr
                         rectangle = rectangle.iloc[0]
                     cell_features = rectangle_features.get(grid_id, {})
 
-                    print(f"🔍 Checking cell {grid_id}: Features found? {bool(cell_features)}")
+                    #print(f"🔍 Checking cell {grid_id}: Features found? {bool(cell_features)}")
 
                     if not cell_features:
                         print(f"⚠️ No features found for cell {grid_id} in {city_name}. Skipping.")
                         continue  # Skip empty cells
 
-                    print(f"✅ Adding cell {grid_id} to delayed_results for {city_name}")
+                    #print(f"✅ Adding cell {grid_id} to delayed_results for {city_name}")
 
                     if rectangle is None or rectangle.is_empty or not rectangle.is_valid:
                         print(f"🚨 Skipping cell {grid_id}: Invalid rectangle {rectangle}")
                         continue  # Skip this cell
 
-                    print(f"📏 Checking cell {grid_id}: rectangle={rectangle}")
+                    #print(f"📏 Checking cell {grid_id}: rectangle={rectangle}")
                     if rectangle is None or rectangle.is_empty:
                         print(f"🚨 Skipping cell {grid_id}: Invalid or empty rectangle")
                         continue
@@ -616,7 +619,7 @@ def process_city(city_name, city_data, sample_prop, override_processed=False, gr
                     print(f" ⚠️ Cell ID NOT in rectangle features")
 
             # Before calling from_delayed(), print metadata
-            print(f"🔍 DEBUG: Checking delayed_results before creating Dask DataFrame for {city_name}")
+            #print(f"🔍 DEBUG: Checking delayed_results before creating Dask DataFrame for {city_name}")
 
             # Ensure that delayed_results is not empty
             if not delayed_results:
@@ -627,18 +630,11 @@ def process_city(city_name, city_data, sample_prop, override_processed=False, gr
                 print(f"   - Cell {i}: Type={type(result)}")
 
             # DEBUGGING: Check what is inside `delayed_results` before calling `from_delayed()`
-            print(f"🔍 DEBUG: Checking `delayed_results` for {city_name}")
+            #print(f"🔍 DEBUG: Checking `delayed_results` for {city_name}")
             if not delayed_results:
                 print(f"🚨 No valid processed cells for {city_name}. Check if all cells were skipped.")
 
-            for i, result in enumerate(delayed_results[:5]):  # Checking first 5
-                print(f"   - Cell {i}: Type={type(result)} Value={result}")
-
-            print(f"🔍 DEBUG: Length of delayed_results before dd.from_delayed(): {len(delayed_results)}")
-
             first_result = delayed_results[0].compute()
-            print(f"🔍 DEBUG: first_result type = {type(first_result)}")
-            print(f"🔍 DEBUG: first_result content:\n{first_result}")
 
             # Now, try creating Dask DataFrame with only valid results
             final_geo_df = dd.from_delayed(delayed_results, meta={
@@ -652,15 +648,7 @@ def process_city(city_name, city_data, sample_prop, override_processed=False, gr
 
             final_geo_df = final_geo_df.persist()
 
-            print(f"🧐 DEBUG: Checking `final_geo_df` before merging in {city_name}")
-            print(f"   - Type: {type(final_geo_df)}")
-            #print(f"   - Sample Rows: \n{final_geo_df.head().compute()}")  # Ensure it's valid
-            print(f"   - Columns: {list(final_geo_df.columns)}")
-
             # Merge back with city grid
-
-            print(f"Columns in city_grid: {set(city_grid.columns)}")
-            print(f"Columns in final_geo_df: {set(final_geo_df.columns)}")
 
             if not isinstance(final_geo_df, dgpd.GeoDataFrame):
                 print("🔄 Converting final_geo_df to Dask GeoDataFrame")
@@ -668,7 +656,7 @@ def process_city(city_name, city_data, sample_prop, override_processed=False, gr
 
             # Save to S3
             output_name = f"{city_name}_{grid_size}m_results"
-            remote_path = f"{OUTPUT_PATH}/{city_name}/raw_results_{grid_size}"
+            remote_path = f"{OUTPUT_PATH_RAW}/{city_name}/raw_results_{grid_size}"
             output_temp_path = "."
 
             # Temporary save for computation
