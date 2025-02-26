@@ -14,7 +14,7 @@ import shutil
 #import pyproj
 from pyproj import CRS, Geod
 import json
-from dask import delayed, compute
+from dask import delayed, compute, visualize
 import dask_geopandas as dgpd  
 import dask.dataframe as dd
 from dask.diagnostics import ProgressBar, Profiler, ResourceProfiler
@@ -39,6 +39,7 @@ OUTPUT_PATH = f'{MAIN_PATH}/output'
 OUTPUT_PATH_CSV = f'{MAIN_PATH}/output/csv'
 OUTPUT_PATH_RASTER = f'{MAIN_PATH}/output/raster'
 OUTPUT_PATH_PNG = f'{MAIN_PATH}/output/png'
+OUTPUT_PATH_RAW = f'{OUTPUT_PATH}/raw_results'
 
 fs = s3fs.S3FileSystem(anon=False)
 
@@ -667,7 +668,7 @@ def process_city(city_name, city_data, sample_prop, override_processed=False, gr
 
             # Save to S3
             output_name = f"{city_name}_{grid_size}m_results"
-            remote_path = f"{OUTPUT_PATH}/{city_name}/raw_results"
+            remote_path = f"{OUTPUT_PATH}/{city_name}/raw_results_{grid_size}"
             output_temp_path = "."
 
             # Temporary save for computation
@@ -692,7 +693,7 @@ def process_city(city_name, city_data, sample_prop, override_processed=False, gr
             print(f"❌ Error processing {city_name}: {e}")
             raise
     else:
-        print(f"❌ Received empty geographic features") 
+        print(f"❌ Received empty geographic features")  
 
 def run_all_citywide_calculation(cities, sample_prop, grid_size=200):
     tasks = []
