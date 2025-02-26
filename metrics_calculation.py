@@ -741,7 +741,7 @@ def metric_8_two_row_blocks(blocks_clipped, buildings, utm_proj_rectangle, row_e
     width_buffer_area = width_buffers.geometry.area.sum()
     building_to_block_share = buildings_in_width_buffers_area / width_buffer_area
 
-    # Calculate share of buildings in epsilon buffer (building_to_buffer_share)
+    # Calculate share of buildings in epsilon mbuffer (building_to_buffer_share)
     epsilon_buffers = gpd.GeoDataFrame(blocks_clipped, geometry='epsilon_buffer', crs=blocks_clipped.crs)
     buildings_in_epsilon_buffers = buildings.clip(epsilon_buffers.geometry.unary_union)
     buildings_in_epsilon_buffers_area = buildings_in_epsilon_buffers.area.sum()
@@ -749,7 +749,12 @@ def metric_8_two_row_blocks(blocks_clipped, buildings, utm_proj_rectangle, row_e
     building_to_buffer_share = buildings_in_epsilon_buffers_area / epsilon_buffer_area
 
     # Calculate m8 metric
-    m8 = building_to_buffer_share / building_to_block_share
+    
+    if building_to_block_share != 0:
+        m8 = building_to_buffer_share / building_to_block_share
+    else:
+        print("🚨 m8 assigned to 1 because building_to_block_share was zero.")
+        m8 = 1.  # or 0 depending on logic
     return m8, epsilon_buffers, width_buffers
 
 
@@ -770,7 +775,7 @@ def metric_9_tortuosity_index(roads_clipped):
 
 #10 Average angle between road segments
 def metric_10_average_angle_between_road_segments(intersections, roads):
-
+    
     df_angles = calculate_sequential_angles_option_A(intersections, roads)
     intersection_angles_df = intersections[['osmid','street_count']].set_index('osmid').merge(df_angles.set_index('Intersection ID'), left_index=True, right_index=True, how='outer')
     # In 3-way intersections, include only the smallest angle in the tile average. 

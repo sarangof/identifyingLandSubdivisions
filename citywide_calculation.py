@@ -10,6 +10,7 @@ import geopandas as gpd
 import numpy as np
 from shapely.geometry import box
 from datetime import datetime
+import shutil
 #import pyproj
 from pyproj import CRS, Geod
 import json
@@ -106,7 +107,7 @@ def process_cell(grid_id, geod, rectangle, rectangle_projected, buildings, block
         if not roads_bool and not intersections_bool:
             print(f"⚠️ Assigning NAs to {grid_id}: No roads or intersections present.")
             return pd.DataFrame([{
-                'index': grid_id,
+                'grid_id': grid_id,
                 'metric_1': np.nan, 'metric_2': np.nan, 'metric_3': np.nan,
                 'metric_4': np.nan, 'metric_5': np.nan, 'metric_6': np.nan,
                 'metric_7': np.nan, 'metric_8': np.nan, 'metric_9': np.nan,
@@ -127,15 +128,7 @@ def process_cell(grid_id, geod, rectangle, rectangle_projected, buildings, block
         # Otherwise, proceed with normal metric calculations
         if not buildings.empty and not roads.empty:
             print(f"📌 DEBUG: Running metric_1 for cell {grid_id}")
-            print(f"📌 DEBUG: buildings DataFrame shape: {buildings.shape}")
-            print(f"📌 DEBUG: buildings DataFrame columns: {list(buildings.columns)}")
-            print(f"📌 DEBUG: Sample buildings geometries: {buildings['geometry'].head().tolist() if 'geometry' in buildings else 'MISSING'}")
-            print(f"📌 DEBUG: Checking road_union before metric_1 for cell {grid_id}")
-            print(f"📌 DEBUG: road_union type: {type(roads_union_extended)}")
-
             print(f"📌 DEBUG: road_union geometry: {roads_union_extended if isinstance(roads_union_extended, gpd.GeoSeries) else 'Not a GeoSeries'}")
-
-
             m1, buildings = metric_1_distance_less_than_20m(buildings, roads_union_extended, utm_proj_city)
             print(f"📌 DEBUG: Running metric_2 for cell {grid_id}")
             m2 = metric_2_average_distance_to_roads(buildings)
@@ -298,6 +291,7 @@ def load_intersections(city_name):
         try:
            intersections = gpd.read_parquet(path)  # Directly load as GeoDataFrame
            intersections['osmid'] = intersections['osmid'].astype('int64')
+           intersections = intersections[intersections.street_count>2]
            print(f"✅ Successfully loaded intersections data for {city_name}")
         except Exception as e:
             print(f"❌ Error loading intersections data for {city_name}: {e}")
@@ -503,7 +497,11 @@ def process_city(city_name, city_data, sample_prop, override_processed=False, gr
             # Convert index to column if 'grid_id' is missing
             if "grid_id" not in city_grid.columns:
                 print(f"🔄 Assigning index as 'grid_id' for {city_name}")
-                city_grid = city_grid.reset_index().rename(columns={'index': 'grid_id'})
+                city_grid = city_grid.reset_index()
+                if "index" in city_grid.columns:  # Check if reset_index() created "index"
+                    city_grid = city_grid.rename(columns={"index": "grid_id"})
+                else:
+                    raise ValueError(f"🚨 Failed to generate 'grid_id' for {city_name}. Check Parquet file structure.")
 
             # Ensure `city_grid` is not empty
             if city_grid.compute().empty:
@@ -525,12 +523,15 @@ def process_city(city_name, city_data, sample_prop, override_processed=False, gr
             if 'geometry' not in city_grid.columns:
                 raise ValueError(f"🚨 {city_name}: 'geometry' column is missing in city grid!")
 
+            # OJO: AN EXTRA STEP WILL BE NEEDED HERE BECAUSE THE PROCESSED FLAG WILL BE HANDLED SEPARATELY.
             # Initialize 'processed' column in a Dask-friendly way
+            city_grid["grid_id"] = city_grid["grid_id"].astype(int)
             city_grid = city_grid.assign(processed=False)
 
             # Sample unprocessed cells
             unprocessed_grid = city_grid[~city_grid['processed']]
             sampled_grid = unprocessed_grid.sample(frac=sample_prop, random_state=42) if sample_prop < 1.0 else unprocessed_grid
+            sampled_grid["grid_id"] = sampled_grid["grid_id"].astype(int)
 
             # Ensure sampled_grid is not empty
             if sampled_grid.npartitions == 0:
@@ -683,7 +684,7 @@ def process_city(city_name, city_data, sample_prop, override_processed=False, gr
             print(f"✅ Successfully processed and saved {city_name} to {output_path}")
 
             if os.path.exists(temporary_folder_for_computation):
-                os.remove(temporary_folder_for_computation)
+                shutil.rmtree(temporary_folder_for_computation)
 
             print(f"✅ (And temporary file was deleted) {city_name} to {output_path}")
 
