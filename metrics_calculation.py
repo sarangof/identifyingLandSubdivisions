@@ -608,10 +608,17 @@ def metric_3_road_density(rectangle_area,roads_clipped):
 
 #4 Share of 3-way and 4-way intersections 
 def metric_4_share_4way_intersections(intersections):
-    n_intersections_3_or_higher = 1.*len(intersections[(intersections.street_count >= 3)])
-    n_4_way = 1.*len(intersections[(intersections.street_count == 4)])
-    m4 = (n_4_way / n_intersections_3_or_higher)
-    return m4
+    # Ensure intersections is a DataFrame with at least one row
+    if intersections.empty:
+        return np.nan
+
+    intersections_filtered = intersections[intersections.street_count >= 3]
+    n_intersections_3_or_higher = float(len(intersections_filtered))
+    n_4_way = float(len(intersections[intersections.street_count == 4]))
+    
+    if n_intersections_3_or_higher == 0:
+        return np.nan  # Or return 0.0 if that makes more sense
+    return n_4_way / n_intersections_3_or_higher
 
 #5 Density of intersections
 def metric_5_intersection_density(intersections, rectangle_area):
