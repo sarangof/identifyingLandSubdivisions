@@ -38,7 +38,7 @@ def s3_save(file, output_file, output_temp_path, remote_path):
     elif output_file.endswith(".geoparquet"):
         file.to_parquet(local_temporary_file, engine="pyarrow", index=False)
     else:
-        raise ValueError(f"Unsupported file format. Only .gpkg and .csv are supported but we got {file}.")
+        raise ValueError(f"Unsupported file format. Only .gpkg, .geoparquet and .csv are supported but we got {file}.")
 
     # Upload to S3
     output_path = S3Path(remote_path)
@@ -54,8 +54,8 @@ def merge_parquet_parts(city_name, grid_size=200):
     output_file = f"{OUTPUT_PATH_RASTER}/{city_name}_final.parquet"
 
     # List all Parquet part files
-    part_files = sorted([os.path.join(raw_output_path, f) for f in os.listdir(raw_output_path) 
-                         if f.startswith("part.") and f.endswith(".parquet")])
+    part_files = sorted([f for f in fs.ls(raw_output_path) if f.endswith(".parquet")])
+
 
     if not part_files:
         print(f"No part files found for {city_name}. Skipping...")
@@ -70,9 +70,6 @@ def merge_parquet_parts(city_name, grid_size=200):
     remote_path = f'{OUTPUT_PATH_RASTER}/{city_name}/'
     output_temp_path = '.'
     s3_save(city_raster, output_file, output_temp_path, remote_path)
-
-    # Save as a single Parquet file
-    city_raster.to_parquet(output_file, engine="pyarrow", write_index=False)
 
     print(f"Unified file saved: {output_file}")
 
@@ -148,8 +145,8 @@ def save_metric_maps(post_processed_results, city_name, grid_size):
         axes[j].set_visible(False)
 
     # Save the matrix of maps
-    output_dir_png = f'{OUTPUT_PATH_PNG}/{city_name} '
-    matrix_plot_path = os.path.join(output_dir_png, "metrics_map_matrix.png")
+    output_dir_png = f'{OUTPUT_PATH_PNG}/{city_name}'
+    matrix_plot_path = matrix_plot_path = f"{output_dir_png}/metrics_map_matrix.png"
     plt.tight_layout()
     plt.savefig(matrix_plot_path, dpi=300)
     plt.close()
@@ -220,8 +217,10 @@ def post_process_cities(city_name, grid_size):
         save_summary(post_processed_results, city_name, grid_size)  
         # Save PNG files
         save_metric_maps(post_processed_results, city_name, grid_size)
+        return True
     else: 
         print("❌ No output from merge_parquet_parts, skipping further processing.")
+        return False
 
 if __name__ == "__main__":
     cities = ["Belo_Horizonte", "Campinas", "Bogota"]
