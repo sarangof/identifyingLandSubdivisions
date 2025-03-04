@@ -13,3 +13,5 @@ dependencies:
   - overturemaps
   - earthengine-api
   - google-cloud-sdk
+  - boto3
+  - dask-geopandas
