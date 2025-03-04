@@ -27,6 +27,7 @@ from cloudpathlib import S3Path
 import s3fs
 from shapely.strtree import STRtree  
 from dask.distributed import CancelledError
+from dask_geopandas import read_parquet as dgpd_read_parquet
 
 
 MAIN_PATH = "s3://wri-cities-sandbox/identifyingLandSubdivisions/data"
@@ -482,6 +483,7 @@ def clip_features_to_rectangles(city_data, rectangles, buffer_size=300):
             "blocks_clipped": blocks_within_rect if not blocks_within_rect.empty else gpd.GeoDataFrame(columns=['geometry'], geometry='geometry', crs=blocks.crs),
             "blocks_intersecting": blocks_intersecting_rect if not blocks_intersecting_rect.empty else gpd.GeoDataFrame(columns=['geometry'], geometry='geometry', crs=blocks.crs)
         }
+        del city_data
 
 
     #print(f"🧐 Clipped {len(rectangle_features)} cells")
@@ -534,11 +536,7 @@ def process_city(city_name, city_data, sample_prop, override_processed=False, gr
             # OJO: AN EXTRA STEP WILL BE NEEDED HERE BECAUSE THE PROCESSED FLAG WILL BE HANDLED SEPARATELY.
             # Initialize 'processed' column in a Dask-friendly way
             city_grid["grid_id"] = city_grid["grid_id"].astype(int)
-            city_grid = city_grid.assign(processed=False)
-
-            # Sample unprocessed cells
-            unprocessed_grid = city_grid[~city_grid['processed']]
-            sampled_grid = unprocessed_grid.sample(frac=sample_prop, random_state=42) if sample_prop < 1.0 else unprocessed_grid
+            sampled_grid = city_grid.sample(frac=sample_prop, random_state=42) 
             sampled_grid["grid_id"] = sampled_grid["grid_id"].astype(int)
 
             # Ensure sampled_grid is not empty
@@ -549,9 +547,6 @@ def process_city(city_name, city_data, sample_prop, override_processed=False, gr
             # Ensure sampled_grid has `grid_id`
             if "grid_id" not in sampled_grid.columns:
                 raise ValueError(f"🚨 'grid_id' column missing after sampling in {city_name}. Columns present: {list(sampled_grid.columns)}")
-
-            # Mark sampled cells as processed
-            city_grid = city_grid.assign(processed=city_grid['grid_id'].isin(sampled_grid['grid_id']))
 
             sampled_grid = sampled_grid.set_index("grid_id")
 
@@ -646,6 +641,9 @@ def process_city(city_name, city_data, sample_prop, override_processed=False, gr
                 'road_length': float, 'n_intersections': int, 'n_buildings': int, 'building_density': float
             })
 
+            # Repartition to 4 partitions
+            final_geo_df = final_geo_df.repartition(npartitions=4)
+
             final_geo_df = final_geo_df.persist()
 
             # Merge back with city grid
@@ -683,31 +681,74 @@ def process_city(city_name, city_data, sample_prop, override_processed=False, gr
     else:
         print(f"❌ Received empty geographic features")  
 
-def run_all_citywide_calculation(cities, sample_prop, grid_size=200):
+
+
+# Function to load data for a single city
+@delayed
+def load_city_data(city_name):
+    """Loads buildings, roads, and intersections for a city in parallel."""
+    def load_parquet(path):
+        return gpd.read_parquet(path) if fs.exists(path) else None
+
+    print(f"📥 Loading data for {city_name}...")
+
+    buildings = load_parquet(f'{BUILDINGS_PATH}/{city_name}/Overture_building_{city_name}.geoparquet')
+    roads = load_parquet(f'{ROADS_PATH}/{city_name}/{city_name}_OSM_roads.geoparquet')
+    intersections = load_parquet(f'{INTERSECTIONS_PATH}/{city_name}/{city_name}_OSM_intersections.geoparquet')
+
+    if buildings is not None and "dataset" in buildings.columns:
+        buildings = buildings[buildings["dataset"] != "OpenStreetMap"]
+
+    return city_name, buildings, roads, intersections
+
+# Load all cities in parallel
+def load_all_cities(cities):
+    """Load geographic data for all cities in parallel and return a dictionary."""
+    delayed_results = [load_city_data(city) for city in cities]
+    city_data_list = compute(*delayed_results)
+
+    return {city_name: {"buildings": b, "roads": r, "intersections": i} for city_name, b, r, i in city_data_list}
+
+
+
+def load_all_city_grids(cities, grid_size=200):
+    """Loads the grids for all cities and creates a global processing queue."""
+    grid_paths = {city: f"{GRIDS_PATH}/{city}/{city}_{grid_size}m_grid.geoparquet" for city in cities}
+    
+    # Read all grids in parallel
+    grids = {city: dgpd_read_parquet(path) for city, path in grid_paths.items() if fs.exists(path)}
+    
+    # Add city name column for tracking
+    for city, grid in grids.items():
+        grid["city_name"] = city
+
+    # Concatenate all city grids into a single Dask DataFrame
+    return dd.concat(list(grids.values()))
+
+
+def process_all_cells(global_grid, city_data):
+    """Creates a global queue of all grid cells and processes them in parallel."""
+    
+    delayed_tasks = [
+        process_cell(grid_id, row, city_data) #THIS NEEDS MODIFICATION AND A WHOLE OTHER FUNCTION
+        for grid_id, row in global_grid.iterrows()
+    ]
+
+    return compute(*delayed_tasks)
+
+def run_all(cities, sample_prop, grid_size=200):
     tasks = []
-    for city in cities:
-        
-        # Load geographic features
-        buildings = load_buildings(city)
-        roads = load_roads(city)
-        intersections = load_intersections(city)
-
-        # Project data 
-        city_data = project_and_process(buildings, roads, intersections).compute()
-        if city_data is not None:
-            task = process_city(city, city_data, sample_prop=sample_prop, grid_size=grid_size)
-        else:
-            print(f"❌ Error processing {city}: some geographic features are missing.")
-            continue
-
-        tasks.append(task)
-    tasks[0].visualize(filename="dask_graph.svg", format="svg")
+    print("📥 Loading city data...")
+    city_data = load_all_cities(cities)
+    print("📊 Creating global task queue...")
+    global_grid = load_all_city_grids(cities)
+    print("⚡ Processing all cells and saving in batches...")
+    # Project data 
+    #city_data = project_and_process(buildings, roads, intersections).compute()
     with Profiler() as prof, ResourceProfiler(dt=1) as rprof, ProgressBar():
-        #compute(*tasks)
         compute(*tasks, timeout=1200)
     prof.visualize(filename="profiler_graph.svg")
 
-# This function allows external cluster calls like Code C.
 if __name__ == "__main__":
     cities = ["Belo_Horizonte", "Campinas", "Bogota"]
-    run_all_citywide_calculation(cities, sample_prop=0.05)
+    run_all(cities, sample_prop=0.05)
