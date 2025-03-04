@@ -106,10 +106,10 @@ def run_all(cities, sample_prop, grid_size=200):
     delayed_grids = load_all_city_grids(cities)
     visualize(delayed_cities, delayed_grids, 'dask_file.svg')
     city_data_list, grid_data_list = compute(delayed_cities, delayed_grids)
-    return city_data, grid_data_list
+    return city_data_list, grid_data_list
 
 cities = ["Belo_Horizonte", "Campinas", "Bogota", "Nairobi"]
-city_data, grid_data_list = run_all(cities, sample_prop=0.05)
+city_data_list, grid_data_list = run_all(cities, sample_prop=0.05)
 
 
 end_time = time.time()  # End the timer
