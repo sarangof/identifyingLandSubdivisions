@@ -395,7 +395,7 @@ def clip_features_to_rectangles(city_data, rectangles, buffer_size=300):
     Returns a dictionary associating each rectangle ID with its features.
     """
 
-    print(f"👾 Entering project and process.") 
+    print(f"👾 Entering clip_features_to_rectangles.") 
     buildings, roads, intersections, blocks, road_union = (
         city_data['overture'], city_data['roads'], city_data['intersections'], city_data['blocks'], city_data['road_union']
     )
@@ -576,7 +576,7 @@ def process_city(city_name, city_data, sample_prop, override_processed=False, gr
             rectangle_features = {int(k): v for k, v in rectangle_features.items()}  # Match types
 
             #print(f"🧐 Rectangle feature keys: {list(rectangle_features.keys())[:10]}")
-
+            print(f"Starting cell calculations")
             delayed_results = []
             for grid_id, row in sampled_grid.iterrows():
                 if grid_id in rectangle_features:
