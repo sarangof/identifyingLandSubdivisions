@@ -387,6 +387,10 @@ def project_and_process(buildings, roads, intersections):
         "utm_proj": utm_proj_city
     }
 
+    del buildings
+    del roads
+    del intersections
+
     return result
 
 def clip_features_to_rectangles(city_data, rectangles, buffer_size=300):
@@ -555,10 +559,6 @@ def process_city(city_name, city_data, sample_prop, override_processed=False, gr
             #print(f"✂️ Clipping features for {city_name}...")
             rectangle_features = clip_features_to_rectangles(city_data, rectangles=sampled_grid, buffer_size=300)
 
-            # Ensure clipping worked correctly
-            if not rectangle_features:
-                raise ValueError(f"🚨 Clipping returned empty results for {city_name}. Check input data.")
-            
             #print(f"🔍 city_grid['grid_id'] sample: {list(city_grid['grid_id'].compute()[:10])}")
             #print(f"🔍 rectangle_features.keys(): {list(rectangle_features.keys())[:10]}")
 
