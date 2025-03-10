@@ -619,66 +619,89 @@ def metric_5_intersection_density(intersections, rectangle_area):
     return m5
 
 #6 Entropy of building Azimuth
-def metric_6_entropy_of_building_azimuth(buildings_clipped, rectangle_id, bin_width_degrees, plot=True):
+def metric_6_entropy_of_building_azimuth(buildings_clipped, blocks, rectangle_id, bin_width_degrees, plot=True):
     """
-    Calculate the standardized KL divergence between the azimuth distribution
-    of buildings and a uniform distribution, with an option to plot the distributions.
-    
+    Calculate the weighted average KL divergence between the azimuth distribution of buildings and a uniform distribution,
+    where the weights are based on the number of buildings per block.
+
     Parameters:
-    - buildings_clipped: DataFrame or GeoDataFrame with building geometries.
+    - buildings_clipped: GeoDataFrame with building geometries.
                          It should contain azimuths (in degrees) for each building.
-    - bin_width_degrees: Width of the histogram bins in degrees (default is 10).
-    - plot: Whether to plot the two distributions (default is True).
-    
+    - blocks: GeoDataFrame containing block geometries with an index (block_id).
+    - rectangle_id: Identifier for the rectangle being analyzed.
+    - bin_width_degrees: Width of the histogram bins in degrees.
+    - plot: Whether to plot the distributions for each block.
+
     Returns:
-    - standardized_kl_divergence: KL divergence divided by log(n), where n is the number of bins.
+    - weighted_avg_kl_divergence: Weighted average KL divergence where the weight is the number of buildings per block.
+    - buildings_clipped: Updated GeoDataFrame with an assigned block_id.
     """
-    
-    buildings_clipped.loc[:, 'azimuth'] = buildings_clipped['geometry'].apply(lambda x: calculate_azimuth(longest_segment(x))  % 90. )
 
-    # Extract azimuths (assuming they are in degrees)
-    azimuths = buildings_clipped['azimuth'].values
+    # Assign block_id to each building using a spatial join
+    buildings_clipped = buildings_clipped.sjoin(blocks[['geometry']], how='left', predicate='within')
+    buildings_clipped = buildings_clipped.rename(columns={'index_right': 'block_id'})  # Ensure block_id is assigned
 
-    # Define the number of bins (e.g., 0-360 degrees, based on bin width)
+    # Assign a temporary bogus block_id for buildings not matched to a block
+    buildings_clipped['block_id'] = buildings_clipped['block_id'].fillna(-1).astype(int)
+
+    # Compute azimuths for each building
+    buildings_clipped.loc[:, 'azimuth'] = buildings_clipped['geometry'].apply(lambda x: calculate_azimuth(longest_segment(x)) % 90.)
+
+    # Define the number of bins for the histogram
     num_bins = int(90 / bin_width_degrees)
-
-    # Create a histogram of azimuths (observed distribution P)
-    histogram, bin_edges = np.histogram(azimuths, bins=num_bins, range=(0, 90))
     
-    # Normalize the histogram to make it a probability distribution P
-    P = histogram / histogram.sum()
+    block_results = []  # Store per-block KL divergences and counts
 
-    # Create a uniform distribution Q with the same number of bins
-    Q = np.ones(num_bins) / num_bins
+    for block_id, group in buildings_clipped.groupby('block_id'):
+        # Extract azimuths for the current block
+        azimuths = group['azimuth'].values
 
-    # Calculate the KL divergence
-    kl_divergence = entropy(P, Q)
+        if len(azimuths) == 0:
+            continue  # Skip empty blocks
 
-    # Standardize the KL divergence by dividing by log(n)
-    max_kl_divergence = np.log(num_bins)
-    standardized_kl_divergence = kl_divergence / max_kl_divergence
+        # Create histogram of observed azimuths
+        histogram, bin_edges = np.histogram(azimuths, bins=num_bins, range=(0, 90))
+        P = histogram / histogram.sum()  # Normalize to make it a probability distribution
 
-    # Plot the two distributions if requested
-    if plot:
-        plt.figure(figsize=(10, 6))
-        bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2  # Get bin centers for plotting
-        
-        # Plot the observed distribution (P)
-        plt.bar(bin_centers, P, width=bin_width_degrees, alpha=0.6, label='Observed Azimuths (P)')
-        
-        # Plot the uniform distribution (Q)
-        plt.plot(bin_centers, Q, 'r--', linewidth=2, label='Uniform Distribution (Q)')
+        # Create uniform distribution Q
+        Q = np.ones(num_bins) / num_bins
 
-        # Add plot details
-        plt.xlabel('Azimuth (degrees)')
-        plt.ylabel('Probability')
-        plt.title('Observed Azimuths vs. Uniform Distribution')
-        plt.legend(loc='upper right')
-        plt.grid(axis='y', linestyle='--', alpha=0.7)
-        #plt.show()
-        plt.savefig(f'{plots_path}/entropy_{str(bin_width_degrees)}-wide_bins_{rectangle_id}.png')
+        # Compute KL divergence
+        kl_divergence = entropy(P, Q)
 
-    return standardized_kl_divergence, buildings_clipped
+        # Standardize KL divergence
+        max_kl_divergence = np.log(num_bins)
+        standardized_kl_divergence = kl_divergence / max_kl_divergence if max_kl_divergence > 0 else 0
+
+        # Store results
+        block_results.append((block_id, standardized_kl_divergence, len(group)))
+
+        # Optional: Plot the distributions for this block
+        if plot:
+            plt.figure(figsize=(10, 6))
+            bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+
+            plt.bar(bin_centers, P, width=bin_width_degrees, alpha=0.6, label=f'Observed Azimuths (P) - Block {block_id}')
+            plt.plot(bin_centers, Q, 'r--', linewidth=2, label='Uniform Distribution (Q)')
+
+            plt.xlabel('Azimuth (degrees)')
+            plt.ylabel('Probability')
+            plt.title(f'Azimuth Distribution for Block {block_id}')
+            plt.legend(loc='upper right')
+            plt.grid(axis='y', linestyle='--', alpha=0.7)
+            plt.savefig(f'{plots_path}/entropy_{str(bin_width_degrees)}-wide_bins_{rectangle_id}_block_{block_id}.png')
+
+    # Convert results to DataFrame
+    block_df = pd.DataFrame(block_results, columns=['block_id', 'kl_divergence', 'num_buildings'])
+
+    # Compute weighted average KL divergence
+    if not block_df.empty:
+        weighted_avg_kl_divergence = np.average(block_df['kl_divergence'], weights=block_df['num_buildings'])
+    else:
+        weighted_avg_kl_divergence = np.nan  # No valid blocks
+
+    return weighted_avg_kl_divergence, buildings_clipped
+
 
 #7 Average block width
 def metric_7_average_block_width(blocks_clipped, blocks_clipped_within_rectangle, rectangle_projected, rectangle_area):
