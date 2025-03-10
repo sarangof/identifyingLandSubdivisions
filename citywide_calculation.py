@@ -563,6 +563,12 @@ def process_city(city_name, sample_prop=1.0, override_processed=False, grid_size
             print(f"Missing roads data for city {city_name}. Skipping.")
             return
         OSM_roads_all = gpd.read_file(f'{ROADS_PATH}/{city_name}/{city_name}_OSM_roads.gpkg')
+        allowed_highways = {'trunk', 'primary', 'secondary', 'tertiary', 'primary_link', 
+                    'secondary_link', 'tertiary_link', 'trunk_link', 'residential', 
+                    'unclassified', 'road', 'living_street'}
+
+        OSM_roads_all = OSM_roads_all[OSM_roads_all.highway.apply(lambda x: any(h in allowed_highways for h in str(x).split(',')))]
+
 
         print(f"{city_name}: OSM files read")
 
@@ -626,7 +632,7 @@ def main():
     cities = ["Belo Horizonte", "Campinas", "Bogota", "Nairobi", "Bamako", 
               "Lagos", "Accra", "Abidjan", "Mogadishu", "Cape Town", 
               "Maputo", "Luanda"]
-    cities = ["Belo Horizonte"]
+    cities = ["Nairobi"]
     cities = [city.replace(' ', '_') for city in cities]
     sample_prop = 1.0  # Sample 10% of the grid cells
 
