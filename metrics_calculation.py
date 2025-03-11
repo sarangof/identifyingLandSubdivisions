@@ -754,6 +754,20 @@ def metric_7_average_block_width(blocks_clipped, blocks_clipped_within_rectangle
 
 #8 Two row blocks
 def metric_8_two_row_blocks(blocks_clipped, buildings, utm_proj_rectangle, row_epsilon):
+    """
+    Computes the two-row blocks metric, only including blocks where the internal buffer is ≤ 100 meters.
+    """
+    
+    # Filter blocks to include only those where `radius` ≤ 100 meters
+    if 'radius' not in blocks_clipped.columns:
+        raise ValueError("🚨 Blocks must have a 'radius' column from metric_7 before running metric_8.")
+    
+    blocks_clipped = blocks_clipped[blocks_clipped['radius'] <= 100].copy()  # Keep only valid blocks
+
+    if blocks_clipped.empty:
+        print("🚨 No blocks with internal buffer ≤ 100m. Assigning NaN to m8.")
+        return np.nan, None, None  # Return NaN and empty buffers
+
     # Apply internal buffers (both epsilon and width-based buffers)
     blocks_clipped = apply_internal_buffer(blocks_clipped, row_epsilon)
 
@@ -762,20 +776,25 @@ def metric_8_two_row_blocks(blocks_clipped, buildings, utm_proj_rectangle, row_e
     buildings_in_width_buffers = buildings.clip(width_buffers.geometry.unary_union)
     buildings_in_width_buffers_area = buildings_in_width_buffers.area.sum()
     width_buffer_area = width_buffers.geometry.area.sum()
-    building_to_block_share = buildings_in_width_buffers_area / width_buffer_area
+
+    building_to_block_share = buildings_in_width_buffers_area / width_buffer_area if width_buffer_area > 0 else 0
 
     # Calculate share of buildings in epsilon buffer (building_to_buffer_share)
     epsilon_buffers = gpd.GeoDataFrame(blocks_clipped, geometry='epsilon_buffer', crs=blocks_clipped.crs)
     buildings_in_epsilon_buffers = buildings.clip(epsilon_buffers.geometry.unary_union)
     buildings_in_epsilon_buffers_area = buildings_in_epsilon_buffers.area.sum()
     epsilon_buffer_area = epsilon_buffers.geometry.area.sum()
-    building_to_buffer_share = buildings_in_epsilon_buffers_area / epsilon_buffer_area
 
-    # Calculate m8 metric
-    m8 = building_to_buffer_share / building_to_block_share
+    building_to_buffer_share = buildings_in_epsilon_buffers_area / epsilon_buffer_area if epsilon_buffer_area > 0 else 0
+
+    # Compute metric safely
+    if building_to_block_share != 0:
+        m8 = building_to_buffer_share / building_to_block_share
+    else:
+        print("🚨 m8 assigned to 1 because building_to_block_share was zero.")
+        m8 = 1.0  # Assign 1 or 0 depending on logic
+
     return m8, epsilon_buffers, width_buffers
-
-
 
 #9 Tortuosity index
 def metric_9_tortuosity_index(roads_clipped):
@@ -793,27 +812,54 @@ def metric_9_tortuosity_index(roads_clipped):
 
 #10 Average angle between road segments
 def metric_10_average_angle_between_road_segments(intersections, roads):
-
+    """
+    Computes the average absolute deviation of intersection angles from 90 degrees.
+    """
+    
     df_angles = calculate_sequential_angles_option_A(intersections, roads)
-    intersection_angles_df = intersections[['osmid','street_count']].set_index('osmid').merge(df_angles.set_index('Intersection ID'), left_index=True, right_index=True, how='outer')
-    # In 3-way intersections, include only the smallest angle in the tile average. 
-    df_3_way = intersection_angles_df[(intersection_angles_df.street_count==3)]
+
+    # Safeguard: Ensure df_angles is not empty and contains 'Intersection ID'
+    if df_angles.empty or 'Intersection ID' not in df_angles.columns:
+        print("Metric 10 Warning: No valid intersection angles found. Returning NaN.")
+        return np.nan
+
+    # Merge intersection data
+    intersection_angles_df = intersections[['osmid', 'street_count']].set_index('osmid') \
+        .merge(df_angles.set_index('Intersection ID'), left_index=True, right_index=True, how='outer')
+
+    # Drop NaN angles early to avoid errors later
+    intersection_angles_df = intersection_angles_df.dropna(subset=['Angle'])
+
+    # Process 3-way intersections
+    df_3_way = intersection_angles_df[intersection_angles_df.street_count == 3]
+    
     if not df_3_way.empty:
-        to_keep_3 = df_3_way.reset_index().loc[(df_3_way.reset_index().groupby(df_3_way.index)['Angle'].idxmin())]#.set_index('index')
+        idx_min = df_3_way.groupby(df_3_way.index)['Angle'].idxmin().dropna()
+        to_keep_3 = df_3_way.loc[idx_min]  # Keep original index
     else:
         to_keep_3 = pd.DataFrame([])
-    # In 4-way intersections, include only the two smallest angles in the tile average.
-    df_4_way_or_more = intersection_angles_df[intersection_angles_df.street_count>=4]
+
+    # Process 4-way+ intersections (keep two smallest angles)
+    df_4_way_or_more = intersection_angles_df[intersection_angles_df.street_count >= 4]
+    
     if not df_4_way_or_more.empty:
-        to_keep_4_or_more = df_4_way_or_more.groupby(df_4_way_or_more.index).apply(lambda x: x.nsmallest(2, 'Angle')).reset_index(drop=True)   
+        to_keep_4_or_more = df_4_way_or_more.groupby(df_4_way_or_more.index) \
+            .apply(lambda x: x.nsmallest(2, 'Angle')).reset_index(drop=True)
     else:
         to_keep_4_or_more = pd.DataFrame([])
+
+    # Ensure index consistency
     to_keep_4_or_more.index.names = ['index']
-    to_keep_df = pd.concat([to_keep_3,to_keep_4_or_more])
+
+    # Concatenate results
+    to_keep_df = pd.concat([to_keep_3, to_keep_4_or_more])
+
+    # Compute metric
     if not to_keep_df.empty:
         m10 = np.mean(np.abs(90. - to_keep_df['Angle']))
     else:
-        m10 = np.nan
+        m10 = np.nan  # No valid data
+
     return m10
 
 
