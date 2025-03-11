@@ -34,7 +34,9 @@ def remove_duplicate_roads(osm_roads):
 def remove_list_columns(gdf):
     for col in gdf.columns:
         if gdf[col].apply(lambda x: isinstance(x, list)).any():
-            gdf[col] = gdf[col].apply(lambda x: ', '.join(map(str, x)) if isinstance(x, list) else x)
+            gdf[col] = gdf[col].apply(lambda x: ', '.join(map(str, x)) if isinstance(x, list) else str(x))
+        elif gdf[col].dtype == 'object':  # Convert all object columns to string
+            gdf[col] = gdf[col].astype(str)
     return gdf
 
 def get_utm_proj(lon, lat):
@@ -53,6 +55,24 @@ def osm_command(city_name, search_area):
 
     # Process and save roads
     osm_roads = remove_duplicate_roads(osm_roads)
+    osm_roads = osm_roads.reset_index()
+    osm_intersections = osm_intersections.reset_index()
+
+    # Ensure 'osmid' exists in intersections
+    if "osmid" not in osm_intersections.columns:
+        print(f"⚠️ WARNING: 'osmid' column missing in intersections for {city_name}")
+        osm_intersections["osmid"] = None  # Assign None as placeholder
+
+    # Convert lists in roads and intersections to strings
+    osm_roads = remove_list_columns(osm_roads)
+    osm_intersections = remove_list_columns(osm_intersections)
+
+    # Convert 'osmid' to string before saving
+    if "osmid" in osm_intersections.columns:
+        osm_intersections["osmid"] = osm_intersections["osmid"].astype(str)
+    if "osmid" in osm_roads.columns:
+        osm_roads["osmid"] = osm_roads["osmid"].astype(str)
+
     output_dir_roads = os.path.join(ROADS_PATH, city_name)
     os.makedirs(output_dir_roads, exist_ok=True)
     road_output_file = os.path.join(output_dir_roads, f"{city_name}_OSM_roads.geoparquet")
@@ -110,8 +130,8 @@ def run_all(cities):
     cities_set = pd.DataFrame({'city': [city.replace(' ', '_') for city in cities]})
     cities_set_ddf = dd.from_pandas(cities_set, npartitions=12)
     meta = pd.DataFrame({"city": pd.Series(dtype="str"), 
-                         "type": pd.Series(dtype="str"), 
-                         "status": pd.Series(dtype="str")})
+                            "type": pd.Series(dtype="str"), 
+                            "status": pd.Series(dtype="str")})
     results = cities_set_ddf.map_partitions(make_requests, meta=meta)
     results_df = results.compute()
 
@@ -119,7 +139,7 @@ def run_all(cities):
     results_df.to_csv(os.path.join(OUTPUT_PATH_CSV, "data_gather_logs.csv"), index=False)
 
 def main():
-    cities = ["Belo Horizonte"] #, "Campinas", "Bogota", "Nairobi", "Bamako", "Lagos", "Accra", "Abidjan", "Cape Town", "Maputo", "Mogadishu", "Luanda"
+    cities = ["Belo Horizonte", "Campinas", "Bogota", "Nairobi", "Bamako", "Lagos", "Accra", "Abidjan", "Cape Town", "Maputo", "Mogadishu", "Luanda"]
     run_all(cities)
 
 if __name__ == "__main__":
