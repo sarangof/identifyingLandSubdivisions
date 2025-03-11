@@ -114,7 +114,7 @@ def save_city_grid_results(city_grid, sampled_grid, output_dir_csv, grid_size):
 
     if os.path.exists(results_path):
         # Load existing results with semicolon delimiter
-        existing_results = pd.read_csv(results_path, delimiter=";", skip_blank_lines=True, dtype=str)
+        existing_results = pd.read_csv(results_path, delimiter=",", skip_blank_lines=True, dtype=str)
 
         # Ensure necessary columns exist in existing results
         for col in ["processed", "timestamp"]:
@@ -165,7 +165,7 @@ def save_metric_maps(city_grid, output_dir_png, grid_size, grid_path, city_name,
     # Load analysis buffer (areas not calculated) if available
     if os.path.exists(grid_path):
         try:
-            grid = gpd.read_file(f'{grid_path}/{city_name}_{grid_size}m_grid.geoparquet')
+            grid = gpd.read_parquet(f'{grid_path}/{city_name}_{grid_size}m_grid.geoparquet')
             print(f"Loaded grid for {city_name}")
         except Exception as e:
             print(f"Error loading grid for {city_name}: {e}")
@@ -322,9 +322,9 @@ def process_cell(cell_id, geod, rectangle, rectangle_projected, buildings, block
             OSM_intersections_bool = False
             n_intersections = np.nan
 
-        print(buildings.head(), buildings.crs)
-        print(OSM_roads_all_projected.head(), OSM_roads_all_projected.crs)
-        print(OSM_intersections_all_projected.head(), OSM_intersections_all_projected.crs)
+        #print(buildings.head(), buildings.crs)
+        #print(OSM_roads_all_projected.head(), OSM_roads_all_projected.crs)
+        #print(OSM_intersections_all_projected.head(), OSM_intersections_all_projected.crs)
 
         print(f"Buildings intersecting cell {cell_id}: {len(buildings_clipped)}")
         print(f"Roads intersecting cell {cell_id}: {len(roads_clipped)}")
@@ -381,7 +381,7 @@ def process_cell(cell_id, geod, rectangle, rectangle_projected, buildings, block
             # Metric 6 -- building azimuth
             if (not buildings_clipped.empty):
                 n_orientation_groups = 4
-                m6, buildings_clipped = metric_6_entropy_of_building_azimuth(buildings_clipped, rectangle_id=1, bin_width_degrees=5, plot=False)
+                m6, buildings_clipped = metric_6_entropy_of_building_azimuth(buildings_clipped, blocks_clipped, rectangle_id=1, bin_width_degrees=5, plot=False)
             else:
                 m6 = np.nan
 
@@ -434,9 +434,9 @@ def process_cell(cell_id, geod, rectangle, rectangle_projected, buildings, block
 
         else:
             m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13 = np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
-            OSM_buildings_bool, OSM_roads_bool, OSM_intersections_bool, building_area, building_density, share_tiled_by_blocks, road_length, n_buildings, n_intersections = np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
+            OSM_buildings_bool, OSM_roads_bool, OSM_intersections_bool, building_area, building_density, share_tiled_by_blocks, road_length, n_buildings, n_intersections = False, False, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
 
-        print(f"One round of metrics done for cell_id: {cell_id}")
+        #print(f"One round of metrics done for cell_id: {cell_id}")
 
         result = {'index':cell_id,
                 'metric_1':m1,
@@ -494,7 +494,7 @@ def process_cell(cell_id, geod, rectangle, rectangle_projected, buildings, block
                 }
     return result
 
-def process_city(city_name, sample_prop=1.0, override_processed=False, grid_size=200):
+def process_city(city_name, sample_prop=1.0, override_processed=True, grid_size=200):
     """
     Processes a city grid, calculates metrics for unprocessed rows, and updates the grid status CSV.
     """
@@ -539,7 +539,7 @@ def process_city(city_name, sample_prop=1.0, override_processed=False, grid_size
         # Update 'processed' column for sampled rows
         city_grid.loc[sampled_grid.index, 'processed'] = True
 
-        rectangles = sampled_grid['geometry']
+        rectangles = sampled_grid.set_index('grid_id')['geometry']
 
         # Read and process required datasets (buildings, roads, intersections)
         if not os.path.exists(f'{BUILDINGS_PATH}/{city_name}/Overture_building_{city_name}.geoparquet'):
@@ -553,21 +553,21 @@ def process_city(city_name, sample_prop=1.0, override_processed=False, grid_size
         Overture_data_all = Overture_data_all.set_geometry('geometry')[Overture_data_all.dataset != 'OpenStreetMap']
 
         # Read intersections
-        if not os.path.exists(f'{INTERSECTIONS_PATH}/{city_name}/{city_name}_OSM_intersections.gpkg'):
+        if not os.path.exists(f'{INTERSECTIONS_PATH}/{city_name}/{city_name}_OSM_intersections.geoparquet'):
             print(f"Missing intersections data for city {city_name}. Skipping.")
             return
-        OSM_intersections_all = gpd.read_file(f'{INTERSECTIONS_PATH}/{city_name}/{city_name}_OSM_intersections.gpkg')
+        OSM_intersections_all = gpd.read_parquet(f'{INTERSECTIONS_PATH}/{city_name}/{city_name}_OSM_intersections.geoparquet')
 
         # Read roads
-        if not os.path.exists(f'{ROADS_PATH}/{city_name}/{city_name}_OSM_roads.gpkg'):
+        if not os.path.exists(f'{ROADS_PATH}/{city_name}/{city_name}_OSM_roads.geoparquet'):
             print(f"Missing roads data for city {city_name}. Skipping.")
             return
-        OSM_roads_all = gpd.read_file(f'{ROADS_PATH}/{city_name}/{city_name}_OSM_roads.gpkg')
+        OSM_roads_all = gpd.read_parquet(f'{ROADS_PATH}/{city_name}/{city_name}_OSM_roads.geoparquet')
         allowed_highways = {'trunk', 'primary', 'secondary', 'tertiary', 'primary_link', 
                     'secondary_link', 'tertiary_link', 'trunk_link', 'residential', 
                     'unclassified', 'road', 'living_street'}
 
-        OSM_roads_all = OSM_roads_all[OSM_roads_all.highway.apply(lambda x: any(h in allowed_highways for h in str(x).split(',')))]
+        OSM_roads_all = OSM_roads_all[OSM_roads_all.highway.apply(lambda x: any(h in allowed_highways for h in str(x).split(',')))].reset_index()
 
 
         print(f"{city_name}: OSM files read")
@@ -587,7 +587,7 @@ def process_city(city_name, sample_prop=1.0, override_processed=False, grid_size
 
         # Prepare delayed processing
         geod = Geod(ellps="WGS84")
-        rectangles_projected = sampled_grid['geometry'].to_crs(epsg=utm_proj_city)
+        rectangles_projected = sampled_grid.set_index('grid_id')['geometry'].to_crs(epsg=utm_proj_city)
 
         road_union = OSM_roads_all_projected.unary_union
 
@@ -595,6 +595,10 @@ def process_city(city_name, sample_prop=1.0, override_processed=False, grid_size
             blocks = get_blocks(road_union, OSM_roads_all_projected)
         else:
             blocks = gpd.GeoDataFrame([])
+
+        OSM_intersections_all_projected['osmid'] = OSM_intersections_all_projected['osmid'].astype('int')
+        OSM_roads_all_projected['u'] = OSM_roads_all_projected['u'].astype('int')
+        OSM_roads_all_projected['v'] = OSM_roads_all_projected['v'].astype('int')
 
 
         delayed_results = [
@@ -634,7 +638,7 @@ def main():
               "Maputo", "Luanda"]
     cities = ["Nairobi"]
     cities = [city.replace(' ', '_') for city in cities]
-    sample_prop = 1.0  # Sample 10% of the grid cells
+    sample_prop = 0.001  # Sample 10% of the grid cells
 
     # City-Level Parallelization
     with ProcessPoolExecutor() as executor:
