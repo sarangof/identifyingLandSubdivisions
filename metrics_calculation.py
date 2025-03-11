@@ -765,7 +765,7 @@ def metric_8_two_row_blocks(blocks_clipped, buildings, utm_proj_rectangle, row_e
     blocks_clipped = blocks_clipped[blocks_clipped['radius'] <= 100].copy()  # Keep only valid blocks
 
     if blocks_clipped.empty:
-        print("🚨 No blocks with internal buffer ≤ 100m. Assigning NaN to m8.")
+        #print("🚨 No blocks with internal buffer ≤ 100m. Assigning NaN to m8.")
         return np.nan, None, None  # Return NaN and empty buffers
 
     # Apply internal buffers (both epsilon and width-based buffers)
@@ -791,7 +791,7 @@ def metric_8_two_row_blocks(blocks_clipped, buildings, utm_proj_rectangle, row_e
     if building_to_block_share != 0:
         m8 = building_to_buffer_share / building_to_block_share
     else:
-        print("🚨 m8 assigned to 1 because building_to_block_share was zero.")
+        #print("🚨 m8 assigned to 1 because building_to_block_share was zero.")
         m8 = 1.0  # Assign 1 or 0 depending on logic
 
     return m8, epsilon_buffers, width_buffers
@@ -820,7 +820,7 @@ def metric_10_average_angle_between_road_segments(intersections, roads):
 
     # Safeguard: Ensure df_angles is not empty and contains 'Intersection ID'
     if df_angles.empty or 'Intersection ID' not in df_angles.columns:
-        print("Metric 10 Warning: No valid intersection angles found. Returning NaN.")
+        #print("Metric 10 Warning: No valid intersection angles found. Returning NaN.")
         return np.nan
 
     # Merge intersection data
