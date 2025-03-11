@@ -113,16 +113,28 @@ def save_city_grid_results(city_grid, sampled_grid, output_dir_csv, grid_size):
     city_grid.loc[city_grid["grid_id"].isin(sampled_ids), "timestamp"] = timestamp
 
     if os.path.exists(results_path):
-        # Load existing results with semicolon delimiter
-        existing_results = pd.read_csv(results_path, delimiter=",", skip_blank_lines=True, dtype=str)
+        try:
+            # Load existing results with semicolon delimiter
+            existing_results = pd.read_csv(results_path, delimiter=";", skip_blank_lines=True, dtype=str)
 
-        # Ensure necessary columns exist in existing results
-        for col in ["processed", "timestamp"]:
-            if col not in existing_results.columns:
-                existing_results[col] = pd.NA
+            # Ensure necessary columns exist in existing results
+            for col in ["processed", "timestamp"]:
+                if col not in existing_results.columns:
+                    existing_results[col] = pd.NA
 
-        # Merge new results, updating only 'processed' and 'timestamp' where needed
-        updated_results = existing_results.set_index("grid_id").combine_first(city_grid.set_index("grid_id")).reset_index()
+            # Merge new results, updating only 'processed' and 'timestamp' where needed
+            updated_results = existing_results.set_index("grid_id").combine_first(city_grid.set_index("grid_id")).reset_index()
+        except KeyError: 
+            # Load existing results with semicolon delimiter
+            existing_results = pd.read_csv(results_path, delimiter=",", skip_blank_lines=True, dtype=str)
+
+            # Ensure necessary columns exist in existing results
+            for col in ["processed", "timestamp"]:
+                if col not in existing_results.columns:
+                    existing_results[col] = pd.NA
+
+            # Merge new results, updating only 'processed' and 'timestamp' where needed
+            updated_results = existing_results.set_index("grid_id").combine_first(city_grid.set_index("grid_id")).reset_index()
 
         # Explicitly update 'processed' and 'timestamp' based on sampled_grid
         updated_results.loc[updated_results["grid_id"].isin(sampled_ids), "processed"] = True
@@ -270,7 +282,7 @@ def output_results(city_grid, sampled_grid, city_name, grid_size, sample_prop, O
         output_dir_csv
 
 def process_cell(cell_id, geod, rectangle, rectangle_projected, buildings, blocks_all, OSM_roads_all_projected, OSM_intersections_all_projected, road_union, utm_proj_city):
-    print(f"cell_id: {cell_id}")
+    #print(f"cell_id: {cell_id}")
 
     bounding_box = rectangle_projected.bounds
     bounding_box_geom = box(*bounding_box)
@@ -293,8 +305,6 @@ def process_cell(cell_id, geod, rectangle, rectangle_projected, buildings, block
             buildings_clipped = gpd.GeoDataFrame([])
             building_density = np.nan
             n_buildings = np.nan
-
-        print(building_density)
 
         blocks_clipped = blocks_all[blocks_all.geometry.intersects(bounding_box_geom)]
         OSM_buildings_bool = False
@@ -326,9 +336,9 @@ def process_cell(cell_id, geod, rectangle, rectangle_projected, buildings, block
         #print(OSM_roads_all_projected.head(), OSM_roads_all_projected.crs)
         #print(OSM_intersections_all_projected.head(), OSM_intersections_all_projected.crs)
 
-        print(f"Buildings intersecting cell {cell_id}: {len(buildings_clipped)}")
-        print(f"Roads intersecting cell {cell_id}: {len(roads_clipped)}")
-        print(f"Intersections intersecting cell {cell_id}: {len(OSM_intersections)}")
+        #print(f"Buildings intersecting cell {cell_id}: {len(buildings_clipped)}")
+        #print(f"Roads intersecting cell {cell_id}: {len(roads_clipped)}")
+        #print(f"Intersections intersecting cell {cell_id}: {len(OSM_intersections)}")
 
         #Overture_data = Overture_data_all_projected[Overture_data_all_projected.geometry.intersects(rectangle_projected[0])]
         #if not Overture_data.empty:
@@ -638,7 +648,7 @@ def main():
               "Maputo", "Luanda"]
     cities = ["Nairobi"]
     cities = [city.replace(' ', '_') for city in cities]
-    sample_prop = 0.001  # Sample 10% of the grid cells
+    sample_prop = 1.0 # Sample 10% of the grid cells
 
     # City-Level Parallelization
     with ProcessPoolExecutor() as executor:
