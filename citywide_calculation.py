@@ -259,12 +259,12 @@ def project_and_process(buildings, roads, intersections):
         return None
     else:
         # Get UTM projection for the city
-        first_row_df = roads.head(1)  # This may return a Series if only one column exists
+        first_row_df = roads.head(1)  
         if isinstance(first_row_df, pd.Series):
-            first_row_df = first_row_df.to_frame().T  # Convert Series to DataFrame
+            first_row_df = first_row_df.to_frame().T  
 
         if not first_row_df.empty:
-            first_row = first_row_df.iloc[0]  # Safely access first row
+            first_row = first_row_df.iloc[0]  
         else:
             print("❌ Error: Unable to determine projection based on road network")
             return None
@@ -272,7 +272,7 @@ def project_and_process(buildings, roads, intersections):
         utm_proj_city = get_utm_crs(first_row.geometry)  
         if utm_proj_city is None:
             print("❌ Error: Unable to determine EPSG code for city.")
-            return None  # Fail early if we can't determine the UTM CRS
+            return None  
 
     if intersections is None or intersections.empty:
         print("❌ Error: No intersections data available.")
@@ -353,22 +353,19 @@ def ensure_valid_geodata(data):
 def clip_features_to_rectangles(rectangles, city_data, buffer_size=300):
     print(f"👾 Entering clip_features_to_rectangles.") 
 
-    # 🚨 Ensure `rectangles` is still a Dask object before proceeding
     print(f"📊 Checking `rectangles`: {type(rectangles)}, npartitions={getattr(rectangles, 'npartitions', 'Unknown')}")
     assert isinstance(rectangles, (dd.DataFrame, dgpd.GeoDataFrame)), "❌ `rectangles` was computed too early!"
 
-    # ✅ FIX: Ensure city_name is extracted correctly
     def lazy_clip_partition(df):
         """Ensure `city_name` stays lazy and process partition correctly."""
         if "city_name" not in df.columns:
             print(f"⚠️ `city_name` missing in DataFrame: {df.columns}")
             return pd.DataFrame()
 
-        # 🚨 FIX: Do NOT use `.iloc[0]` or `.values[0]`
         unique_cities = df["city_name"].unique()
         if len(unique_cities) != 1:
             print(f"🚨 Error: Multiple cities found in partition! {unique_cities}")
-            return pd.DataFrame()  # Prevent errors due to mixed data
+            return pd.DataFrame()  
 
         city_name = unique_cities[0]
 
@@ -386,7 +383,6 @@ def clip_features_to_rectangles(rectangles, city_data, buffer_size=300):
             blocks_clipped=ensure_valid_geodata(city.get("blocks")),
         )
 
-    # ✅ Apply map_partitions correctly
     feature_mapping = rectangles.map_partitions(
         lazy_clip_partition,
         meta=pd.DataFrame({
