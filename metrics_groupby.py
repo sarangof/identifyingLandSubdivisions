@@ -67,9 +67,9 @@ def metrics(city_name, YOUR_NAME, grid_size=200):
     buildings = load_dataset(paths['buildings'], epsg=epsg)
 
     # Calculate building count per grid cell
-    joined_buildings = dgpd.sjoin(buildings, grid, predicate='within')
-    counts_buildings = joined_buildings.groupby('index_right').size()
-    grid['building_count'] = grid.index.map(counts_buildings).fillna(0).astype(int)
+    #joined_buildings = dgpd.sjoin(buildings, grid, predicate='within')
+    #counts_buildings = joined_buildings.groupby('index_right').size()
+    #grid['building_count'] = grid.index.map(counts_buildings).fillna(0).astype(int)
  
     # Load roads
     roads = load_dataset(paths['roads'], epsg=epsg)
@@ -93,10 +93,10 @@ def metrics(city_name, YOUR_NAME, grid_size=200):
     grid['intersections_4way'] = grid.index.map(counts_intersections_4way).fillna(0).astype(int)
 
     # Calculate minimum distance to roads
-    buildings['distance_to_road'] = calculate_minimum_distance_to_roads_option_B(buildings, roads)
+    #buildings['distance_to_road'] = calculate_minimum_distance_to_roads_option_B(buildings, roads)
 
     # Count building within 10 meters of road per grid cell
-    buildings_near_road = buildings[buildings.distance_to_road <= 20]
+    #buildings_near_road = buildings[buildings.distance_to_road <= 20]
 
 
 
