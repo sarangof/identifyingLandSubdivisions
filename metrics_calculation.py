@@ -86,6 +86,10 @@ def calculate_minimum_distance_to_roads(building, road_union):
 
 
 def calculate_minimum_distance_to_roads_option_B(building, road_union):
+
+    if isinstance(road_union, LineString):
+        road_union = MultiLineString([road_union])
+
     # Handle Polygon and MultiPolygon cases more efficiently
     def get_minimum_distance(polygon_exterior, road_union):
         nearest_geom = nearest_points(polygon_exterior, road_union)[1]
