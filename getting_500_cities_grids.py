@@ -35,42 +35,37 @@ SEARCH_BUFFER_PATH = os.path.join(INPUT_PATH, "city_info", "search_buffers")
 
 fs = s3fs.S3FileSystem(anon=False)
 
-'''
+
+import pyarrow.parquet as pq
+import pandas as pd
+import geopandas as gpd
+from shapely import wkb
+from shapely.geometry import MultiPolygon
+
+import s3fs
+
+# Initialize S3 filesystem
+fs = s3fs.S3FileSystem(anon=False)
+
 # Read Parquet in batches
 parquet_file = pq.ParquetFile("../combined_cities.parquet")
 
-# Dictionary to store merged geometries per city
-city_geom_dict = {}
+unique_cities = set()
 
-batch_size = 100000  # Adjust based on memory
+# Read in batches to handle large files efficiently
+batch_size = 100000  # Adjust as needed
 
-for batch in parquet_file.iter_batches(batch_size=batch_size):
-    df_batch = batch.to_pandas()[["city_name", "geom"]]  # Read necessary columns
+for batch in parquet_file.iter_batches(batch_size=batch_size, columns=["city_name"]):
+    df_batch = batch.to_pandas()  # Convert batch to Pandas DataFrame
+    unique_cities.update(df_batch["city_name"].unique())  # Update the set with unique values
 
-    # Convert WKB to Shapely geometries
-    df_batch["geometry"] = df_batch["geom"].apply(wkb.loads)
+# Convert set to sorted list (optional)
+all_cities_list = list(sorted(unique_cities))
 
-    # Group by city and store geometries
-    grouped = df_batch.groupby("city_name")["geometry"].agg(list)
+# Print summary
+print(f"Found {len(all_cities_list)} unique city names.")
 
-    # Merge with existing data
-    for city, geom_list in grouped.items():
-        if city in city_geom_dict:
-            city_geom_dict[city].extend(geom_list)
-        else:
-            city_geom_dict[city] = geom_list
 
-# Now merge geometries for each city using unary_union
-final_geometries = {city: unary_union(geom_list) for city, geom_list in city_geom_dict.items()}
-
-# Convert to DataFrame
-df_result = pd.DataFrame(list(final_geometries.items()), columns=["city_name", "merged_geometry"])
-gdf_all_cities = gpd.GeoDataFrame(df_result,geometry='merged_geometry')
-
-gdf_all_cities.to_parquet('../all_cities_combined.geoparquet')
-'''
-
-gdf_all_cities = gpd.read_parquet('../all_cities_combined.geoparquet')
 
 city_names_500 = pd.read_csv('../500cities.csv',sep=';', encoding="ISO-8859-1")
 
@@ -91,36 +86,189 @@ def normalize_city_name(city):
     return re.sub(r'_(?=[a-z])', '', city)  # Remove underscore only if followed by lowercase letter
 
 # Function to match city names based on refined rules
+
+# Function to match city names based on refined rules
 def refined_fuzzy_match(city, city_set):
     """Matches city names by allowing underscore corrections but avoiding over-relaxed matches."""
     if city in city_set:  # Exact match
-        return city
-    
+        return (city, city)
+
     # Normalize city name: remove underscores only where appropriate
     cleaned_city = normalize_city_name(city)
-    
+
     # Find close matches allowing a max difference of 1 edit
     possible_matches = get_close_matches(cleaned_city, city_set, n=1, cutoff=0.9)  # More restrictive cutoff
-    return possible_matches[0] if possible_matches else None  # Return matched city or None
+
+    # Return the closest match and the original city, or (None, city) if no match found
+    return (possible_matches[0], city) if possible_matches else (None, None)
+
 
 # Apply refined fuzzy matching
-gdf_all_cities["city_name_matched"] = gdf_all_cities["city_name"].apply(lambda x: refined_fuzzy_match(x, city_set))
+matching_list_500_cities = [refined_fuzzy_match(x, city_set)[0] for x in all_cities_list]
+matched_list_all_cities = [refined_fuzzy_match(x, city_set)[1] for x in all_cities_list]
 
 # Count how many cities were successfully matched
-num_matched = gdf_all_cities["city_name_matched"].notna().sum()
-gdf_all_cities['matched_bool'] = gdf_all_cities["city_name_matched"].notna()
+matched_cities = [x for x in matched_list_all_cities if x is not None]
+num_matched = len(matched_cities)
+
+
+
+
+# Configuration
+grid_size = 200  # Define grid size for naming
+output_base_dir = "../separate_city_geoparquets"
+
+# Convert matched city names to sets for filtering & naming
+city_match_dict = dict(zip(matched_list_all_cities, matching_list_500_cities))  # Maps filtered names to saved names
+matched_cities_set = set(matched_list_all_cities)  # For efficient filtering
+
+# Ensure output base directory exists
+os.makedirs(output_base_dir, exist_ok=True)
+
+# Process Parquet in batches
+batch_size = 100000  # Adjust as needed
+
+for batch in parquet_file.iter_batches(batch_size=batch_size):
+    df_batch = batch.to_pandas()[["city_name", "geom"]]  # Read necessary columns
+
+    # Filter only the matched cities
+    df_filtered = df_batch[df_batch["city_name"].isin(matched_cities_set)].copy()
+
+    if df_filtered.empty:
+        continue  # Skip if no relevant rows in this batch
+
+    # Convert WKB geometries to Shapely
+    df_filtered["geometry"] = df_filtered["geom"].apply(wkb.loads)
+    
+    # Convert to GeoDataFrame
+    gdf = gpd.GeoDataFrame(df_filtered, geometry="geometry", crs="EPSG:4326")
+
+    # Save each city in its corresponding folder
+    for original_city_name, city_gdf in gdf.groupby("city_name"):
+        matched_city_name = city_match_dict.get(original_city_name, original_city_name)  # Get the correct save name
+        
+        city_folder = os.path.join(output_base_dir, matched_city_name)
+        os.makedirs(city_folder, exist_ok=True)  # Create city folder if it doesn't exist
+
+        output_path = os.path.join(city_folder, f"{matched_city_name}_{grid_size}m_grid.geoparquet")
+        city_gdf.to_parquet(output_path)
+
+print(f"Saved individual city grids in {output_base_dir}")
+
+import os
+import geopandas as gpd
+from shapely.geometry import MultiPolygon
+from shapely.ops import unary_union, polygonize
+from shapely import wkt
+
+# Paths
+INPUT_DIR = "../grids/"
+OUTPUT_DIR = "../city_search_buffers/"
+
+# Ensure the output directory exists
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+# Loop through city folders
+for city_name in os.listdir(INPUT_DIR):
+    city_folder = os.path.join(INPUT_DIR, city_name)
+
+    # Check if it's a directory
+    if not os.path.isdir(city_folder):
+        print(f'{city_name} not a folder')
+        continue
+
+    # Find the .geoparquet file inside the city's folder
+    grid_files = [f for f in os.listdir(city_folder) if f.endswith("_200m_grid.geoparquet")]
+    
+    if not grid_files:
+        print(f"No grid file found for {city_name}, skipping.")
+        continue
+
+    grid_path = os.path.join(city_folder, grid_files[0])  # Assuming one file per city
+    #print(f"Processing: {grid_path}")
+
+    # Read the grid file
+    gdf = gpd.read_parquet(grid_path)
+
+    # Merge all grid cell geometries into a single multipolygon
+    merged_geom = unary_union(gdf["geometry"])  # Dissolve
+
+    # Ensure it remains a MultiPolygon
+    if not isinstance(merged_geom, MultiPolygon):
+        merged_geom = MultiPolygon([merged_geom])
+
+    # Instead of convex hull, create a more accurate outline
+    dissolved_boundary = merged_geom.buffer(0.001).simplify(0.0005, preserve_topology=True)
+
+    # Create a new GeoDataFrame
+    urban_gdf = gpd.GeoDataFrame({"city_name": [city_name], "geometry": [dissolved_boundary]}, geometry="geometry", crs=gdf.crs)
+
+    # Define output folder and filename
+    city_output_folder = os.path.join(OUTPUT_DIR, city_name)
+    os.makedirs(city_output_folder, exist_ok=True)
+
+    output_file = os.path.join(city_output_folder, f"{city_name}_search_buffer.geoparquet")
+
+    # Save to GeoParquet
+    urban_gdf.to_parquet(output_file)
+    #print(f"Saved: {output_file}")
+
+print("Processing complete! 🚀")
+
+
+
+#------------
+
 gdf_all_cities[gdf_all_cities['matched_bool']][['city_name_matched','merged_geometry']].to_file('../421_cities.shp')
 print(num_matched, "cities matched")
 
 
+selected_cities = gdf_all_cities[gdf_all_cities['matched_bool']][['city_name_matched','merged_geometry']].set_index('city_name_matched')
+
+
+import matplotlib.pyplot as plt
+
+def s3_save(file, output_file, output_temp_path, remote_path):
+
+    os.makedirs(output_temp_path, exist_ok=True)
+
+    local_temporary_file = f"{output_temp_path}/{output_file}"
+
+    # Ensure osmid is a string before saving
+    if "osmid" in file.columns:
+        file["osmid"] = file["osmid"].astype(str)
+
+    # Save the file based on its extension
+    if output_file.endswith(".gpkg"):
+        file.to_file(local_temporary_file, driver="GPKG")
+    elif output_file.endswith(".csv"):
+        file.to_csv(local_temporary_file, index=False)
+    elif output_file.endswith(".geoparquet"):
+        file.to_parquet(local_temporary_file, index=False)
+    else:
+        raise ValueError("Unsupported file format. Only .gpkg, .geoparquet and .csv are supported.")
+
+    # Upload to S3
+    output_path = S3Path(remote_path)
+    output_path.upload_from(local_temporary_file)
+
+    # Delete the local file after upload
+    if os.path.exists(local_temporary_file):
+        os.remove(local_temporary_file)
+
+for city_name in selected_cities.index:
+    print(city_name)
+    search_area_path = f"{SEARCH_BUFFER_PATH}/{city_name}/{city_name}_search_buffer.geoparquet"
+    search_area_file = gpd.GeoDataFrame(geometry=gpd.GeoSeries(selected_cities.loc[city_name]['merged_geometry'])).to_parquet(search_area_path)
+    s3_save(file=search_area_file, 
+        output_file=f"{city_name}_search_buffer.geoparquet", 
+        output_temp_path='.', 
+        remote_path=f"{SEARCH_BUFFER_PATH}/{city_name}")
 
 
 
 
-
-
-
-'''
+#----------
 
 
 
@@ -158,5 +306,4 @@ df_unmatched = pd.DataFrame({
 output_excel = "../unmatched_cities.xlsx"
 df_unmatched.to_excel(output_excel, index=False)
 
-print(f"Saved unmatched cities list to {output_excel}")'
-'''
+print(f"Saved unmatched cities list to {output_excel}")
