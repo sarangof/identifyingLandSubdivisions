@@ -14,5 +14,5 @@ rectangles_generation.py
 /cache
 environment_old.yaml
 .ipynb_checkpoints
-
+.geoparquet
 data
