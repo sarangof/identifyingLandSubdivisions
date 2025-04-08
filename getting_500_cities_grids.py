@@ -1,5 +1,3 @@
-
-
 import pyarrow.parquet as pq
 import pandas as pd
 import geopandas as gpd
@@ -7,20 +5,14 @@ from shapely import wkb
 from difflib import get_close_matches
 import dask.dataframe as dd
 import dask_geopandas as dgpd
-import geopandas as gpd
 from shapely.ops import unary_union
-
-import pyarrow.parquet as pq
-import pandas as pd
-from shapely import wkb
-from shapely.ops import unary_union
-
 from cloudpathlib import S3Path
 import s3fs
 import fsspec
 import traceback
-
 import os
+from shapely.geometry import MultiPolygon
+import glob
 
 # Paths Configuration
 MAIN_PATH = "s3://wri-cities-sandbox/identifyingLandSubdivisions/data" #
@@ -35,20 +27,8 @@ SEARCH_BUFFER_PATH = os.path.join(INPUT_PATH, "city_info", "search_buffers")
 
 fs = s3fs.S3FileSystem(anon=False)
 
-
-import pyarrow.parquet as pq
-import pandas as pd
-import geopandas as gpd
-from shapely import wkb
-from shapely.geometry import MultiPolygon
-
-import s3fs
-
-# Initialize S3 filesystem
-fs = s3fs.S3FileSystem(anon=False)
-
 # Read Parquet in batches
-parquet_file = pq.ParquetFile("../combined_cities.parquet")
+parquet_file = pq.ParquetFile("../500_cities_grids/combined_cities.parquet")
 
 unique_cities = set()
 
@@ -67,7 +47,7 @@ print(f"Found {len(all_cities_list)} unique city names.")
 
 
 
-city_names_500 = pd.read_csv('../500cities.csv',sep=';', encoding="ISO-8859-1")
+city_names_500 = pd.read_csv('../500_cities_grids/500cities.csv',sep=';', encoding="ISO-8859-1")
 
 city_names_500["city_name_no_country"] = city_names_500["City Name"].apply(lambda x: x.split(',')[0].replace(" ", "_"))
 city_names_500["city_name_no_country"] = city_names_500["city_name_no_country"].apply(lambda x: x.replace(" ", "_"))
@@ -116,7 +96,7 @@ num_matched = len(matched_cities)
 
 # Configuration
 grid_size = 200  # Define grid size for naming
-output_base_dir = "../separate_city_geoparquets"
+output_base_dir = "../500_cities_grids/separate_city_geoparquets"
 
 # Convert matched city names to sets for filtering & naming
 city_match_dict = dict(zip(matched_list_all_cities, matching_list_500_cities))  # Maps filtered names to saved names
@@ -127,6 +107,9 @@ os.makedirs(output_base_dir, exist_ok=True)
 
 # Process Parquet in batches
 batch_size = 100000  # Adjust as needed
+
+# Add this before your for-loop:
+batch_idx = 0
 
 for batch in parquet_file.iter_batches(batch_size=batch_size):
     df_batch = batch.to_pandas()[["city_name", "geom"]]  # Read necessary columns
@@ -143,18 +126,65 @@ for batch in parquet_file.iter_batches(batch_size=batch_size):
     # Convert to GeoDataFrame
     gdf = gpd.GeoDataFrame(df_filtered, geometry="geometry", crs="EPSG:4326")
 
-    # Save each city in its corresponding folder
+    # Save each city in its corresponding folder, include batch_idx in the filename to avoid overwrites.
     for original_city_name, city_gdf in gdf.groupby("city_name"):
-        matched_city_name = city_match_dict.get(original_city_name, original_city_name)  # Get the correct save name
+        matched_city_name = city_match_dict.get(original_city_name, original_city_name)
         
         city_folder = os.path.join(output_base_dir, matched_city_name)
-        os.makedirs(city_folder, exist_ok=True)  # Create city folder if it doesn't exist
-
-        output_path = os.path.join(city_folder, f"{matched_city_name}_{grid_size}m_grid.geoparquet")
+        os.makedirs(city_folder, exist_ok=True)
+        
+        output_path = os.path.join(city_folder, f"{matched_city_name}_{grid_size}m_grid_batch{batch_idx}.geoparquet")
         city_gdf.to_parquet(output_path)
+
+    batch_idx += 1
 
 print(f"Saved individual city grids in {output_base_dir}")
 
+
+
+# Loop through each city folder in output_base_dir
+for city_folder in os.listdir(output_base_dir):
+    folder_path = os.path.join(output_base_dir, city_folder)
+    if not os.path.isdir(folder_path):
+        continue  # Skip if it's not a folder
+
+    # Find all .geoparquet files in the city folder
+    parquet_files = glob.glob(os.path.join(folder_path, "*.geoparquet"))
+    if not parquet_files:
+        print(f"No geoparquet files found in {folder_path}")
+        continue
+
+    # Read each file and store in a list
+    gdf_list = []
+    for file in parquet_files:
+        try:
+            gdf = gpd.read_parquet(file)
+            gdf_list.append(gdf)
+        except Exception as e:
+            print(f"Error reading {file}: {e}")
+
+    # Only proceed if we successfully loaded at least one file
+    if gdf_list:
+        # Combine all GeoDataFrames into one, ignoring index differences
+        combined_gdf = gpd.GeoDataFrame(pd.concat(gdf_list, ignore_index=True))
+        
+        # Define the output filename for the combined file
+        output_file = os.path.join(folder_path, f"{city_folder}_search_buffer.geoparquet")
+        combined_gdf.to_parquet(output_file)
+        print(f"Saved combined geoparquet for {city_folder} at {output_file}")
+        
+        # After combining, delete the individual parts (all geoparquet files except the combined file)
+        for file in parquet_files:
+            if os.path.basename(file) != os.path.basename(output_file):
+                try:
+                    os.remove(file)
+                    print(f"Deleted {file}")
+                except Exception as e:
+                    print(f"Error deleting {file}: {e}")
+
+
+
+'''
 import os
 import geopandas as gpd
 from shapely.geometry import MultiPolygon
@@ -307,3 +337,4 @@ output_excel = "../unmatched_cities.xlsx"
 df_unmatched.to_excel(output_excel, index=False)
 
 print(f"Saved unmatched cities list to {output_excel}")
+'''
