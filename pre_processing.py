@@ -162,4 +162,7 @@ def produce_blocks(city_name,YOUR_NAME,grid_size):
     return blocks
 
 
-import time
+
+@delayed
+def produce_azimuths(city_name, YOUR_NAME, grid_size):
+    calculate_azimuths(city_name, YOUR_NAME, grid_size)
