@@ -5,17 +5,17 @@ import numpy as np
 from dask import delayed, compute, visualize
 import geopandas as gpd
 from dask.diagnostics import ProgressBar
-from citywide_calculation import get_utm_crs
-from metrics_calculation import calculate_minimum_distance_to_roads_option_B
+#from metrics_calculation import calculate_minimum_distance_to_roads_option_B
 from shapely.geometry import MultiLineString, LineString, Point
 from shapely.ops import polygonize, nearest_points
 #from shapely.geometry import Polygon, LineString, Point, MultiPolygon, MultiLineString, GeometryCollection
 from scipy.optimize import fminbound, minimize
-from metrics_groupby import metrics
+#from metrics_groupby import metrics
 from scipy.stats import entropy
 from shapely.ops import unary_union, polygonize
 from shapely.geometry import LineString, mapping, Point
 from polylabel import polylabel 
+from pyproj import CRS, Geod
 
 
 MAIN_PATH = "s3://wri-cities-sandbox/identifyingLandSubdivisions/data"
@@ -38,6 +38,16 @@ OUTPUT_PATH_RAW = f"{OUTPUT_PATH}/raw_results"
 """
 BASIC FUNCTIONS
 """
+
+def get_utm_crs(geometry):
+    lon, lat = geometry.centroid.x, geometry.centroid.y
+    utm_crs = CRS.from_user_input(f"+proj=utm +zone={(int((lon + 180) // 6) + 1)} +{'south' if lat < 0 else 'north'} +datum=WGS84")
+    authority_code = utm_crs.to_authority()
+    if authority_code is not None:
+        epsg_code = int(authority_code[1])
+    else:
+        epsg_code = None
+    return epsg_code
 
 @delayed
 def get_epsg(city_name):
@@ -202,7 +212,7 @@ def compute_azimuth_partition(df):
     return df
 
 
-def calculate_azimuths(city_name, CITY_NAME, grid_size):
+def calculate_azimuths(city_name, YOUR_NAME, grid_size):
     paths = {
         'grid': f'{GRIDS_PATH}/{city_name}/{city_name}_{str(grid_size)}m_grid.geoparquet',
         'blocks': f'{BLOCKS_PATH}/{city_name}/{city_name}_blocks_{YOUR_NAME}.geoparquet',
