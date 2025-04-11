@@ -92,11 +92,15 @@ matched_cities = [x for x in matched_list_all_cities if x is not None]
 num_matched = len(matched_cities)
 
 
-
+'''
+SAVE AND COMBINE GRIDS
+'''
 
 # Configuration
 grid_size = 200  # Define grid size for naming
-output_base_dir = "../500_cities_grids/separate_city_geoparquets"
+output_base_dir = "../500_cities_grids/city_grids"
+search_buffer_base = "../500_cities_grids/search_buffers"
+os.makedirs(search_buffer_base, exist_ok=True)
 
 # Convert matched city names to sets for filtering & naming
 city_match_dict = dict(zip(matched_list_all_cities, matching_list_500_cities))  # Maps filtered names to saved names
@@ -141,7 +145,6 @@ for batch in parquet_file.iter_batches(batch_size=batch_size):
 print(f"Saved individual city grids in {output_base_dir}")
 
 
-
 # Loop through each city folder in output_base_dir
 for city_folder in os.listdir(output_base_dir):
     folder_path = os.path.join(output_base_dir, city_folder)
@@ -169,7 +172,7 @@ for city_folder in os.listdir(output_base_dir):
         combined_gdf = gpd.GeoDataFrame(pd.concat(gdf_list, ignore_index=True))
         
         # Define the output filename for the combined file
-        output_file = os.path.join(folder_path, f"{city_folder}_search_buffer.geoparquet")
+        output_file = os.path.join(folder_path, f"{city_folder}_{str(grid_size)}m_grid.geoparquet")
         combined_gdf.to_parquet(output_file)
         print(f"Saved combined geoparquet for {city_folder} at {output_file}")
         
@@ -182,7 +185,85 @@ for city_folder in os.listdir(output_base_dir):
                 except Exception as e:
                     print(f"Error deleting {file}: {e}")
 
+'''
+SAVE SEARCH BUFFERS
+'''
 
+# Loop through each city folder in city_grids
+for city_folder in os.listdir(output_base_dir):
+    folder_path = os.path.join(output_base_dir, city_folder)
+    if not os.path.isdir(folder_path):
+        continue  # Skip if it's not a folder
+
+    # Look for the *combined* city grid file (the merged file for that city)
+    # Example filename: "<city_folder>_200m_grid.geoparquet"
+    combined_filename = f"{city_folder}_{grid_size}m_grid.geoparquet"
+    combined_path = os.path.join(folder_path, combined_filename)
+
+    if not os.path.exists(combined_path):
+        print(f"❌ No combined file found for {city_folder} at {combined_path}")
+        continue
+
+    # Read the combined city grid
+    try:
+        combined_gdf = gpd.read_parquet(combined_path)
+    except Exception as e:
+        print(f"Error reading {combined_path}: {e}")
+        continue
+    
+    if combined_gdf.empty:
+        print(f"Empty GeoDataFrame for {city_folder}, skipping...")
+        continue
+
+    # ------------------------------------------------------------------
+    # 1) SIMPLE BOUNDING BOX APPROACH (cheapest, “rectangle outline”)
+    #
+    # Get bounding box of all geometries in the city grid
+    #minx, miny, maxx, maxy = combined_gdf.total_bounds
+    #bounding_geom = box(minx, miny, maxx, maxy)
+    #
+    # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+    # 2) OPTIONAL: “ROUNDED” BOUNDING SHAPE
+    #    If you want the bounding rectangle’s corners to be rounded,
+    #    buffer outward by some distance, then buffer inward by the same
+    #    distance. The distance is in map units (degrees if EPSG:4326),
+    #    so for large city areas, you’d typically reproject to a meter-based
+    #    CRS, buffer, and reproject back. But here’s the simplest version:
+    #
+    # distance = 0.02  # Example “rounding” distance in degrees lat/lon
+    # bounding_geom = bounding_geom.buffer(distance).buffer(-distance)
+    # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+    # 3) OPTIONAL: CONVEX HULL APPROACH
+    #    A quick way to get a single outer boundary that’s “rounded”
+    #    around the city, ignoring internal holes. This does a cheap union
+    #    internally but is often lighter weight than a full union of all cells.
+    #
+    city_outline = combined_gdf.geometry.apply(lambda g: g.convex_hull.buffer(0.01))
+    bounding_geom = unary_union(city_outline)  
+    # ------------------------------------------------------------------
+
+    # Create a one-row GeoDataFrame for the search area
+    search_area_gdf = gpd.GeoDataFrame(
+        pd.DataFrame({"city_name": [city_folder]}),
+        geometry=[bounding_geom],
+        crs=combined_gdf.crs
+    )
+
+    # Prepare the output folder for this city’s search buffer
+    city_search_folder = os.path.join(search_buffer_base, city_folder)
+    os.makedirs(city_search_folder, exist_ok=True)
+
+    # Define output path for the city’s “search buffer”
+    buffer_filename = f"{city_folder}_search_buffer.geoparquet"
+    search_buffer_path = os.path.join(city_search_folder, buffer_filename)
+
+    # Write to Parquet
+    search_area_gdf.to_parquet(search_buffer_path)
+    print(f"✅ Wrote search buffer for {city_folder} at {search_buffer_path}")
 
 '''
 import os
