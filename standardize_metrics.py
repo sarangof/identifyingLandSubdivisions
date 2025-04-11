@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 
 """
 Here, 0 will be irregular and 1 will be subdivision
@@ -8,8 +9,8 @@ def standardize_metric_1(series):
     return series
 
 def standardize_metric_2(series):
-    series = np.where(series > 100, 100, series)
-    return 1 - (series/100)
+    result = np.where(series > 100, 100, series)
+    return pd.Series(1 - (result / 100), index=series.index)
 
 def standardize_metric_3(series):
     series = np.where(series > 40, 40, series)
@@ -20,7 +21,7 @@ def standardize_metric_4(series):
 
 def standardize_metric_5(series):
     series = np.where(series > 324, 324, series)
-    return series/324
+    return series/324.
 
 def standardize_metric_6(series):
     return series
@@ -28,14 +29,14 @@ def standardize_metric_6(series):
 def standardize_metric_7(series):
     series = np.where(series < 30, 30, series)
     series = np.where(series > 200, 200, series)
-    return (1.-((series - 30)/170))
+    return (1.-((series - 30.)/170.))
 
 def standardize_metric_8(series):
     """
     M8 = IF(B/A>=S/T, 1, 1-(B/A)/(S/T). 
     If, for example, (B/A)/(S/T) = 0.1, then M8=0.9
     """
-    series = np.where(series > 1, 1, series)
+    series = np.where(series > 1, 1., series)
     return (1 - series)
 
 def standardize_metric_9(series):
@@ -45,15 +46,15 @@ def standardize_metric_10(series):
     return 1-(series/90)
 
 def standardize_metric_11(series):
-    series = np.where(series > 200, 200, series)
-    return series/200
+    series = np.where(series > 4000, 4000, series)
+    return series/4000.
 
 def standardize_metric_12(series):
     return series
 
 def standardize_metric_13(series):
     series = np.where(series > 200, 200, series)
-    return series/200
+    return series/200.
 
 # Map metrics to their respective functions
 standardization_functions = {
