@@ -86,8 +86,8 @@ def osm_command(city_name, search_area):
         raise ValueError(f"Search area for {city_name} is empty.")
     
     osm_intersections, osm_roads = ox.graph_to_gdfs(G)
+    osm_roads = remove_duplicate_roads(osm_roads)
 
-    osm_roads = osm_roads.reset_index()
     osm_intersections = osm_intersections.reset_index()
 
     # Ensure 'osmid' exists in intersections
