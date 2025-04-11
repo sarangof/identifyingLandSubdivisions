@@ -1,6 +1,5 @@
 import dask_geopandas as dgpd
 from dask import delayed
-from citywide_calculation import get_utm_crs
 from metrics_calculation import calculate_minimum_distance_to_roads_option_B
 
 MAIN_PATH = "s3://wri-cities-sandbox/identifyingLandSubdivisions/data"
