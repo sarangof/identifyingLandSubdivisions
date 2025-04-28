@@ -95,9 +95,24 @@ def osm_command(city_name, search_area):
         print(f"⚠️ WARNING: 'osmid' column missing in intersections for {city_name}")
         osm_intersections["osmid"] = None  # Assign None as placeholder
 
+    # Clean up roads
     # Convert lists in roads and intersections to strings
     osm_roads = remove_list_columns(osm_roads)
+    included_road_types = ['trunk','motorway','primary','secondary','tertiary','primary_link','secondary_link','tertiary_link','trunk_link','motorway_link','residential','unclassified','road','living_street']
+    def highway_filter(highway_value):
+        # If highway_value is missing, return False
+        if pd.isna(highway_value):
+            return False
+        # Split the string by commas, and strip any whitespace from each part
+        types = [part.strip() for part in highway_value.split(',')]
+        # Return True if any of the types is in our included list
+        return any(t in included_road_types for t in types)
+    # Now filter the roads GeoDataFrame:
+    osm_roads = osm_roads[osm_roads['highway'].apply(highway_filter)]
+
+    # Clean up intersections
     osm_intersections = remove_list_columns(osm_intersections)
+    osm_intersections = osm_intersections[osm_intersections.street_count!=2]
 
     # Convert 'osmid' to string before saving
     if "osmid" in osm_intersections.columns:
