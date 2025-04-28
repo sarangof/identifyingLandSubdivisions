@@ -545,6 +545,29 @@ def compute_intersection_mapping(intersection_angles, street_count_mapping):
 FOR TORTUOSITY INDEX
 """
 
+def partition_tortuosity_clipped(df):
+    # df.geometry is the clipped segment
+    seg = df.geometry
+    L = seg.length.values            # true path length
+    b = seg.bounds                   # DataFrame with minx,miny,maxx,maxy
+    Dx = (b["maxx"] - b["minx"]).values
+    Dy = (b["maxy"] - b["miny"]).values
+    D  = np.hypot(Dx, Dy)            # straight‐line distance
+    S  = np.clip(D / L, 0, 1)        # straightness in [0,1]
+    W  = L * S                       # length‐weighted straightness
+
+    return pd.DataFrame({
+        "index_right": df["index_right"].values,
+        "wt":           W,
+        "length":      L
+    }, index=df.index)
+
+def overlay_partition(roads_part, grid_small):
+    # roads_part: a pandas GeoDataFrame partition of full roads GDF
+    # grid_small: a pandas GeoDataFrame of all grid cells with an index_right column
+    return gpd.overlay(roads_part, grid_small, how="intersection")
+
+
 def calculate_tortuosity(roads_df, intersections_df):
 
     # Merge roads with intersections for start point (u)
