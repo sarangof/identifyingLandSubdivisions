@@ -86,7 +86,11 @@ def osm_command(city_name, search_area):
         raise ValueError(f"Search area for {city_name} is empty.")
     
     osm_intersections, osm_roads = ox.graph_to_gdfs(G)
+    # 1) Remember the original set of node‐IDs
     osm_roads = remove_duplicate_roads(osm_roads)
+    orig_nodes = set(osm_roads['u']).union(osm_roads['v'])
+
+
 
     osm_intersections = osm_intersections.reset_index()
 
@@ -111,8 +115,22 @@ def osm_command(city_name, search_area):
     osm_roads = osm_roads[osm_roads['highway'].apply(highway_filter)]
 
     # Clean up intersections
+    # 3) Compute which nodes lost all their edges
+    kept_nodes   = set(osm_roads['u']).union(osm_roads['v'])
+    removed_nodes = orig_nodes - kept_nodes
+
+    # 4) Now filter intersections GeoDataFrame by dropping any
+    #    whose osmid is in removed_nodes
+    #    (convert types as needed)
     osm_intersections = remove_list_columns(osm_intersections)
-    osm_intersections = osm_intersections[osm_intersections.street_count!=2]
+    # ensure osmid is integer-like for comparison
+    osm_intersections['osmid'] = osm_intersections['osmid'].astype(int)
+    osm_intersections = osm_intersections[
+        ~osm_intersections['osmid'].isin(removed_nodes)
+    ]
+
+    # 5) Then do your street_count filter
+    osm_intersections = osm_intersections[osm_intersections.street_count != 2]
 
     # Convert 'osmid' to string before saving
     if "osmid" in osm_intersections.columns:
