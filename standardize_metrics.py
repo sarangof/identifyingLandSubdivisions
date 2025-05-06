@@ -32,27 +32,20 @@ def standardize_metric_7(series):
     return (1.-((series - 30.)/170.))
 
 def standardize_metric_8(series):
-    """
-    M8 = IF(B/A>=S/T, 1, 1-(B/A)/(S/T). 
-    If, for example, (B/A)/(S/T) = 0.1, then M8=0.9
-    """
-    series = np.where(series > 1, 1., series)
-    return (1 - series)
-
-def standardize_metric_9(series):
+    series = np.where(series < 0.85, 0.85, series)
     return series
 
-def standardize_metric_10(series):
+def standardize_metric_9(series):
     return 1-(series/90)
 
-def standardize_metric_11(series):
+def standardize_metric_10(series):
     series = np.where(series > 4000, 4000, series)
     return series/4000.
 
-def standardize_metric_12(series):
+def standardize_metric_11(series):
     return series
 
-def standardize_metric_13(series):
+def standardize_metric_12(series):
     series = np.where(series > 200, 200, series)
     return series/200.
 
@@ -69,6 +62,5 @@ standardization_functions = {
     'metric_9': standardize_metric_9,
     'metric_10': standardize_metric_10,
     'metric_11': standardize_metric_11,
-    'metric_12': standardize_metric_12,
-    'metric_13': standardize_metric_13
+    'metric_12': standardize_metric_12
 }
