@@ -76,85 +76,101 @@ def s3_save(file, output_file, output_temp_path, remote_path):
     if os.path.exists(local_temporary_file):
         os.remove(local_temporary_file)
 
+def filter_osm_network(
+    osm_roads: gpd.GeoDataFrame,
+    osm_intersections: gpd.GeoDataFrame,
+    included_road_types: list[str]
+) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
+    """
+    1) Keep only roads whose 'highway' tag intersects included_road_types.
+    2) Count each node’s actual degree in the filtered roads.
+    3) Drop any intersection whose osmid is missing from the filtered roads OR
+       whose original street_count != actual degree.
+    4) Return (roads, intersections) ready to write out.
+    """
+    # 1) roads filter
+    def _hw_filter(val):
+        if pd.isna(val): return False
+        parts = [p.strip() for p in val.split(',')]
+        return any(p in included_road_types for p in parts)
+    roads = osm_roads[osm_roads['highway'].apply(_hw_filter)].copy()
+
+    # 2) compute actual degree of each node
+    deg_u = roads['u'].value_counts()
+    deg_v = roads['v'].value_counts()
+    degree = (deg_u.add(deg_v, fill_value=0)
+                    .astype(int)
+                    .rename("actual_degree"))
+
+    # 3) clean intersections
+    inter = osm_intersections.reset_index(drop=True).copy()
+    # ensure osmid is int for matching
+    inter['osmid'] = inter['osmid'].astype(int)
+
+    # keep only those present in our filtered roads
+    inter = inter[inter['osmid'].isin(degree.index)]
+
+    # compare street_count vs actual_degree
+    inter = inter.merge(degree, left_on='osmid', right_index=True, how='left')
+    mask_good = inter['street_count'] == inter['actual_degree']
+    # drop bad ones
+    inter = inter[mask_good].drop(columns=['actual_degree'])
+
+    return roads, inter
+
+
 def osm_command(city_name, search_area):
+    # … build G & call graph_to_gdfs …
     if len(search_area) > 0:
         polygon = search_area.geometry.iloc[0]
-        G = ox.graph_from_polygon(polygon=polygon, 
-                                  custom_filter='["highway"~"motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|service|track|path|footway|cycleway|bridleway|steps|pedestrian|corridor|road"]',
-                                  retain_all=True)
+        G = ox.graph_from_polygon(
+            polygon=polygon,
+            custom_filter=(
+                '["highway"~"motorway|trunk|primary|secondary|'
+                'tertiary|unclassified|residential|living_street|'
+                'service|track|path|footway|cycleway|bridleway|'
+                'steps|pedestrian|corridor|road"]'
+            ),
+            retain_all=True
+        )
     else:
         raise ValueError(f"Search area for {city_name} is empty.")
-    
+
     osm_intersections, osm_roads = ox.graph_to_gdfs(G)
-    # 1) Remember the original set of node‐IDs
-    osm_roads = remove_duplicate_roads(osm_roads)
-    orig_nodes = set(osm_roads['u']).union(osm_roads['v'])
 
-
-
+    osm_roads         = remove_duplicate_roads(osm_roads)
     osm_intersections = osm_intersections.reset_index()
-
-    # Ensure 'osmid' exists in intersections
-    if "osmid" not in osm_intersections.columns:
-        print(f"⚠️ WARNING: 'osmid' column missing in intersections for {city_name}")
-        osm_intersections["osmid"] = None  # Assign None as placeholder
-
-    # Clean up roads
-    # Convert lists in roads and intersections to strings
-    osm_roads = remove_list_columns(osm_roads)
-    included_road_types = ['trunk','motorway','primary','secondary','tertiary','primary_link','secondary_link','tertiary_link','trunk_link','motorway_link','residential','unclassified','road','living_street']
-    def highway_filter(highway_value):
-        # If highway_value is missing, return False
-        if pd.isna(highway_value):
-            return False
-        # Split the string by commas, and strip any whitespace from each part
-        types = [part.strip() for part in highway_value.split(',')]
-        # Return True if any of the types is in our included list
-        return any(t in included_road_types for t in types)
-    # Now filter the roads GeoDataFrame:
-    osm_roads = osm_roads[osm_roads['highway'].apply(highway_filter)]
-
-    # Clean up intersections
-    # 3) Compute which nodes lost all their edges
-    kept_nodes   = set(osm_roads['u']).union(osm_roads['v'])
-    removed_nodes = orig_nodes - kept_nodes
-
-    # 4) Now filter intersections GeoDataFrame by dropping any
-    #    whose osmid is in removed_nodes
-    #    (convert types as needed)
+    osm_roads         = remove_list_columns(osm_roads)
     osm_intersections = remove_list_columns(osm_intersections)
-    # ensure osmid is integer-like for comparison
-    osm_intersections['osmid'] = osm_intersections['osmid'].astype(int)
-    osm_intersections = osm_intersections[
-        ~osm_intersections['osmid'].isin(removed_nodes)
+
+    # ensure 'osmid' always exists
+    if 'osmid' not in osm_intersections:
+        osm_intersections['osmid'] = None
+
+    included = [
+      'trunk','motorway','primary','secondary','tertiary',
+      'primary_link','secondary_link','tertiary_link',
+      'trunk_link','motorway_link','residential',
+      'unclassified','road','living_street'
     ]
+    roads_filt, inters_filt = filter_osm_network(
+        osm_roads, osm_intersections, included
+    )
 
-    # 5) Then do your street_count filter
-    osm_intersections = osm_intersections[osm_intersections.street_count != 2]
+    # now save them
+    s3_save(
+      file=roads_filt,
+      output_file=f"{city_name}_OSM_roads.geoparquet",
+      output_temp_path=".",
+      remote_path=f"{ROADS_PATH}/{city_name}/{city_name}_OSM_roads.geoparquet"
+    )
+    s3_save(
+      file=inters_filt,
+      output_file=f"{city_name}_OSM_intersections.geoparquet",
+      output_temp_path=".",
+      remote_path=f"{INTERSECTIONS_PATH}/{city_name}/{city_name}_OSM_intersections.geoparquet"
+    )
 
-    # Convert 'osmid' to string before saving
-    if "osmid" in osm_intersections.columns:
-        osm_intersections["osmid"] = osm_intersections["osmid"].astype(str)
-    if "osmid" in osm_roads.columns:
-        osm_roads["osmid"] = osm_roads["osmid"].astype(str)
-
-    # Save roads
-    road_output_file_name = f"{city_name}_OSM_roads.geoparquet"
-    road_output_tmp_path = f"."
-    road_output_path_remote = f"{ROADS_PATH}/{city_name}/{road_output_file_name}"
-    s3_save(file=osm_roads, 
-            output_file=road_output_file_name, 
-            output_temp_path=road_output_tmp_path, 
-            remote_path=road_output_path_remote)
-
-    # Save intersections
-    intersections_output_file_name = f"{city_name}_OSM_intersections.geoparquet"
-    intersections_output_tmp_path = f"."
-    intersections_output_path_remote = f"{INTERSECTIONS_PATH}/{city_name}/{intersections_output_file_name}"
-    s3_save(file=osm_intersections, 
-            output_file=intersections_output_file_name, 
-            output_temp_path=intersections_output_tmp_path, 
-            remote_path=intersections_output_path_remote)
 
 
 def overturemaps_download_and_save(bbox_str, request_type: str, output_dir, city_name: str):
