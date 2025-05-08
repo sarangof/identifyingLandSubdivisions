@@ -364,55 +364,6 @@ def get_internal_buffer_with_target_area(geom, target_area, tolerance=1e-6, max_
     return buffered_geom  # Return best-found buffer
 
 """
-AUXULIARY FUNCTIONS FOR METRIC 8
-"""
-
-def clip_group(df_group, buffer_type):
-    # Use the buffer from the specified column.
-    buffer_geom = df_group[buffer_type].iloc[0]
-    # Use the original building footprint column for intersection.
-    clipped = np.vectorize(lambda geom: geom.intersection(buffer_geom))(df_group['geometry'].values)
-    return pd.DataFrame({
-        'building_id': df_group['building_id'],
-        'block_id': df_group['block_id'],
-        'clipped_geometry': clipped
-    }, index=df_group.index)
-
-
-def clip_buildings_by_buffer(buildings_blocks_df, buffer_type):
-    # Copy the input and reset the index.
-    gdf = buildings_blocks_df.copy().reset_index()
-    # If an 'id' column exists, rename it; otherwise, create 'building_id' from the index.
-    if 'id' in gdf.columns:
-        gdf = gdf.rename(columns={'id': 'building_id'})
-    else:
-        gdf['building_id'] = gdf.index
-
-    if gdf.crs is None or not gdf.crs.is_projected:
-        raise ValueError("GeoDataFrame must have a projected CRS for efficient clipping.")
-
-    # Group by block_id and apply the clipping function.
-    clipped_series = gdf.groupby('block_id', group_keys=False).apply(clip_group, buffer_type)
-    
-    # Create a GeoDataFrame from the result.
-    clipped_geo = gpd.GeoDataFrame(clipped_series, geometry='clipped_geometry', crs=buildings_blocks_df.crs)
-    
-    # Merge the clipped geometries back into the original GeoDataFrame.
-    gdf = gdf.merge(clipped_geo[['building_id', 'block_id', 'clipped_geometry']], 
-                    on=['building_id', 'block_id'], how='left')
-    
-    gdf_clipped = gpd.GeoDataFrame(gdf.copy(), geometry='clipped_geometry', crs=buildings_blocks_df.crs)
-    gdf_clipped['clipped_area'] = gdf_clipped['clipped_geometry'].area
-    gdf_clipped['buffer_area'] = gdf_clipped[buffer_type].area
-    
-    # Aggregate the areas by block.
-    clipped_building_area = gdf_clipped.groupby('block_id')['clipped_area'].sum()
-    total_buffer_area = gdf_clipped.groupby('block_id')['buffer_area'].sum()
-    ratio = clipped_building_area / total_buffer_area
-    return ratio
-
-
-"""
 FOR ROAD ANGLES AT INTERSECTIONS
 """
 
@@ -428,42 +379,66 @@ def compute_bearing_vectorized(x1, y1, x2, y2):
 
 def compute_intersection_angles(roads_df, intersections_df):
     """
-    For each road, compute the bearing at the intersection.
-    
-    For each road, we assume:
-      - If an intersection is the start (u), we compute the bearing from that intersection
-        (using its coordinates from intersections_df) to the road's centroid.
-      - Similarly for the end (v).
-    
-    Returns a DataFrame with columns:
-      intersection_id, bearing
+    For each road‐intersection pair (u or v), compute the bearing from the node
+    to the *first* segment endpoint rather than the centroid.
+    Returns a Dask DataFrame with columns ['intersection_id','bearing'].
     """
-    # Merge for start intersections
-    roads_u = roads_df.merge(intersections_df[['osmid', 'geometry']], left_on='u', right_on='osmid', how='left', suffixes=('', '_u'))
-    # Extract coordinates: intersection (start) and road centroid
+    def first_segment_pt(line, at_start):
+        # shapely LineString
+        coords = list(line.coords)
+        return coords[1] if at_start else coords[-2]
+
+    # ——— START intersections ———
+    roads_u = roads_df.merge(
+        intersections_df[['osmid','geometry']],
+        left_on='u', right_on='osmid',
+        how='inner', suffixes=('','_u')
+    )
+    # node coords
     roads_u['x_u'] = roads_u.geometry_u.x
     roads_u['y_u'] = roads_u.geometry_u.y
-    roads_u['centroid_x'] = roads_u.geometry.centroid.x
-    roads_u['centroid_y'] = roads_u.geometry.centroid.y
-    roads_u['bearing'] = compute_bearing_vectorized(roads_u['x_u'], roads_u['y_u'],
-                                                      roads_u['centroid_x'], roads_u['centroid_y'])
-    roads_u = roads_u[['u', 'bearing']].rename(columns={'u': 'intersection_id'})
-    
-    # Merge for end intersections
-    roads_v = roads_df.merge(intersections_df[['osmid', 'geometry']], left_on='v', right_on='osmid', how='left', suffixes=('', '_v'))
+
+    # first‐segment endpoint coords, split into two Series
+    roads_u['px'] = roads_u.geometry.map_partitions(
+        lambda geoms: geoms.apply(lambda g: first_segment_pt(g, True)[0]),
+        meta=('px','float64')
+    )
+    roads_u['py'] = roads_u.geometry.map_partitions(
+        lambda geoms: geoms.apply(lambda g: first_segment_pt(g, True)[1]),
+        meta=('py','float64')
+    )
+
+    # bearing
+    roads_u['bearing'] = compute_bearing_vectorized(
+        roads_u['x_u'], roads_u['y_u'], roads_u['px'], roads_u['py']
+    )
+    roads_u = roads_u[['u','bearing']].rename(columns={'u':'intersection_id'})
+
+    # ——— END intersections ———
+    roads_v = roads_df.merge(
+        intersections_df[['osmid','geometry']],
+        left_on='v', right_on='osmid',
+        how='inner', suffixes=('','_v')
+    )
     roads_v['x_v'] = roads_v.geometry_v.x
     roads_v['y_v'] = roads_v.geometry_v.y
-    roads_v['centroid_x'] = roads_v.geometry.centroid.x
-    roads_v['centroid_y'] = roads_v.geometry.centroid.y
-    roads_v['bearing'] = compute_bearing_vectorized(roads_v['x_v'], roads_v['y_v'],
-                                                      roads_v['centroid_x'], roads_v['centroid_y'])
-    roads_v = roads_v[['v', 'bearing']].rename(columns={'v': 'intersection_id'})
-    
-    # Combine both: Each row corresponds to a road connected to an intersection, with its computed bearing.
+
+    roads_v['px'] = roads_v.geometry.map_partitions(
+        lambda geoms: geoms.apply(lambda g: first_segment_pt(g, False)[0]),
+        meta=('px','float64')
+    )
+    roads_v['py'] = roads_v.geometry.map_partitions(
+        lambda geoms: geoms.apply(lambda g: first_segment_pt(g, False)[1]),
+        meta=('py','float64')
+    )
+    roads_v['bearing'] = compute_bearing_vectorized(
+        roads_v['x_v'], roads_v['y_v'], roads_v['px'], roads_v['py']
+    )
+    roads_v = roads_v[['v','bearing']].rename(columns={'v':'intersection_id'})
+
+    # concatenate the two halves
     intersection_angles = dd.concat([roads_u, roads_v], interleave_partitions=True)
     return intersection_angles
-
-# --- Step 2: Compute Sequential Differences for Each Intersection ---
 
 
 def compute_sequential_differences(angles):
