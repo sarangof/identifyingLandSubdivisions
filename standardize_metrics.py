@@ -40,10 +40,10 @@ def standardize_metric_9(series):
 
 def standardize_metric_10(series):
     series = np.where(series > 4000, 4000, series)
-    return series/4000.
+    return 1.-(series/4000.)
 
 def standardize_metric_11(series):
-    return series
+    return (1.-series)
 
 def standardize_metric_12(series):
     series = np.where(series > 200, 200, series)
