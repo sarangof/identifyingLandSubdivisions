@@ -24,4 +24,3 @@ From the root of the repository:
 2. From pre_processing.py, run the following functions: calculate_building_distances_to_roads(), produce_blocks(), produce_azimuths()
 1. pre_process_all_cities.py
 2. produce_azimuths
-
