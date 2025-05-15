@@ -359,6 +359,7 @@ def compute_m6_m7(city_name, grid_size, YOUR_NAME):
         f'{BUILDINGS_PATH}/{city_name}/Overture_building_{city_name}_with_distances_and_azimuths.geoparquet',
         epsg=epsg
     ).persist()
+    
     # Ensure azimuth is numeric
     buildings['azimuth'] = buildings['azimuth'].map_partitions(
         pd.to_numeric, meta=('azimuth','float64'), errors='coerce'
