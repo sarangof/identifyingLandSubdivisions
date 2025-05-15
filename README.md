@@ -21,6 +21,20 @@ From the root of the repository:
 # How to run
 0. Set up the environment.
 1. Run gather_data_cities.py
-2. From pre_processing.py, run the following functions: calculate_building_distances_to_roads(), produce_blocks(), produce_azimuths()
-1. pre_process_all_cities.py
-2. produce_azimuths
+3. From pre_processing.py, run the following functions: calculate_building_distances_to_roads(), produce_blocks(), produce_azimuths()
+4. pre_process_all_cities.py
+5. Run metric calculations, for example:
+
+cities = ["Nairobi", "Medellin", "Accra", "Bamako", "Belo_Horizonte", "Bogota", "Campinas", "Cape_Town", "Abidjan", "Luanda"]
+cities = [city.replace(' ', '_') for city in cities]
+
+tasks = []
+for city in cities:
+    tasks.append(building_and_intersection_metrics(city,grid_size,YOUR_NAME))
+    tasks.append(building_distance_metrics(city, grid_size, YOUR_NAME))
+    tasks.append(compute_m6_m7(city, grid_size, YOUR_NAME))
+    tasks.append(metrics_roads_intersections(city, grid_size, YOUR_NAME))
+
+results = compute(*tasks)
+
+6. Run consolidate_irregularity_index()
