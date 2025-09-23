@@ -14,7 +14,8 @@ from scipy.optimize import fminbound, minimize
 from scipy.stats import entropy
 from shapely.ops import unary_union, polygonize
 from shapely.geometry import LineString, mapping, Point
-from polylabel import polylabel 
+#from polylabel import polylabel 
+from shapely.ops import polylabel  # ✅ built into Shapely >= 1.8
 from pyproj import CRS, Geod
 
 

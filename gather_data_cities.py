@@ -247,7 +247,7 @@ def run_all(cities):
         remote_path = logs_output_path_remote)
 
 def main():
-    cities = ["Belo Horizonte"] #, "Campinas", "Bogota", "Nairobi", "Bamako", "Lagos", "Accra", "Abidjan", "Cape Town", "Maputo", "Mogadishu", "Luanda"
+    cities = ["Belo_Horizonte"] #, "Campinas", "Bogota", "Nairobi", "Bamako", "Lagos", "Accra", "Abidjan", "Cape Town", "Maputo", "Mogadishu", "Luanda"
     run_all(cities)
 
 if __name__ == "__main__":
