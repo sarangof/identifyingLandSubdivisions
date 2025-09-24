@@ -60,275 +60,414 @@ OUTPUT_PATH_RAW = f'{OUTPUT_PATH}/raw_results'
 # - Computes road length per cell and related flags
 # - Derives intersection counts and standardizes various metrics (m3, m4, m5, m10, m11, m12)
 @delayed
-def building_and_intersection_metrics(city_name, grid_size, YOUR_NAME):
-    # Initialize counter for total grid cells processed
-    grid_cell_count = 0
+def building_and_intersection_metrics(city_name, YOUR_NAME, boundary_eps=0.75):
+    """
+    Block-native metrics (M3, M4, M5, M10, M11, M12), with *roads associated to a block*
+    defined as: interior segments + the segments that run along the block boundary
+    (enclosing). Intersections are counted only if they lie on those associated
+    road segments (and only on the valid portions).
 
-    # Define file paths for inputs based on city name and grid size
+    dask-expr compatible; writes a Parquet dataset dir and returns its path.
+    boundary_eps is in CRS units (meters if projected).
+    """
+    # -------- Paths --------
     paths = {
-        'grid': f'{GRIDS_PATH}/{city_name}/{city_name}_{str(grid_size)}m_grid.geoparquet',
-        'buildings': f'{BUILDINGS_PATH}/{city_name}/Overture_building_{city_name}.geoparquet',
-        'buildings_with_distances': f'{BUILDINGS_PATH}/{city_name}/Overture_building_{city_name}_with_distances.geoparquet',
-        'roads': f'{ROADS_PATH}/{city_name}/{city_name}_OSM_roads.geoparquet',
-        'intersections': f'{INTERSECTIONS_PATH}/{city_name}/{city_name}_OSM_intersections.geoparquet'
+        'buildings':     f'{BUILDINGS_PATH}/{city_name}/Overture_building_{city_name}.geoparquet',
+        'roads':         f'{ROADS_PATH}/{city_name}/{city_name}_OSM_roads.geoparquet',
+        'intersections': f'{INTERSECTIONS_PATH}/{city_name}/{city_name}_OSM_intersections.geoparquet',
+        'blocks':        f'{BLOCKS_PATH}/{city_name}/{city_name}_blocks_{YOUR_NAME}.geoparquet',
     }
 
-    # Retrieve the appropriate EPSG code for spatial operations
+    # -------- Load base layers --------
     epsg = get_epsg(city_name).compute()
-
-    # Load and prepare road geometries
     roads = load_dataset(paths['roads'], epsg=epsg)
-    # Load and prepare grid cells
-    grid = load_dataset(paths['grid'], epsg=epsg)  # geometry and index
-
-    # Remove any stray 'geom' column if present
-    if 'geom' in grid.columns:
-        grid = grid.drop(columns=['geom'])
-    # Compute area of each grid cell
-    grid['cell_area'] = grid.geometry.area
-
-    # Update grid cell count
-    cells = grid.index.size
-    grid_cell_count += cells
-
-    # --- Building area and count per cell ---
-    # Load building footprints and compute their area
     buildings = load_dataset(paths['buildings'], epsg=epsg)
+    intersections = load_dataset(paths['intersections'], epsg=epsg)
+    blocks = load_dataset(paths['blocks'], epsg=epsg)
+
+    # Clean stray columns, ensure unique id
+    if 'geom' in blocks.columns:
+        blocks = blocks.drop(columns=['geom'])
+    if 'fid' in blocks.columns and blocks['fid'].dropna().is_unique:
+        blocks = blocks.rename(columns={'fid': 'block_id'})
+    else:
+        blocks = blocks.reset_index(drop=True)
+        blocks['block_id'] = blocks.index.astype('int64')
+
+    # IMPORTANT: make block_id the INDEX ONLY (no same-named column)
+    blocks = blocks.set_index('block_id', drop=True)
+
+    # Denominators
+    blocks['block_area'] = blocks.geometry.area
+    blocks['block_area_km2'] = blocks['block_area'] / 1e6
+
+    # Optional
     buildings['area'] = buildings.geometry.area
 
-    # Create a lightweight copy of grid for spatial joins
-    grid_small = (
-        grid
-        .reset_index()[['index', 'geometry']]
-        .rename(columns={'index': 'index_right'})
+    # -------- Small pandas block frames --------
+    # For polygon overlays (interior roads/buildings): need block_id as COLUMN
+    blocks_small_overlay = (
+        blocks[['geometry']].compute().reset_index()[['block_id','geometry']]
     )
+    # For boundary overlays: boundary buffer polygon per block (block_id as COLUMN)
+    blocks_boundary_overlay = blocks_small_overlay.copy()
+    # buffer the boundary a tiny amount to capture co-linear boundary segments robustly
+    blocks_boundary_overlay['geometry'] = blocks_boundary_overlay.geometry.boundary.buffer(boundary_eps)
 
-    # Define function for per-partition clipping and aggregation of building areas
-    def building_area_partition(bldg_part, grid_sm):
-        # Clip building geometries to grid cells
-        clipped = gpd.overlay(bldg_part, grid_sm, how='intersection')
-        # Compute clipped building area
+    # For sjoin (points on segments): use index = block_id ONLY
+    blocks_small_sjoin = blocks[['geometry']].compute()  # index = block_id
+    blocks_small_sjoin.index.name = 'block_id'
+
+    # -------- Partition fns --------
+    def building_area_partition(bldg_part: gpd.GeoDataFrame, blocks_sm_ov: gpd.GeoDataFrame) -> pd.DataFrame:
+        clipped = gpd.overlay(bldg_part, blocks_sm_ov, how='intersection')
+        if clipped.empty:
+            return pd.DataFrame(columns=['built_area', 'n_buildings'], index=pd.Index([], name='block_id'))
         clipped['clipped_area'] = clipped.geometry.area
-        # Aggregate built area and count buildings by cell
-        out = clipped.groupby('index_right').agg(
-            built_area=('clipped_area', 'sum'),
-            n_buildings=('geometry', 'size')
-        )
+        out = (clipped.groupby('block_id')
+                     .agg(built_area=('clipped_area', 'sum'),
+                          n_buildings=('geometry', 'size')))
+        out.index.name = 'block_id'
         return out
 
-    # Define minimal metadata DataFrame for Dask
+    def road_segments_partition(roads_part: gpd.GeoDataFrame,
+                                blocks_sm_ov: gpd.GeoDataFrame,
+                                blocks_bd_ov: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+        """
+        Return *associated road segments* per block:
+          - interior clips (roads ∩ polygon)
+          - boundary clips (roads ∩ buffered boundary)
+        Columns: ['block_id','geometry']
+        """
+        # Interior segments
+        inside = gpd.overlay(roads_part, blocks_sm_ov, how='intersection')
+        inside = inside[['block_id','geometry']]
+        # Boundary-following segments (enclosing)
+        boundary = gpd.overlay(roads_part, blocks_bd_ov, how='intersection')
+        boundary = boundary[['block_id','geometry']]
+
+        if inside.empty and boundary.empty:
+            return gpd.GeoDataFrame({'block_id': pd.Series([], dtype='int64'),
+                                     'geometry': gpd.GeoSeries([], dtype='geometry')},
+                                     geometry='geometry')
+
+        segs = pd.concat([inside, boundary], ignore_index=True)
+        # Remove empties and zero-length artifacts
+        segs = segs[~segs.geometry.is_empty]
+        segs = segs[segs.geometry.length > 0]
+        return segs
+
+    # intersections will be counted *on associated road segments* (not polygon)
+    def intersections_on_segments_partition(pnts_part: gpd.GeoDataFrame,
+                                            assoc_segments_pd: gpd.GeoDataFrame) -> pd.DataFrame:
+        """
+        Join intersections to associated road segments; count by street_count thresholds.
+        Deduplicate per (block_id, osmid) if osmid exists to avoid double counts from multiple segments.
+        Returns index=block_id with columns n_intersections, intersections_3plus, intersections_4way.
+        """
+        if pnts_part.empty or assoc_segments_pd.empty:
+            cols = ['n_intersections', 'intersections_3plus', 'intersections_4way']
+            return pd.DataFrame(columns=cols, index=pd.Index([], name='block_id'))
+
+        left = pnts_part[['geometry', 'street_count']].copy()
+        if 'osmid' in pnts_part.columns:
+            left['osmid'] = pnts_part['osmid'].astype('int64', errors='ignore')
+
+        j = gpd.sjoin(left, assoc_segments_pd[['block_id','geometry']], predicate='intersects', how='inner')
+        # De-dup (intersection might touch multiple segments in the same block)
+        if 'osmid' in j.columns:
+            j = j.drop_duplicates(subset=['block_id','osmid'])
+        else:
+            # fall back: drop dup by geometry coords per block (coarse but prevents explosion)
+            j = j.drop_duplicates(subset=['block_id','geometry'])
+
+        g2 = j[j.street_count >= 2].groupby('block_id').size().rename('n_intersections')
+        g3 = j[j.street_count >= 3].groupby('block_id').size().rename('intersections_3plus')
+        g4 = j[j.street_count == 4].groupby('block_id').size().rename('intersections_4way')
+        out = pd.concat([g2, g3, g4], axis=1)
+        out.index.name = 'block_id'
+        return out
+
+    # -------- Metadata (Dask) --------
     meta_ba = pd.DataFrame({
-        'index_right': pd.Series(dtype='int64'),
+        'block_id': pd.Series(dtype='int64'),
         'built_area': pd.Series(dtype='float64'),
         'n_buildings': pd.Series(dtype='int64')
-    }).set_index('index_right')
+    }).set_index('block_id')
 
-    # Apply building_area_partition across Dask partitions and persist
-    parts = buildings.map_partitions(
-        building_area_partition,
-        grid_small,
-        meta=meta_ba
+    # for road segments: we return geometries with block_id (not aggregated yet)
+    meta_rseg = gpd.GeoDataFrame({
+        'block_id': pd.Series(dtype='int64'),
+        'geometry': gpd.GeoSeries(dtype='geometry')
+    }, geometry='geometry')
+
+    meta_ic = pd.DataFrame({
+        'block_id': pd.Series(dtype='int64'),
+        'n_intersections': pd.Series(dtype='int64'),
+        'intersections_3plus': pd.Series(dtype='int64'),
+        'intersections_4way': pd.Series(dtype='int64')
+    }).set_index('block_id')
+
+    # -------- Buildings → blocks (built area / counts) --------
+    parts_b = buildings.map_partitions(building_area_partition, blocks_small_overlay, meta=meta_ba).persist()
+    agg_bldg = (
+        parts_b.reset_index()
+               .groupby('block_id')
+               .sum()
+               .reset_index()
+               .set_index('block_id')
+    )
+    blocks = blocks.join(agg_bldg, how='left')
+    blocks['n_buildings'] = blocks['n_buildings'].fillna(0).astype('int64')
+    blocks['built_area']  = blocks['built_area'].fillna(0.0)
+
+    # -------- Roads → associated segments (interior + boundary) --------
+    roads_simple = roads[['geometry']]
+    assoc_segments = roads_simple.map_partitions(
+        road_segments_partition,
+        blocks_small_overlay,
+        blocks_boundary_overlay,
+        meta=meta_rseg
     ).persist()
 
-    # Sum results across partitions
-    agg = parts.groupby('index_right').sum()
-
-    # Attach aggregated building metrics back to grid
-    grid['n_buildings'] = agg['n_buildings'].fillna(0).astype(int)
-    grid['built_area']  = agg['built_area'].fillna(0.0)
-
-    # --- Road length per cell ---
-    # Extract only geometry column for roads
-    roads_geo = roads[['geometry']]
-
-    # Prepare lightweight grid copy again for overlay
-    grid_small = (
-        grid.reset_index()[['index', 'geometry']]
-            .rename(columns={'index': 'index_right'})
-    )
-
-    # Define partition function to compute clipped road lengths
-    def road_length_partition(df, grid_sm):
-        clipped = gpd.overlay(df, grid_sm, how='intersection')
-        # Extract length of each clipped segment
-        L = clipped.geometry.length.values
-        return pd.DataFrame({
-            'index_right': clipped['index_right'].values,
-            'length_in_cell': L
-        }, index=clipped.index)
-
-    # Metadata for Dask overlay of road lengths
-    meta_rl = pd.DataFrame({
-        'index_right': pd.Series(dtype='int64'),
-        'length_in_cell': pd.Series(dtype='float64')
-    })
-
-    # Compute road lengths per partition and persist
-    road_parts = roads_geo.map_partitions(
-        road_length_partition, grid_small, meta=meta_rl
+    # Compute total length per block from associated segments
+    assoc_with_len = assoc_segments.map_partitions(
+        lambda df: df.assign(seg_len_m=df.geometry.length),
+        meta=pd.DataFrame({
+            'block_id': pd.Series(dtype='int64'),
+            'geometry': gpd.GeoSeries(dtype='geometry'),
+            'seg_len_m': pd.Series(dtype='float64')
+        })
     ).persist()
 
-    # Aggregate total road length per cell
-    agg_rl = road_parts.groupby('index_right').agg(
-        total_len_m=('length_in_cell', 'sum')
+    agg_len = (
+        assoc_with_len[['block_id','seg_len_m']]
+        .reset_index()
+        .groupby('block_id')
+        .sum()
+        .reset_index()
+        .set_index('block_id')
     )
 
-    # Convert cell area to km^2 and road length to km, add a boolean to indicate whether a grid cell has roads.
-    grid['cell_area_km2'] = grid['cell_area'] / 1e6
-    grid['road_length'] = (agg_rl['total_len_m'] / 1000.0).fillna(0.0)
-    grid['has_roads'] = grid['road_length'] > 0
+    blocks = blocks.join(agg_len.rename(columns={'seg_len_m':'total_len_m'}), how='left')
+    blocks['total_len_m'] = blocks['total_len_m'].fillna(0.0)
+    blocks['road_length'] = blocks['total_len_m'] / 1000.0  # km
+    blocks['has_roads']   = blocks['road_length'] > 0
 
-    # --- Intersection counts per cell ---
-    intersections = load_dataset(paths['intersections'], epsg=epsg)
-    ji = dgpd.sjoin(intersections, grid, predicate='intersects')
-    # Count intersections by minimum street counts
-    counts2 = ji[ji.street_count >= 2].groupby('index_right').size()
-    counts3 = ji[ji.street_count >= 3].groupby('index_right').size()
-    counts4 = ji[ji.street_count == 4].groupby('index_right').size()
+    # -------- Intersections → counted only on associated segments --------
+    # Bring associated segments to pandas for a robust sjoin with points
+    assoc_segments_pd = assoc_segments.compute()
+    # Map intersections partitions to counts-on-segments
+    parts_i = intersections.map_partitions(
+        intersections_on_segments_partition, assoc_segments_pd, meta=meta_ic
+    ).persist()
 
-    # Attach intersection counts and flags
-    grid['n_intersections'] = counts2.fillna(0).astype(int)
-    grid['has_intersections'] = (grid['n_intersections'] > 0).astype(bool)
-    grid['intersections_3plus'] = counts3.fillna(0).astype(int)
-    grid['intersections_4way']  = counts4.fillna(0).astype(int)
-
-    # --- Compute raw and standardized metrics ---
-    # M3: Road density (km per km^2)
-    grid['m3_raw'] = grid['road_length'] / grid['cell_area_km2']
-    grid['m3_std'] = grid['m3_raw'].map_partitions(
-        standardize_metric_3, meta=('m3', 'float64')
+    agg_i = (
+        parts_i.reset_index()
+               .groupby('block_id')
+               .sum()
+               .reset_index()
+               .set_index('block_id')
     )
+    blocks = blocks.join(agg_i, how='left')
+    for c in ['n_intersections', 'intersections_3plus', 'intersections_4way']:
+        blocks[c] = blocks[c].fillna(0).astype('int64')
+    blocks['has_intersections'] = blocks['n_intersections'] > 0
 
-    # M4: Fraction of 4-way intersections among 3+ intersections
-    grid['m4_raw'] = grid['intersections_4way'] / grid['intersections_3plus']
-    # Fill missing values with median of non-null
-    m4_median = grid['m4_raw'].dropna().quantile(0.5).compute()
-    grid['m4_raw'] = grid['m4_raw'].fillna(m4_median)
-    grid['m4_std'] = grid['m4_raw'].map_partitions(
-        standardize_metric_4, meta=('m4', 'float64')
-    )
+    # -------- Metrics (raw + std) --------
+    blocks['m3_raw'] = blocks['road_length'] / blocks['block_area_km2']                        # road density
+    blocks['m3_std'] = blocks['m3_raw'].map_partitions(standardize_metric_3, meta=('m3','float64'))
 
-    # M5: Intersection density per m^2, scaled to per km^2
-    grid['m5_raw'] = (1000 ** 2) * (grid['n_intersections'] / grid['cell_area'])
-    grid['m5_raw'] = grid['m5_raw'].mask(
-        grid['has_roads'] & grid['m5_raw'].isna(),
-        0.0
-    )
-    grid['m5_std'] = grid['m5_raw'].map_partitions(
-        standardize_metric_5, meta=('m5', 'float64')
-    )
+    blocks['m4_raw'] = blocks['intersections_4way'] / blocks['intersections_3plus']            # 4-way share
+    m4_med = blocks['m4_raw'].dropna().quantile(0.5).compute()
+    if pd.isna(m4_med):
+        m4_med = 0.0
+    blocks['m4_raw'] = blocks['m4_raw'].fillna(m4_med)
+    blocks['m4_std'] = blocks['m4_raw'].map_partitions(standardize_metric_4, meta=('m4','float64'))
 
-    # M10: Building density (count per km^2)
-    grid['m10_raw'] = grid['n_buildings'] / grid['cell_area_km2']
-    grid['m10_std'] = grid['m10_raw'].map_partitions(
-        standardize_metric_10, meta=('m10', 'float64')
-    )
+    blocks['m5_raw'] = (blocks['n_intersections'] / blocks['block_area']) * (1000 ** 2)        # intersections / km²
+    blocks['m5_raw'] = blocks['m5_raw'].mask(blocks['has_roads'] & blocks['m5_raw'].isna(), 0.0)
+    blocks['m5_std'] = blocks['m5_raw'].map_partitions(standardize_metric_5, meta=('m5','float64'))
 
-    # M11: Built-area fraction of cell area
-    grid['m11_raw'] = grid['built_area'] / grid['cell_area']
-    grid['m11_std'] = grid['m11_raw'].map_partitions(
-        standardize_metric_11, meta=('m11', 'float64')
-    )
+    blocks['m10_raw'] = blocks['n_buildings'] / blocks['block_area_km2']                       # building density
+    blocks['m10_std'] = blocks['m10_raw'].map_partitions(standardize_metric_10, meta=('m10','float64'))
 
-    # M12: Average building size (built area per building)
-    grid['m12_raw'] = (grid['built_area'] / grid['n_buildings']).fillna(0.0)
-    grid['m12_std'] = grid['m12_raw'].map_partitions(
-        standardize_metric_12, meta=('m12', 'float64')
-    )
+    blocks['m11_raw'] = blocks['built_area'] / blocks['block_area']                             # built fraction
+    blocks['m11_std'] = blocks['m11_raw'].map_partitions(standardize_metric_11, meta=('m11','float64'))
 
-    # --- Output results to Parquet file ---
-    out = (
-        f'{OUTPUT_PATH_RASTER}/{city_name}/'
-        f'{city_name}_{grid_size}m_metrics_3_4_5_10_11_12_grid_{YOUR_NAME}.geoparquet'
-    )
-    # Drop stray geometry if present before writing
-    if 'geom' in grid.columns:
-        grid = grid.drop(columns=['geom'])
-    grid.to_parquet(out)
+    blocks['m12_raw'] = (blocks['built_area'] / blocks['n_buildings']).fillna(0.0)             # avg building size
+    blocks['m12_std'] = blocks['m12_raw'].map_partitions(standardize_metric_12, meta=('m12','float64'))
+
+    # -------- Write out (dataset directory) --------
+    out = f'{OUTPUT_PATH_RASTER}/{city_name}/{city_name}_block_metrics_3_4_5_10_11_12_{YOUR_NAME}'
+
+    # Dask-safe duplicate check (index is block_id ONLY)
+    tmp = blocks.reset_index()[['block_id']]
+    n_unique = tmp['block_id'].nunique().compute()
+    n_rows   = tmp['block_id'].count().compute()
+    if n_unique != n_rows:
+        raise ValueError(f"Duplicate block_id detected: n_unique={n_unique}, n_rows={n_rows}")
+
+    # Column-name duplicates check via pandas Index
+    import pandas as _pd
+    if _pd.Index(blocks.columns).duplicated().any():
+        raise ValueError("Duplicate column names found.")
+
+    # Eager write
+    blocks.to_parquet(out, write_index=True, compute=True)
     return out
 
 # Delayed task to compute building distance metrics for each grid cell
 # - Counts buildings and computes average distance to nearest road per cell
 # - Calculates proportion of buildings within 20m and standardizes metrics m1 and m2
 @delayed
-def building_distance_metrics(city_name, grid_size, YOUR_NAME):
-    # Define file paths for inputs based on city name and grid size
+def building_distance_metrics(city_name, YOUR_NAME):
+    """
+    Block-native M1 & M2 (using buildings_with_distances):
+      - M1: share of buildings within 20m of a road (per block)
+      - M2: average building→nearest-road distance (per block)
+    Avoids dask-expr pitfalls:
+      * 'block_id' is the index ONLY on the dask frame
+      * sjoin uses pandas frames inside map_partitions
+      * groupby folds via reset_index() → groupby('block_id') → sum
+    Writes a Parquet dataset dir and returns its path.
+    """
+
+    # ---------- Paths ----------
     paths = {
-        'grid': f'{GRIDS_PATH}/{city_name}/{city_name}_{str(grid_size)}m_grid.geoparquet',
-        'buildings': f'{BUILDINGS_PATH}/{city_name}/Overture_building_{city_name}.geoparquet',
-        'buildings_with_distances': f'{BUILDINGS_PATH}/{city_name}/Overture_building_{city_name}_with_distances.geoparquet',
-        'roads': f'{ROADS_PATH}/{city_name}/{city_name}_OSM_roads.geoparquet',
-        'intersections': f'{INTERSECTIONS_PATH}/{city_name}/{city_name}_OSM_intersections.geoparquet'
+        'blocks':        f'{BLOCKS_PATH}/{city_name}/{city_name}_blocks_{YOUR_NAME}.geoparquet',
+        'buildings_dist':f'{BUILDINGS_PATH}/{city_name}/Overture_building_{city_name}_with_distances.geoparquet',
     }
 
-    # Retrieve the EPSG code for spatial operations
+    # ---------- Load bases ----------
     epsg = get_epsg(city_name).compute()
 
-    # Load and prepare grid cells
-    grid = load_dataset(paths['grid'], epsg=epsg)
-    if 'geom' in grid.columns:
-        grid = grid.drop(columns=['geom'])
+    # Blocks (dask-geopandas)
+    blocks = load_dataset(paths['blocks'], epsg=epsg)
+    if 'geom' in blocks.columns:
+        blocks = blocks.drop(columns=['geom'])
 
-    # Load building data with precomputed distances to nearest road
-    buildings = load_dataset(paths['buildings_with_distances'], epsg=epsg)
-    # Ensure distance field is float
-    buildings['distance_to_nearest_road'] = buildings['distance_to_nearest_road'].astype(float)
-    # Compute building footprint area
-    buildings['area'] = buildings.geometry.area
+    # Ensure unique block_id, as INDEX ONLY
+    if 'fid' in blocks.columns and blocks['fid'].dropna().is_unique:
+        blocks = blocks.rename(columns={'fid': 'block_id'})
+    elif 'block_id' not in blocks.columns:
+        blocks = blocks.reset_index(drop=True)
+        blocks['block_id'] = blocks.index.astype('int64')
+    blocks = blocks.set_index('block_id', drop=True)
 
-    # Spatial join buildings to grid cells
-    joined_buildings = dgpd.sjoin(buildings, grid, predicate='intersects')
+    # Buildings with precomputed distances
+    buildings = load_dataset(paths['buildings_dist'], epsg=epsg)
+    # Robust dtypes
+    buildings['distance_to_nearest_road'] = buildings['distance_to_nearest_road'].astype('float64')
 
-    # Count total buildings per cell
-    counts_buildings = joined_buildings.groupby('index_right').size()
-    grid['n_buildings'] = counts_buildings.fillna(0).astype(int)
-    grid['has_buildings'] = grid['n_buildings'] > 0
+    # ---------- Make small pandas block frame for sjoin ----------
+    # index = block_id (no 'block_id' column) → avoids "cannot insert block_id" error
+    blocks_small_sjoin = blocks[['geometry']].compute()  # pandas GeoDF; index is block_id
 
-    # Compute average distance to nearest road per cell
-    average_distance = joined_buildings.groupby('index_right')['distance_to_nearest_road'].mean()
-    grid['average_distance_nearest_building'] = average_distance.fillna(0.0)
+    # ---------- Partition function ----------
+    def building_dist_partition(bldg_part: gpd.GeoDataFrame,
+                                blocks_sm_sj: gpd.GeoDataFrame) -> pd.DataFrame:
+        """
+        Per-partition: sjoin buildings→blocks; aggregate count, sum(distance), and <=20m count.
+        Returns a pandas DataFrame indexed by block_id with columns:
+          n_buildings, sum_distance, n_closer_20m
+        """
+        if bldg_part.empty:
+            return pd.DataFrame(columns=['n_buildings','sum_distance','n_closer_20m'],
+                                index=pd.Index([], name='block_id'))
 
-    # Identify buildings closer than 20m to roads
-    buildings_closer_than_20m = buildings[buildings['distance_to_nearest_road'] <= 20]
-    joined_closer = dgpd.sjoin(buildings_closer_than_20m, grid, predicate='intersects')
-    n_closer = joined_closer.groupby('index_right').size()
-    grid['n_buildings_closer_than_20m'] = n_closer.fillna(0).astype(int)
+        # Keep only needed columns to reduce memory
+        bb = bldg_part[['geometry', 'distance_to_nearest_road']].copy()
+        # sjoin (right index becomes 'index_right')
+        j = gpd.sjoin(bb, blocks_sm_sj, predicate='intersects', how='inner')
+        if j.empty:
+            return pd.DataFrame(columns=['n_buildings','sum_distance','n_closer_20m'],
+                                index=pd.Index([], name='block_id'))
 
-    # Assign zero where cells have buildings but none are within 20m
-    grid = grid.assign(
-        n_buildings_closer_than_20m =
-            grid['n_buildings_closer_than_20m'].mask(
-                (grid['n_buildings'] > 0) &
-                (grid['n_buildings_closer_than_20m'].isna()),
-                0
-            )
+        # Move right index into a real column named block_id
+        if 'index_right' in j.columns:
+            j = j.rename(columns={'index_right': 'block_id'})
+
+        # Aggregate per block
+        j['is_close'] = (j['distance_to_nearest_road'] <= 20.0).astype('int8')
+        grp = j.groupby('block_id')
+        out = grp.agg(
+            n_buildings = ('geometry', 'size'),
+            sum_distance = ('distance_to_nearest_road', 'sum'),
+            n_closer_20m = ('is_close', 'sum'),
+        )
+        out.index.name = 'block_id'
+        return out
+
+    # ---------- Dask metadata ----------
+    meta = (
+        pd.DataFrame({
+            'block_id': pd.Series(dtype='int64'),
+            'n_buildings': pd.Series(dtype='int64'),
+            'sum_distance': pd.Series(dtype='float64'),
+            'n_closer_20m': pd.Series(dtype='int64'),
+        }).set_index('block_id')
     )
 
-    # M1: Proportion of buildings within 20m of a road
-    grid = grid.assign(
-        m1_raw = grid['n_buildings_closer_than_20m'] / grid['n_buildings']
-    )
-    grid['m1_raw'] = grid['m1_raw'].fillna(grid['m1_raw'].median())
-    grid['m1_std'] = grid['m1_raw'].map_partitions(
-        standardize_metric_1, meta=('m1', 'float64')
-    )
-
-    # M2: Average building-to-road distance metric
-    grid['m2_raw'] = grid['average_distance_nearest_building'].fillna(
-        grid['average_distance_nearest_building'].median()
-    )
-    grid['m2_std'] = grid['m2_raw'].map_partitions(
-        standardize_metric_2, meta=('m2', 'float64')
+    # ---------- Map-reduce across partitions ----------
+    parts = buildings.map_partitions(building_dist_partition, blocks_small_sjoin, meta=meta).persist()
+    agg_all = (
+        parts.reset_index()
+             .groupby('block_id')     # dask-expr safe (no as_index=)
+             .sum()
+             .reset_index()
+             .set_index('block_id')
     )
 
-    # Output results to Parquet file
-    path = (
-        f'{OUTPUT_PATH_RASTER}/{city_name}/'
-        f'{city_name}_{str(grid_size)}m_grid_{YOUR_NAME}_metrics_1_2.geoparquet'
-    )
-    if 'geom' in grid.columns:
-        grid = grid.drop(columns=['geom'])
-    grid.to_parquet(path)
+    # ---------- Join back to blocks (safe alignment) ----------
+    blocks = blocks.join(agg_all, how='left')
+    for c, dtype in [('n_buildings','int64'), ('n_closer_20m','int64')]:
+        blocks[c] = blocks[c].fillna(0).astype(dtype)
+    blocks['sum_distance'] = blocks['sum_distance'].fillna(0.0)
+
+    blocks['has_buildings'] = blocks['n_buildings'] > 0
+
+    # Average distance (handle 0/0)
+    with pd.option_context('mode.use_inf_as_na', True):
+        blocks['average_distance_nearest_building'] = (
+            (blocks['sum_distance'] / blocks['n_buildings'].where(blocks['n_buildings'] > 0))
+            .fillna(0.0)
+        )
+
+    # ---------- Metrics ----------
+    # M1: share of buildings within 20m (fill NA with median of non-NA)
+    blocks['m1_raw'] = (blocks['n_closer_20m'] / blocks['n_buildings'].where(blocks['n_buildings'] > 0))
+    m1_med = blocks['m1_raw'].dropna().quantile(0.5).compute()
+    if pd.isna(m1_med):
+        m1_med = 0.0
+    blocks['m1_raw'] = blocks['m1_raw'].fillna(m1_med)
+    blocks['m1_std'] = blocks['m1_raw'].map_partitions(standardize_metric_1, meta=('m1', 'float64'))
+
+    # M2: average distance (fill NA with median)
+    blocks['m2_raw'] = blocks['average_distance_nearest_building']
+    m2_med = blocks['m2_raw'].dropna().quantile(0.5).compute()
+    if pd.isna(m2_med):
+        m2_med = 0.0
+    blocks['m2_raw'] = blocks['m2_raw'].fillna(m2_med)
+    blocks['m2_std'] = blocks['m2_raw'].map_partitions(standardize_metric_2, meta=('m2', 'float64'))
+
+    # ---------- Write out ----------
+    out = f'{OUTPUT_PATH_RASTER}/{city_name}/{city_name}_block_metrics_1_2_{YOUR_NAME}'
+
+    # Dask-safe duplicate id check (index is block_id ONLY → this is safe)
+    tmp = blocks.reset_index()[['block_id']]
+    n_unique = tmp['block_id'].nunique().compute()
+    n_rows   = tmp['block_id'].count().compute()
+    if n_unique != n_rows:
+        raise ValueError(f"Duplicate block_id detected: n_unique={n_unique}, n_rows={n_rows}")
+
+    # No duplicate column names
+    if pd.Index(blocks.columns).duplicated().any():
+        raise ValueError("Duplicate column names found.")
+
+    # Eager write so the delayed task really produces files now
+    blocks.to_parquet(out, write_index=True, compute=True)
+    return out
 
 
 # Delayed task to compute KL divergence and average block width metrics per grid cell
@@ -336,219 +475,231 @@ def building_distance_metrics(city_name, grid_size, YOUR_NAME):
 #       Fallback: unweighted KL for cells with ≥2 buildings and no associated blocks
 # - M7: Average block width, weighted by block area share within each grid cell
 @delayed
-def compute_m6_m7(city_name, grid_size, YOUR_NAME):
+def compute_m6_m7(city_name, YOUR_NAME):
     """
-    Computes:
-    - M6 (weighted): KL divergence of building orientations per cell
-        * Weight by block-area share within cell and building count per block-cell overlap
-    - M6 (fallback): Unweighted KL for cells with ≥2 buildings but no block overlap
-    - M7: Mean block width per cell, weighted by block-area share
+    Block-level metrics:
+      - M6: KL divergence of building orientations per block (0..1)
+      - M7: Block width proxy per block (≈ 2 * max_radius)
+    No grid dependency. dask-expr compatible.
+    Writes a Parquet dataset directory and returns its path.
     """
+    # ---------- Paths ----------
+    paths = {
+        'blocks':    f'{BLOCKS_PATH}/{city_name}/{city_name}_blocks_{YOUR_NAME}.geoparquet',
+        'buildings': f'{BUILDINGS_PATH}/{city_name}/Overture_building_{city_name}_with_distances_and_azimuths.geoparquet',
+    }
 
-    # 0) Determine projection and load inputs
+    # ---------- Load ----------
     epsg = get_epsg(city_name).compute()
-    grid = load_dataset(
-        f'{GRIDS_PATH}/{city_name}/{city_name}_{grid_size}m_grid.geoparquet',
-        epsg=epsg
-    )
-    blocks = load_dataset(
-        f'{BLOCKS_PATH}/{city_name}/{city_name}_blocks_{YOUR_NAME}.geoparquet',
-        epsg=epsg
-    ).persist()
-    buildings = load_dataset(
-        f'{BUILDINGS_PATH}/{city_name}/Overture_building_{city_name}_with_distances_and_azimuths.geoparquet',
-        epsg=epsg
-    ).persist()
-    
-    # Ensure azimuth is numeric
+
+    blocks = load_dataset(paths['blocks'], epsg=epsg)
+    if 'geom' in blocks.columns:
+        blocks = blocks.drop(columns=['geom'])
+
+    # Ensure unique block_id as INDEX ONLY (avoid name collisions later)
+    if 'fid' in blocks.columns and blocks['fid'].dropna().is_unique:
+        blocks = blocks.rename(columns={'fid': 'block_id'})
+    elif 'block_id' not in blocks.columns:
+        blocks = blocks.reset_index(drop=True)
+        blocks['block_id'] = blocks.index.astype('int64')
+    blocks = blocks.set_index('block_id', drop=True)
+
+    # Need max_radius for M7
+    if 'max_radius' not in blocks.columns:
+        raise ValueError("blocks is missing 'max_radius' column required for M7. Please add it in pre-processing.")
+
+    # Buildings (with azimuths)
+    buildings = load_dataset(paths['buildings'], epsg=epsg)
+    # Make sure azimuth is numeric float in [0,180)
     buildings['azimuth'] = buildings['azimuth'].map_partitions(
-        pd.to_numeric, meta=('azimuth','float64'), errors='coerce'
+        pd.to_numeric, errors='coerce', meta=('azimuth', 'float64')
     )
+    def _clamp_azimuth(s):
+        s = s.astype('float64')
+        s = s.where(~s.notnull(), s % 180.0)
+        return s
+    buildings['azimuth'] = buildings['azimuth'].map_partitions(_clamp_azimuth, meta=('azimuth','float64'))
 
-    # Remove any extraneous geometry column
-    if 'geom' in grid.columns:
-        grid = grid.drop(columns=['geom'])
+    # ---------- Small pandas frame for sjoin (index = block_id ONLY) ----------
+    blocks_small_sjoin = blocks[['geometry']].compute()
+    # Explicit index name helps some GeoPandas versions return 'block_id' column
+    blocks_small_sjoin.index.name = 'block_id'
 
-    # 1) Prepare block buffers for overlap weighting
-    epsilon = 0.001
-    blocks = blocks.assign(
-        block_id=blocks.index,
-        epsilon_buffer=blocks.geometry.buffer(-(1-epsilon) * blocks.max_radius),
-        width_buffer=blocks.geometry.buffer(-0.2 * blocks.max_radius)
-    )
-
-    # 2) Compute block-to-grid overlap weights (area_weight per record)
-    bgo = compute_block_grid_weights(blocks, grid).compute()
-
-    # 3) Count buildings within each block-cell overlap
-    buildings_pdf = buildings.compute()[['geometry']]
-    join = gpd.sjoin(
-        buildings_pdf,
-        bgo[['block_id', 'grid_id', 'geometry']],
-        predicate='intersects'
-    )
-    n_bc = (
-        join.groupby(['block_id','grid_id']).size()
-            .rename('n_buildings_cell')
-            .reset_index()
-    )
-    bgo = (
-        bgo.merge(n_bc, on=['block_id','grid_id'], how='left')
-           .fillna({'n_buildings_cell': 0})
-    )
-
-    # 4) Compute block-level KL and aggregate to weighted m6 per cell
-    kl_df = compute_block_kl_metrics(
-        dgpd.sjoin(buildings, blocks, predicate='intersects')
-            [['block_id','geometry','epsilon_buffer','width_buffer','azimuth']]
-            .set_index('block_id')
-            .repartition(npartitions=4)
-    ).compute()
-    df = (
-        bgo.merge(kl_df, on='block_id', how='left')
-           .dropna(subset=['standardized_kl'])
-           .assign(
-               weight=lambda d: d.area_weight * d.n_buildings_cell,
-               weighted_kl=lambda d: d.standardized_kl * d.weight
-           )
-    )
-    grid_m6 = (
-        df.groupby('grid_id')
-          .agg(
-              total_weighted_kl=('weighted_kl','sum'),
-              total_weight=('weight','sum')
-          )
-    )
-    grid_m6['m6'] = grid_m6.total_weighted_kl / grid_m6.total_weight
-
-    # 5) Compute weighted average block width per cell (m7)
-    bgo['weighted_max_radius'] = bgo.max_radius * bgo.area_weight
-    grid_m7 = (
-        bgo.groupby('grid_id')
-           .agg(
-               total_weighted_max_radius=('weighted_max_radius','sum'),
-               total_weight=('area_weight','sum')
-           )
-    )
-    grid_m7['m7'] = grid_m7.total_weighted_max_radius / grid_m7.total_weight
-
-    # 6) Fallback: unweighted orientation KL for cells lacking block overlaps
+    # ---------- KL helper ----------
     def kl_divergence(arr, bins=18):
-        hist,_ = np.histogram(arr, bins=bins, range=(0,180))
-        P = hist/hist.sum() if hist.sum()>0 else np.ones(bins)/bins
-        Q = np.ones(bins)/bins
-        return entropy(P, Q) / np.log(bins)
+        if arr.size == 0:
+            return np.nan
+        hist, _ = np.histogram(arr, bins=bins, range=(0.0, 180.0))
+        total = hist.sum()
+        if total == 0:
+            return np.nan
+        P = hist / total
+        mask = P > 0
+        kl = np.sum(P[mask] * (np.log(P[mask]) - np.log(1.0 / bins)))
+        return float(kl / np.log(bins))
 
-    b2g = dgpd.sjoin(
-        buildings[['geometry','azimuth']],
-        grid[['geometry']],
-        predicate='intersects'
+    # ---------- Join buildings→blocks and compute M6 per block ----------
+    b2b = dgpd.sjoin(
+        buildings[['geometry', 'azimuth']],
+        blocks_small_sjoin[['geometry']],
+        predicate='intersects',
+        how='inner'
     ).persist()
-    m6_unw = (
-        b2g.groupby('index_right')['azimuth']
-           .apply(lambda s: kl_divergence(s.to_numpy()),
-                  meta=('azimuth','float64'))
-           .rename('m6_unweighted')
+
+    # Harmonize the right key name across GeoPandas/Dask versions
+    if 'index_right' in b2b.columns:
+        join_key = 'index_right'
+    elif 'block_id' in b2b.columns:
+        join_key = 'block_id'
+    else:
+        # As a last resort, try to recover from index names
+        # (very rare; helps if sjoin kept right index unnamed)
+        # Convert to pandas for a tiny sample to inspect columns
+        sample_cols = list(b2b._meta.columns)
+        raise KeyError(f"sjoin result lacks 'index_right'/'block_id'. Columns: {sample_cols}")
+
+    m6_series = (
+        b2b.groupby(join_key)['azimuth']
+           .apply(lambda s: kl_divergence(s.to_numpy()), meta=('azimuth', 'float64'))
+           .rename('m6_raw')
     )
 
-    # 7) Merge weighted and unweighted results back into grid
-    grid = grid.rename_axis('grid_id')
-    grid_m6 = grid_m6.rename_axis('grid_id')
-    m6_unw = m6_unw.rename_axis('grid_id')
-    grid_m7 = grid_m7.rename_axis('grid_id')
-    grid = (
-        grid.reset_index()
-            .merge(grid_m6.reset_index(), on='grid_id', how='left')
-            .merge(m6_unw.reset_index(), on='grid_id', how='left')
-            .merge(grid_m7.reset_index()[['grid_id','m7']], on='grid_id', how='left')
-            .set_index('grid_id')
-    )
+    # If key != 'block_id', rename index to 'block_id' for alignment with blocks
+    if join_key != 'block_id':
+        m6_series = m6_series.rename_axis('block_id')
 
-    # 8) Standardize raw metrics and drop intermediates
-    grid['m6_raw'] = grid['m6'].fillna(grid['m6_unweighted'])
-    m6_median = grid['m6_raw'].median().compute()
-    grid['m6_raw'] = grid['m6_raw'].fillna(m6_median)
-    grid['m6_std'] = grid['m6_raw'].map_partitions(
-        standardize_metric_6, meta=('m6','float64')
-    )
-    grid['m7_raw'] = grid['m7'].fillna(200)
-    grid['m7_std'] = grid['m7_raw'].map_partitions(
-        standardize_metric_7, meta=('m7','float64')
-    )
-    grid = grid.drop(columns=['m6','m7'])
+    # Join back to blocks
+    blocks = blocks.join(m6_series, how='left')
 
-    # 9) Write results to Parquet and return path
-    out = (
-        f'{OUTPUT_PATH_RASTER}/{city_name}/'
-        f'{city_name}_{grid_size}m_grid_{YOUR_NAME}_metrics_6_7.geoparquet'
-    )
-    grid.to_parquet(out)
+    # Fill NA with median (or 0 if all NA), then standardize
+    m6_med = blocks['m6_raw'].dropna().quantile(0.5).compute()
+    if pd.isna(m6_med):
+        m6_med = 0.0
+    blocks['m6_raw'] = blocks['m6_raw'].fillna(m6_med)
+    blocks['m6_std'] = blocks['m6_raw'].map_partitions(standardize_metric_6, meta=('m6', 'float64'))
+
+    # ---------- M7: width proxy per block ----------
+    blocks['m7_raw'] = 2.0 * blocks['max_radius']
+    m7_med = blocks['m7_raw'].dropna().quantile(0.5).compute()
+    if pd.isna(m7_med):
+        m7_med = 200.0
+    blocks['m7_raw'] = blocks['m7_raw'].fillna(m7_med)
+    blocks['m7_std'] = blocks['m7_raw'].map_partitions(standardize_metric_7, meta=('m7', 'float64'))
+
+    # ---------- Write out ----------
+    out = f'{OUTPUT_PATH_RASTER}/{city_name}/{city_name}_block_metrics_6_7_{YOUR_NAME}'
+
+    # Dask-safe duplicate id check (index is block_id ONLY → reset_index won’t clash)
+    tmp = blocks.reset_index()[['block_id']]
+    n_unique = tmp['block_id'].nunique().compute()
+    n_rows   = tmp['block_id'].count().compute()
+    if n_unique != n_rows:
+        raise ValueError(f"Duplicate block_id detected: n_unique={n_unique}, n_rows={n_rows}")
+
+    if pd.Index(blocks.columns).duplicated().any():
+        raise ValueError("Duplicate column names found.")
+
+    blocks.to_parquet(out, write_index=True, compute=True)
     return out
 
 
 # Delayed task to compute tortuosity (M8) and intersection angle (M9) per grid cell
 @delayed
-def metrics_roads_intersections(city_name, grid_size, YOUR_NAME):
+def metrics_roads_intersections(city_name, YOUR_NAME):
     """
-    Computes:
-    - M8: Weighted road tortuosity per grid cell
-    - M9: Average intersection angle per grid cell
+    Block-level metrics:
+      - M8: length-weighted road tortuosity per block
+      - M9: average intersection angle per block
+    No grid dependency. dask-expr compatible.
+    Writes a Parquet dataset directory and returns its path.
     """
-    # Define file paths for required inputs
+    # -------- Paths --------
     paths = {
-        'grid': f'{GRIDS_PATH}/{city_name}/{city_name}_{grid_size}m_grid.geoparquet',
-        'blocks': f'{BLOCKS_PATH}/{city_name}/{city_name}_blocks_{YOUR_NAME}.geoparquet',
-        'buildings_with_distances': f'{BUILDINGS_PATH}/{city_name}/Overture_building_{city_name}_with_distances.geoparquet',
-        'roads': f'{ROADS_PATH}/{city_name}/{city_name}_OSM_roads.geoparquet',
-        'intersections': f'{INTERSECTIONS_PATH}/{city_name}/{city_name}_OSM_intersections.geoparquet'
+        'blocks':        f'{BLOCKS_PATH}/{city_name}/{city_name}_blocks_{YOUR_NAME}.geoparquet',
+        'roads':         f'{ROADS_PATH}/{city_name}/{city_name}_OSM_roads.geoparquet',
+        'intersections': f'{INTERSECTIONS_PATH}/{city_name}/{city_name}_OSM_intersections.geoparquet',
     }
 
-    # Load spatial data with correct coordinate reference system
+    # -------- Load --------
     epsg = get_epsg(city_name).compute()
-    grid = load_dataset(paths['grid'], epsg=epsg).persist()
     roads = load_dataset(paths['roads'], epsg=epsg).persist()
-    intersections = load_dataset(paths['intersections'], epsg=epsg).compute()
+    intersections = load_dataset(paths['intersections'], epsg=epsg).compute()  # pandas for angle calc
+    blocks = load_dataset(paths['blocks'], epsg=epsg)
 
-    # Clean grid of extraneous geometry field
-    if 'geom' in grid.columns:
-        grid = grid.drop(columns=['geom'])
+    # Clean & ensure unique block_id
+    if 'geom' in blocks.columns:
+        blocks = blocks.drop(columns=['geom'])
+    if 'fid' in blocks.columns and blocks['fid'].dropna().is_unique:
+        blocks = blocks.rename(columns={'fid': 'block_id'})
+    elif 'block_id' not in blocks.columns:
+        blocks = blocks.reset_index(drop=True)
+        blocks['block_id'] = blocks.index.astype('int64')
+    # IMPORTANT: index ONLY, no same-named column
+    blocks = blocks.set_index('block_id', drop=True)
 
-    # --- M9: Intersection angle metric ---
-    intersections['osmid'] = intersections['osmid'].astype(int)
-    # Compute angles between connecting roads at each intersection
-    intersection_angles = compute_intersection_angles(roads, intersections)
+    # -------- Prepare small pandas block frames to avoid sjoin/overlay name clashes --------
+    # For overlay_partition (expects a column named 'index_right')
+    blocks_small_overlay = (
+        blocks[['geometry']].compute()
+        .reset_index().rename(columns={'index': 'block_id'})  # ensure explicit name
+        .rename(columns={'block_id': 'index_right'})          # overlayPartition expects 'index_right'
+        [['index_right', 'geometry']]
+    )
+    # For sjoin: use index=block_id ONLY (no 'block_id' column)
+    blocks_small_sjoin = blocks[['geometry']].compute()
+    blocks_small_sjoin.index.name = 'block_id'
+
+    # ======================================================================
+    # M9: Average intersection angle per block
+    # ======================================================================
+    intersections['osmid'] = intersections['osmid'].astype('int64')
+
+    # Compute angles between connecting roads at each intersection (helper you already have)
+    # - roads is Dask; intersections is pandas (as in your original)
+    angles_df = compute_intersection_angles(roads, intersections)
+    # Map osmid -> average angle (helper you already have)
     street_count_mapping = intersections.set_index('osmid')['street_count'].to_dict()
-    intersection_angle_mapping = compute_intersection_mapping(
-        intersection_angles, street_count_mapping
-    ).compute()
+    intersection_angle_mapping = compute_intersection_mapping(angles_df, street_count_mapping).compute()
+
     intersections_with_angles = intersections.merge(
         intersection_angle_mapping.rename('average_angle'),
         left_on='osmid', right_index=True, how='left'
     )
-    joined_angles = dgpd.sjoin(
-        intersections_with_angles, grid, predicate='within'
-    )
-    average_angle_between_roads = (
-        joined_angles.groupby('index_right')['average_angle'].mean()
-    )
 
-    # --- M8: Road tortuosity metric ---
-    roads_simple = roads[['geometry']]
-    grid_small = (
-        grid.reset_index()[['index','geometry']]
-            .rename(columns={'index':'index_right'})
+    # Join intersections to blocks (pandas → pandas sjoin)
+    j_int = gpd.sjoin(intersections_with_angles, blocks_small_sjoin[['geometry']],
+                      predicate='within', how='inner')
+    # Right index becomes index of blocks_small_sjoin → in GeoPandas it is stored as 'index_right'
+    if 'index_right' in j_int.columns:
+        j_int = j_int.rename(columns={'index_right': 'block_id'})
+    # Average per block_id (pandas)
+    m9_per_block = (
+        j_int.groupby('block_id')['average_angle']
+             .mean()
+             .rename('m9_raw')
     )
+    # Convert to Dask for a clean join
+    m9_df = dd.from_pandas(m9_per_block.reset_index().set_index('block_id'), npartitions=1)
+
+    # ======================================================================
+    # M8: Road tortuosity per block
+    # ======================================================================
+    roads_simple = roads[['geometry']]
+
+    # Meta for overlay_partition output (GeoDataFrame with 'index_right' and geometry)
     overlay_meta = gpd.GeoDataFrame(
         {'index_right': pd.Series(dtype='int64'),
          'geometry': gpd.GeoSeries(dtype='geometry')},
         geometry='geometry'
     )
-    # Clip road segments to grid cells
-    roads_cells = roads_simple.map_partitions(
-        overlay_partition, grid_small, meta=overlay_meta
+
+    # Clip road segments to blocks (Dask left, pandas right)
+    roads_blocks = roads_simple.map_partitions(
+        overlay_partition, blocks_small_overlay, meta=overlay_meta
     ).persist()
-    # Compute weighted tortuosity and segment length
-    tort = roads_cells.map_partitions(
+
+    # Compute weighted tortuosity + segment length on clipped segments
+    tort = roads_blocks.map_partitions(
         partition_tortuosity_clipped,
         meta=pd.DataFrame({
             'index_right': pd.Series(dtype='int64'),
@@ -556,37 +707,49 @@ def metrics_roads_intersections(city_name, grid_size, YOUR_NAME):
             'length': pd.Series(dtype='float64')
         })
     ).persist()
-    agg = tort.groupby('index_right').agg(
-        total_len=('length','sum'),
-        sum_wt=('wt','sum')
-    )
-    grid['m8_raw'] = (
-        grid.index.map(agg['sum_wt']/agg['total_len'])
-             .fillna(0.0)
-             .astype(float)
-    )
-    grid['m8_std'] = grid['m8_raw'].map_partitions(
-        standardize_metric_8, meta=('m8','float64')
-    )
 
-    # Standardize M9 and fill missing values
-    grid['m9_raw'] = (
-        grid.index.map(average_angle_between_roads)
-             .fillna(0.0)
-             .astype(float)
+    # Aggregate to per-block
+    agg = (
+        tort.groupby('index_right')
+            .agg(total_len=('length', 'sum'),
+                 sum_wt=('wt', 'sum'))
     )
-    m9_median = grid['m9_raw'].dropna().quantile(0.5).compute()
-    grid['m9_raw'] = grid['m9_raw'].fillna(m9_median)
-    grid['m9_std'] = grid['m9_raw'].map_partitions(
-        standardize_metric_9, meta=('m9','float64')
-    )
+    # m8_raw = sum_wt / total_len; rename index to block_id for alignment
+    agg = agg.assign(m8_raw=agg['sum_wt'] / agg['total_len']).rename_axis('block_id')
 
-    # Write and return
-    out = (
-        f'{OUTPUT_PATH_RASTER}/{city_name}/'
-        f'{city_name}_{grid_size}m_grid_metrics_8_9_{YOUR_NAME}.geoparquet'
-    )
-    if 'geom' in grid.columns:
-        grid = grid.drop(columns=['geom'])
-    grid.to_parquet(out)
+    # ======================================================================
+    # Join results back to blocks & standardize
+    # ======================================================================
+    # Join M8
+    blocks = blocks.join(agg[['m8_raw']], how='left')
+    blocks['m8_raw'] = blocks['m8_raw'].fillna(0.0)
+    blocks['m8_std'] = blocks['m8_raw'].map_partitions(standardize_metric_8, meta=('m8', 'float64'))
+
+    # Join M9
+    blocks = blocks.join(m9_df[['m9_raw']], how='left')
+    # Fill with median of non-null
+    m9_median = blocks['m9_raw'].dropna().quantile(0.5).compute()
+    if pd.isna(m9_median):
+        m9_median = 0.0
+    blocks['m9_raw'] = blocks['m9_raw'].fillna(m9_median)
+    blocks['m9_std'] = blocks['m9_raw'].map_partitions(standardize_metric_9, meta=('m9', 'float64'))
+
+    # ======================================================================
+    # Write out (dataset directory)
+    # ======================================================================
+    out = f'{OUTPUT_PATH_RASTER}/{city_name}/{city_name}_block_metrics_8_9_{YOUR_NAME}'
+
+    # Dask-safe duplicate id check
+    tmp = blocks.reset_index()[['block_id']]
+    n_unique = tmp['block_id'].nunique().compute()
+    n_rows   = tmp['block_id'].count().compute()
+    if n_unique != n_rows:
+        raise ValueError(f"Duplicate block_id detected: n_unique={n_unique}, n_rows={n_rows}")
+
+    # Column-name dup check
+    if pd.Index(blocks.columns).duplicated().any():
+        raise ValueError("Duplicate column names found.")
+
+    # Eager write so this delayed task actually produces files
+    blocks.to_parquet(out, write_index=True, compute=True)
     return out
