@@ -16,3 +16,12 @@ environment_old.yaml
 .ipynb_checkpoints
 .geoparquet
 data
+.shp
+.shx
+.dbf
+.prj
+.cpg
+.zip
+.parquet
+.geoparquet
+.geojson
