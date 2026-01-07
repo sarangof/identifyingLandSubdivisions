@@ -17,8 +17,9 @@ import pandas as pd
 
 # Geospatial libraries for vector data handling
 import geopandas as gpd
-from shapely.geometry import MultiLineString, LineString, Point
-from shapely.ops import polygonize, nearest_points
+from shapely.geometry import (MultiLineString, LineString, Point,Polygon, MultiPolygon, MultiPoint)
+from shapely.ops import (polygonize, nearest_points, voronoi_diagram, linemerge, unary_union)
+from shapely.validation import make_valid
 from shapely import wkb
 
 # Dask for parallel computation
@@ -55,9 +56,9 @@ OUTPUT_PATH_RASTER = f'{OUTPUT_PATH}/raster'
 OUTPUT_PATH_PNG = f'{OUTPUT_PATH}/png'
 OUTPUT_PATH_RAW = f'{OUTPUT_PATH}/raw_results'
 
-# Delayed task to compute building and road intersection metrics for each grid cell
-# - Calculates building counts and built area per cell
-# - Computes road length per cell and related flags
+# Delayed task to compute building and road intersection metrics for each block
+# - Calculates building counts and built area per block
+# - Computes road length per block and related flags
 # - Derives intersection counts and standardizes various metrics (m3, m4, m5, m10, m11, m12)
 @delayed
 def building_and_intersection_metrics(city_name, YOUR_NAME, boundary_eps=0.75):
@@ -752,4 +753,168 @@ def metrics_roads_intersections(city_name, YOUR_NAME):
 
     # Eager write so this delayed task actually produces files
     blocks.to_parquet(out, write_index=True, compute=True)
+    return out
+
+
+from dask import delayed  # already in your imports, keep it
+
+# =====================================================================
+# Block-level K-complexity (no grid dependency)
+# =====================================================================
+
+@delayed
+def metrics_k_blocks(city_name, YOUR_NAME, buffer_radius=100.0):
+    """
+    Block-level K-complexity metrics.
+
+    Uses the helpers defined in auxiliary_functions.py:
+
+        compute_k_single_block(block_id,
+                               block_geom,
+                               buildings_geoms,
+                               streets_geoms,
+                               buffer_radius)
+
+    Strategy (mirrors compute_m6_m7 style):
+
+    1. Load blocks, buildings, roads with load_dataset (Dask-GeoPandas).
+    2. Compute a small GeoPandas blocks frame for spatial joins.
+    3. Do ONE buildings→blocks spatial join (Dask) and ONE roads→blocks
+       spatial join with buffered blocks.
+    4. Convert those joins to pandas and group them by block_id.
+    5. For each block_id, call compute_k_single_block with *only*
+       the buildings/roads relevant to that block.
+    6. Join results back to blocks and write a Parquet dataset.
+    """
+
+    # ---------- Paths ----------
+    paths = {
+        'blocks':    f'{BLOCKS_PATH}/{city_name}/{city_name}_blocks_{YOUR_NAME}.geoparquet',
+        'buildings': f'{BUILDINGS_PATH}/{city_name}/Overture_building_{city_name}.geoparquet',
+        'roads':     f'{ROADS_PATH}/{city_name}/{city_name}_OSM_roads.geoparquet',
+    }
+
+    # ---------- Load (Dask GeoDataFrames) ----------
+    epsg = get_epsg(city_name).compute()
+    blocks = load_dataset(paths['blocks'], epsg=epsg)
+    buildings = load_dataset(paths['buildings'], epsg=epsg)
+    roads = load_dataset(paths['roads'], epsg=epsg)
+
+    # Clean stray columns, ensure unique block_id (same logic as other blocks)
+    if 'geom' in blocks.columns:
+        blocks = blocks.drop(columns=['geom'])
+
+    if 'fid' in blocks.columns and blocks['fid'].dropna().is_unique:
+        blocks = blocks.rename(columns={'fid': 'block_id'})
+    elif 'block_id' not in blocks.columns:
+        blocks = blocks.reset_index(drop=True)
+        blocks['block_id'] = blocks.index.astype('int64')
+
+    blocks = blocks.set_index('block_id', drop=True)
+
+    # ---------- Small GeoPandas frame for sjoins ----------
+    blocks_small = blocks[['geometry']].compute()
+    blocks_small.index.name = 'block_id'
+    blocks_small_gdf = gpd.GeoDataFrame(blocks_small, geometry='geometry', crs=epsg)
+
+    # ---------- 1) Buildings → blocks (sjoin) ----------
+    b2b = dgpd.sjoin(
+        buildings[['geometry']],
+        dgpd.from_geopandas(blocks_small_gdf[['geometry']], npartitions=1),
+        predicate='intersects',     
+        how='inner'
+    ).persist()
+
+    # Identify right-hand key name (GeoPandas/Dask version differences)
+    if 'index_right' in b2b.columns:
+        b_join_key = 'index_right'
+    elif 'block_id' in b2b.columns:
+        b_join_key = 'block_id'
+    else:
+        sample_cols = list(b2b._meta.columns)
+        raise KeyError(
+            f"Buildings sjoin lacks 'index_right'/'block_id'. Columns: {sample_cols}"
+        )
+
+    b2b_pd = b2b[['geometry', b_join_key]].compute()
+    b2b_pd = b2b_pd.rename(columns={b_join_key: 'block_id'})
+
+    # Group buildings by block_id once 
+    b_groups = {
+        bid: grp['geometry'].tolist()
+        for bid, grp in b2b_pd.groupby('block_id')
+    }
+
+    # ---------- 2) Roads → blocks with buffer ----------
+    # Buffer blocks in GeoPandas, then wrap as Dask for sjoin
+    blocks_buffered = blocks_small_gdf.copy()
+    blocks_buffered['geometry'] = blocks_buffered['geometry'].buffer(buffer_radius)
+
+    r2b = dgpd.sjoin(
+        roads[['geometry']],
+        dgpd.from_geopandas(blocks_buffered[['geometry']], npartitions=1),
+        predicate='intersects',
+        how='inner'
+    ).persist()
+
+    if 'index_right' in r2b.columns:
+        r_join_key = 'index_right'
+    elif 'block_id' in r2b.columns:
+        r_join_key = 'block_id'
+    else:
+        sample_cols = list(r2b._meta.columns)
+        raise KeyError(
+            f"Roads sjoin lacks 'index_right'/'block_id'. Columns: {sample_cols}"
+        )
+
+    r2b_pd = r2b[['geometry', r_join_key]].compute()
+    r2b_pd = r2b_pd.rename(columns={r_join_key: 'block_id'})
+
+    r_groups = {
+        bid: grp['geometry'].tolist()
+        for bid, grp in r2b_pd.groupby('block_id')
+    }
+
+    # ---------- 3) Compute K per block (pandas loop, but on pre-subset data) ----------
+    results = []
+    for bid, block_geom in blocks_small_gdf['geometry'].items():
+        # pull pre-subset lists (or empty lists)
+        b_geoms = b_groups.get(bid, [])
+        r_geoms = r_groups.get(bid, [])
+
+        info = compute_k_single_block(
+            block_id=int(bid),
+            block_geom=block_geom,
+            buildings_geoms=b_geoms,
+            streets_geoms=r_geoms,
+            buffer_radius=float(buffer_radius),
+        )
+        results.append(info)
+
+    # ---------- 4) Join back to blocks & write ----------
+    if results:
+        k_df = pd.DataFrame(results).set_index('block_id')
+        out_df = blocks_small_gdf.join(k_df, how='left')
+    else:
+        # No blocks / no buildings; produce empty but consistent schema
+        out_df = blocks_small_gdf.copy()
+        out_df['on_network_street_length'] = np.nan
+        out_df['off_network_street_length'] = np.nan
+        out_df['nearest_external_street'] = np.nan
+        out_df['building_count'] = 0
+        out_df['building_layers'] = ""
+        out_df['k_complexity'] = np.nan
+
+    out = f'{OUTPUT_PATH_RASTER}/{city_name}/{city_name}_block_metrics_k_{YOUR_NAME}.geoparquet'
+
+    # Duplicate id check (pandas – like in compute_m6_m7 but non-Dask)
+    tmp = out_df.reset_index()[['block_id']]
+    n_unique = tmp['block_id'].nunique()
+    n_rows = tmp['block_id'].shape[0]
+    if n_unique != n_rows:
+        raise ValueError(
+            f"Duplicate block_id in K-metrics: n_unique={n_unique}, n_rows={n_rows}"
+        )
+
+    out_df.to_parquet(out, index=True)
     return out

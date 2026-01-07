@@ -49,6 +49,10 @@ def standardize_metric_12(series):
     series = np.where(series > 200, 200, series)
     return series/200.
 
+def standardize_metric_k(series):
+    series = np.where(series > 6, 6, series)
+    return 1-(series/6.)
+
 # Map metrics to their respective functions
 standardization_functions = {
     'metric_1': standardize_metric_1,
@@ -62,5 +66,6 @@ standardization_functions = {
     'metric_9': standardize_metric_9,
     'metric_10': standardize_metric_10,
     'metric_11': standardize_metric_11,
-    'metric_12': standardize_metric_12
+    'metric_12': standardize_metric_12,
+    'k_complexity': standardize_metric_k,
 }

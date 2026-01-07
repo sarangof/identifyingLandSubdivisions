@@ -25,6 +25,7 @@ BUILDINGS_PATH = f'{INPUT_PATH}/buildings'
 BUILDINGS_DISTANCES_PATH = f'{INPUT_PATH}/buildings_with_distances'
 ROADS_PATH = f'{INPUT_PATH}/roads'
 INTERSECTIONS_PATH = f'{INPUT_PATH}/intersections'
+NATURAL_FEATURES_PATH = os.path.join(INPUT_PATH, "natural_features_and_railroads")
 GRIDS_PATH = f'{INPUT_PATH}/city_info/grids'
 SEARCH_BUFFER_PATH = f'{INPUT_PATH}/city_info/search_buffers'
 BLOCKS_PATH = f'{INPUT_PATH}/blocks'
@@ -74,18 +75,7 @@ def calculate_building_distances_to_roads(city_name, grid_size=200):
     epsg = get_epsg(city_name).compute()  
     # Load and prepare roads for spatial index
     roads = load_dataset(paths['roads'], epsg=epsg).compute()
-    included_road_types = ['trunk','motorway','primary','secondary','tertiary','primary_link','secondary_link','tertiary_link','trunk_link','motorway_link','residential','unclassified','road','living_street']
-    def highway_filter(highway_value):
-        # If highway_value is missing, return False
-        if pd.isna(highway_value):
-            return False
-        # Split the string by commas, and strip any whitespace from each part
-        types = [part.strip() for part in highway_value.split(',')]
-        # Return True if any of the types is in our included list
-        return any(t in included_road_types for t in types)
 
-    # Now filter the roads GeoDataFrame:
-    roads = roads[roads['highway'].apply(highway_filter)]
 
     roads_geom_list = [geom for geom in roads.geometry]
 
@@ -116,33 +106,22 @@ AUX FUNCTIONS TO CREATE BLOCKS
 '''
 
 @delayed
-def produce_blocks(city_name,YOUR_NAME,grid_size):
+def produce_blocks(city_name,YOUR_NAME):
     # Construct file paths for the city
     paths = {
-        'grid': f'{GRIDS_PATH}/{city_name}/{city_name}_{str(grid_size)}m_grid.geoparquet',
+        #'grid': f'{GRIDS_PATH}/{city_name}/{city_name}_{str(grid_size)}m_grid.geoparquet',
         'buildings': f'{BUILDINGS_PATH}/{city_name}/Overture_building_{city_name}.geoparquet',
         'roads': f'{ROADS_PATH}/{city_name}/{city_name}_OSM_roads.geoparquet',
-        'intersections': f'{INTERSECTIONS_PATH}/{city_name}/{city_name}_OSM_intersections.geoparquet'
+        'intersections': f'{INTERSECTIONS_PATH}/{city_name}/{city_name}_OSM_intersections.geoparquet',
+        'natural_features': f'{NATURAL_FEATURES_PATH}/{city_name}/{city_name}_OSM_natural_features_and_railroads.geoparquet'
     }
     
     epsg = get_epsg(city_name).compute()
     
     roads = load_dataset(paths['roads'], epsg=epsg).compute()
-    included_road_types = ['trunk','motorway','primary','secondary','tertiary','primary_link','secondary_link','tertiary_link','trunk_link','motorway_link','residential','unclassified','road','living_street']
+    natural_features = load_dataset(paths['natural_features'], epsg=epsg).compute()
     
-    def highway_filter(highway_value):
-        # If highway_value is missing, return False
-        if pd.isna(highway_value):
-            return False
-        # Split the string by commas, and strip any whitespace from each part
-        types = [part.strip() for part in highway_value.split(',')]
-        # Return True if any of the types is in our included list
-        return any(t in included_road_types for t in types)
-
-    # Now filter the roads GeoDataFrame:
-    roads = roads[roads['highway'].apply(highway_filter)]
-    
-    blocks = get_blocks(roads)
+    blocks = get_blocks(pd.concat([roads,natural_features], ignore_index=True))
 
     # Now add the inscribed circle information.
     blocks = add_inscribed_circle_info(blocks)
@@ -150,18 +129,18 @@ def produce_blocks(city_name,YOUR_NAME,grid_size):
     # Define the output path for the blocks geoparquet
     path_blocks = f'{BLOCKS_PATH}/{city_name}/{city_name}_blocks_{YOUR_NAME}.geoparquet'
 
-    blocks = blocks.set_crs(epsg)
+    blocks = blocks.set_crs(epsg, allow_override=True)
 
     # Convert the geometry column to WKT before saving
     #blocks["geometry"] = blocks["geometry"].apply(lambda geom: geom.wkt if geom is not None else None)
     
     # Save the blocks dataset. 
-    blocks.to_parquet(path_blocks)
+    blocks.to_parquet(path_blocks, index=False)
     
     # Optionally, return the output path or any summary info.
     return blocks
 
 
 @delayed
-def produce_azimuths(city_name, YOUR_NAME, grid_size):
-    calculate_azimuths(city_name, YOUR_NAME, grid_size)
+def produce_azimuths(city_name, YOUR_NAME):
+    calculate_azimuths(city_name, YOUR_NAME)

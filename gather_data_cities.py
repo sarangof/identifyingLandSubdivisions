@@ -11,6 +11,7 @@ from cloudpathlib import S3Path
 import s3fs
 import fsspec
 import traceback
+import neatnet
 
 fs = s3fs.S3FileSystem(anon=False)
 
@@ -20,20 +21,13 @@ INPUT_PATH = os.path.join(MAIN_PATH, "input")
 BUILDINGS_PATH = os.path.join(INPUT_PATH, "buildings")
 ROADS_PATH = os.path.join(INPUT_PATH, "roads")
 INTERSECTIONS_PATH = os.path.join(INPUT_PATH, "intersections")
+NATURAL_FEATURES_PATH = os.path.join(INPUT_PATH, "natural_features_and_railroads")
 URBAN_EXTENTS_PATH = os.path.join(INPUT_PATH, "urban_extents")
 OUTPUT_PATH = os.path.join(MAIN_PATH, "output")
 OUTPUT_PATH_CSV = os.path.join(OUTPUT_PATH, "csv")
 SEARCH_BUFFER_PATH = os.path.join(INPUT_PATH, "city_info", "search_buffers")
 
-# Ensure paths exist
-os.makedirs(OUTPUT_PATH_CSV, exist_ok=True)
-
 # Utility Functions
-def remove_duplicate_roads(osm_roads):
-    osm_roads_reset = osm_roads.reset_index()
-    osm_roads_reset['sorted_pair'] = osm_roads_reset.apply(lambda row: tuple(sorted([row['u'], row['v']])), axis=1)
-    osm_roads = osm_roads_reset.drop_duplicates(subset=['sorted_pair']).drop(columns=['sorted_pair'])
-    return osm_roads
 
 def remove_list_columns(gdf):
     for col in gdf.columns:
@@ -118,8 +112,7 @@ def filter_osm_network(
 
     return roads, inter
 
-
-def osm_command(city_name, search_area):
+def osm_command(city_name, search_area, utm_proj_city):
     # … build G & call graph_to_gdfs …
     if len(search_area) > 0:
         polygon = search_area.geometry.iloc[0]
@@ -127,37 +120,71 @@ def osm_command(city_name, search_area):
             polygon=polygon,
             custom_filter=(
                 '["highway"~"motorway|trunk|primary|secondary|'
-                'tertiary|unclassified|residential|living_street|'
-                'service|track|path|footway|cycleway|bridleway|'
-                'steps|pedestrian|corridor|road"]'
+                'tertiary|none|unclassified|residential|living_street|'
+                'primary_link|secondary_link|tertiary_link|trunk_link|motorway_link|road"]'
             ),
             retain_all=True
         )
     else:
         raise ValueError(f"Search area for {city_name} is empty.")
+    
+    custom_filter = [
+        '["waterway"~"stream|ditch|river|canal|dam|weir|rapids|waterfall"]'
+    ]
+    
+    if len(search_area) > 0:
+        polygon = search_area.geometry.iloc[0]
+        G_natural_features = ox.graph_from_polygon(
+            polygon=polygon,
+            custom_filter=custom_filter,
+            retain_all=True
+            
+        )
+    else:
+        raise ValueError(f"Search area for {city_name} is empty.")
+    
+
 
     osm_intersections, osm_roads = ox.graph_to_gdfs(G)
-
-    osm_roads         = remove_duplicate_roads(osm_roads)
+    osm_intersections_natural_fatures, osm_natural_fatures = ox.graph_to_gdfs(G_natural_features)
+    
+    osm_roads_to_neatify = osm_roads.to_crs(utm_proj_city).reset_index(drop=False)
+    osm_roads_to_neatify_geometry = osm_roads_to_neatify[["osmid", "u", "v", "geometry"]]
+    osm_roads = neatnet.neatify(osm_roads_to_neatify_geometry).to_crs('EPSG:4326')
+    print("neatify OWAAAAA")
+    
     osm_intersections = osm_intersections.reset_index()
     osm_roads         = remove_list_columns(osm_roads)
     osm_intersections = remove_list_columns(osm_intersections)
+
+    osm_intersections_natural_fatures = osm_intersections_natural_fatures.reset_index()
+    osm_natural_fatures         = remove_list_columns(osm_natural_fatures)
+    osm_intersections_natural_fatures = remove_list_columns(osm_intersections_natural_fatures)
 
     # ensure 'osmid' always exists
     if 'osmid' not in osm_intersections:
         osm_intersections['osmid'] = None
 
+    if 'osmid' not in osm_intersections_natural_fatures:
+        osm_intersections_natural_fatures['osmid'] = None
+
+    '''
     included = [
       'trunk','motorway','primary','secondary','tertiary',
       'primary_link','secondary_link','tertiary_link',
       'trunk_link','motorway_link','residential',
       'unclassified','road','living_street'
     ]
+    
     roads_filt, inters_filt = filter_osm_network(
         osm_roads, osm_intersections, included
     )
+    '''
+    roads_filt = osm_roads
+    natural_fatures_filt = osm_natural_fatures
+    inters_filt = osm_intersections
 
-    # now save them
+    # save gathered data
     s3_save(
       file=roads_filt,
       output_file=f"{city_name}_OSM_roads.geoparquet",
@@ -169,6 +196,13 @@ def osm_command(city_name, search_area):
       output_file=f"{city_name}_OSM_intersections.geoparquet",
       output_temp_path=".",
       remote_path=f"{INTERSECTIONS_PATH}/{city_name}/{city_name}_OSM_intersections.geoparquet"
+    )
+
+    s3_save(
+      file=natural_fatures_filt,
+      output_file=f"{city_name}_OSM_natural_features_and_railroads.geoparquet",
+      output_temp_path=".",
+      remote_path=f"{NATURAL_FEATURES_PATH}/{city_name}/{city_name}_OSM_natural_features_and_railroads.geoparquet"
     )
 
 
@@ -199,7 +233,6 @@ def make_requests(partition):
     for city_name in partition.city:
         try:
             search_area_path = f"{SEARCH_BUFFER_PATH}/{city_name}/{city_name}_search_buffer.geoparquet"
-            #print(f"🔍 Checking S3 Path: {search_area_path}")
 
             if not fs.exists(search_area_path):
                 raise FileNotFoundError(f"❌ ERROR: File does not exist in S3: {search_area_path}")
@@ -211,14 +244,15 @@ def make_requests(partition):
 
             print(f"✅ Successfully read file for {city_name}: {search_area.shape[0]} rows")
 
-
             rep_point = search_area.geometry.representative_point().iloc[0]
             utm_proj_city = get_utm_proj(float(rep_point.x), float(rep_point.y))
             transformer = pyproj.Transformer.from_crs(pyproj.CRS('EPSG:4326'), utm_proj_city, always_xy=True)
-            osm_command(city_name, search_area)
+            print(f"Entering OSM command for {city_name}")
+            osm_command(city_name, search_area, utm_proj_city)
 
             search_area_bounds = search_area.bounds
             bbox_str = ','.join(search_area_bounds[['minx', 'miny', 'maxx', 'maxy']].values[0].astype(str))
+            print(f"Entering overturemaps CLI command for {city_name}")
             results.append(overturemaps_download_and_save(bbox_str, "building", os.path.join(BUILDINGS_PATH, city_name), city_name))
         except Exception as e:
             error_message = "".join(traceback.format_exception(None, e, e.__traceback__))  # Get full traceback
@@ -227,8 +261,90 @@ def make_requests(partition):
             results.append({"city": city_name, "type": "general", "status": f"error: {error_message}"})
     return pd.DataFrame(results)
 
+
+def gather_data_city(city_name: str) -> dict:
+    """
+    Run the full data-gathering pipeline for a single city.
+
+    Parameters
+    ----------
+    city_name : str
+        City name like "Accra" or "Belo Horizonte". Spaces will be
+        replaced by underscores to match the S3 folder convention.
+
+    Returns
+    -------
+    dict
+        A small log dict with keys: city, type, status.
+        - On success, this is the dict returned by overturemaps_download_and_save.
+        - On error, type == "general" and status contains the traceback text.
+    """
+    city_clean = city_name.replace(" ", "_")
+
+    try:
+        # --- 1. Find and load search buffer from S3 ---
+        search_area_path = f"{SEARCH_BUFFER_PATH}/{city_clean}/{city_clean}_search_buffer.geoparquet"
+        # print(f"🔍 Checking S3 Path: {search_area_path}")
+
+        if not fs.exists(search_area_path):
+            raise FileNotFoundError(f"❌ ERROR: File does not exist in S3: {search_area_path}")
+        else:
+            print(f"✅ File exists in S3: {search_area_path}")
+
+        with fs.open(search_area_path, mode="rb", anon=False) as f:
+            search_area = gpd.read_parquet(f)
+
+        print(f"✅ Successfully read file for {city_clean}: {search_area.shape[0]} rows")
+
+        if len(search_area) == 0:
+            raise ValueError(f"Search area for {city_clean} is empty.")
+
+        # --- 2. Compute UTM projection + run OSM command ---
+        rep_point = search_area.geometry.representative_point().iloc[0]
+        utm_proj_city = get_utm_proj(float(rep_point.x), float(rep_point.y))
+
+        # (transformer currently not used, but keep for compatibility / future use)
+        _ = pyproj.Transformer.from_crs(
+            pyproj.CRS("EPSG:4326"),
+            utm_proj_city,
+            always_xy=True
+        )
+
+        # This does the osmnx + neatnet work, writes outputs, etc.
+        osm_command(city_clean, search_area, utm_proj_city)
+
+        # --- 3. Call Overture Maps CLI for buildings ---
+        search_area_bounds = search_area.bounds
+        bbox_str = ",".join(
+            search_area_bounds[["minx", "miny", "maxx", "maxy"]]
+            .values[0]
+            .astype(str)
+        )
+
+        result = overturemaps_download_and_save(
+            bbox_str,
+            "building",
+            os.path.join(BUILDINGS_PATH, city_clean),
+            city_clean,
+        )
+
+        # result is already a {city, type, status} dict
+        return result
+
+    except Exception as e:
+        # Full traceback for logs, short message for the dict
+        error_message = "".join(traceback.format_exception(None, e, e.__traceback__))
+        print(f"Error for {city_clean}: {e}")
+        return {
+            "city": city_clean,
+            "type": "general",
+            "status": f"error: {error_message}",
+        }
+
+
+
 def run_all(cities):
-    print("Entering run_all")
+    print("Entering HIIIIIIIIIIZZZZZZZZZ BLAAAAAA run_all")
     cities_set = pd.DataFrame({'city': [city.replace(' ', '_') for city in cities]})
     cities_set_ddf = dd.from_pandas(cities_set, npartitions=12)
     meta = pd.DataFrame({"city": pd.Series(dtype="str"), 
@@ -236,16 +352,16 @@ def run_all(cities):
                          "status": pd.Series(dtype="str")})
     results = cities_set_ddf.map_partitions(make_requests, meta=meta)
     results_df = results.compute()
-
+    '''
     # Save logs
     data_gathering_logs_file = f"data_gather_logs.csv"
-    data_gathering_logs_tmp_path = "." #if this works, create the right path
-    logs_output_path_remote = f"{OUTPUT_PATH_CSV}/{data_gathering_logs_file}"
+    logs_output_path_remote = f"{OUTPUT_PATH_CSV}"
+    output_temp_path = "."
     s3_save(file = results_df, 
         output_file = data_gathering_logs_file, 
-        output_temp_path = data_gathering_logs_tmp_path, 
+        output_temp_path = output_temp_path, 
         remote_path = logs_output_path_remote)
-
+    '''
 def main():
     cities = ["Belo_Horizonte"] #, "Campinas", "Bogota", "Nairobi", "Bamako", "Lagos", "Accra", "Abidjan", "Cape Town", "Maputo", "Mogadishu", "Luanda"
     run_all(cities)

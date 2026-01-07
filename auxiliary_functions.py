@@ -6,8 +6,13 @@ from dask import delayed, compute, visualize
 import geopandas as gpd
 from dask.diagnostics import ProgressBar
 #from metrics_calculation import calculate_minimum_distance_to_roads_option_B
-from shapely.geometry import MultiLineString, LineString, Point
-from shapely.ops import polygonize, nearest_points
+from shapely.geometry import (MultiLineString, LineString, Point,Polygon, MultiPolygon, MultiPoint)
+from shapely.algorithms.polylabel import polylabel
+from shapely.ops import (polygonize, nearest_points,voronoi_diagram, linemerge, unary_union)
+from shapely.validation import make_valid
+from shapely import wkb
+
+
 #from shapely.geometry import Polygon, LineString, Point, MultiPolygon, MultiLineString, GeometryCollection
 from scipy.optimize import fminbound, minimize
 #from metrics_groupby import metrics
@@ -15,7 +20,6 @@ from scipy.stats import entropy
 from shapely.ops import unary_union, polygonize
 from shapely.geometry import LineString, mapping, Point
 #from polylabel import polylabel 
-from shapely.ops import polylabel  # ✅ built into Shapely >= 1.8
 from pyproj import CRS, Geod
 
 
@@ -103,44 +107,48 @@ def to_geojson_dict(geom):
             return obj
     return recursive_convert(geojson)
 
-def compute_largest_inscribed_circle(geom):
+def compute_largest_inscribed_circle(geom, tolerance=1.0):
     """
-    Compute the largest inscribed circle for a given polygon or multipolygon.
-
-    Parameters:
-      geom (shapely.geometry): A Polygon or MultiPolygon.
-    
-    Returns:
-      tuple: (optimal_point, max_radius) where optimal_point is a shapely Point and max_radius is a float.
+    Returns (optimal_point: Point, max_radius: float) in the geometry's units.
     """
     if geom is None or geom.is_empty:
         return None, None
 
-    if geom.geom_type == 'Polygon':
-        geojson_poly = to_geojson_dict(geom)
-        # Pass in the coordinates list instead of the entire dict.
-        optimal_coords = polylabel(geojson_poly["coordinates"])
-        optimal = Point(optimal_coords)
-        radius = geom.boundary.distance(optimal)
-        return optimal, radius
-
-    elif geom.geom_type == 'MultiPolygon':
-        best_point = None
-        best_radius = 0
-        for poly in geom.geoms:
-            geojson_poly = to_geojson_dict(poly)
-            optimal_coords = polylabel(geojson_poly["coordinates"])
-            candidate = Point(optimal_coords)
-            radius = poly.boundary.distance(candidate)
-            if radius > best_radius:
-                best_radius = radius
-                best_point = candidate
-        return best_point, best_radius
-
-    else:
+    try:
+        if not geom.is_valid:
+            geom = geom.buffer(0)
+            if geom.is_empty:
+                return None, None
+    except Exception:
         return None, None
 
-def add_inscribed_circle_info(blocks_gdf):
+    def _solve(poly: Polygon):
+        p = polylabel(poly, tolerance=tolerance)  # p is a shapely Point
+        r = poly.boundary.distance(p)
+        return p, float(r)
+
+    if isinstance(geom, Polygon):
+        return _solve(geom)
+
+    if isinstance(geom, MultiPolygon):
+        best = (None, 0.0)
+        for poly in geom.geoms:
+            if not isinstance(poly, Polygon) or poly.is_empty:
+                continue
+            try:
+                p, r = _solve(poly)
+                if r > best[1]:
+                    best = (p, r)
+            except Exception:
+                continue
+        return best
+
+    # ignore other geometry types
+    return None, None
+
+
+
+def add_inscribed_circle_info(blocks_gdf, tolerance=1.0):
     """
     Adds two new columns to a blocks GeoDataFrame: 'optimal_point' and 'max_radius'
     which indicate the center and radius of the largest inscribed circle for each block.
@@ -152,18 +160,22 @@ def add_inscribed_circle_info(blocks_gdf):
     Returns:
       GeoDataFrame: The input GeoDataFrame with two new columns.
     """
+    # Make sure CRS is projected (meters) to interpret radius meaningfully
+    if blocks_gdf.crs is None or not blocks_gdf.crs.is_projected:
+        raise ValueError("blocks_gdf must be in a projected CRS (meters) before computing radii.")
+
     # Apply the computation for each geometry
-    results = blocks_gdf.geometry.apply(lambda geom: compute_largest_inscribed_circle(geom))
-    
+    results = blocks_gdf.geometry.apply(lambda g: compute_largest_inscribed_circle(g, tolerance))
+
     # Unpack the tuple results into two new columns
     blocks_gdf["optimal_point"] = results.apply(lambda x: x[0])
-    blocks_gdf["max_radius"] = results.apply(lambda x: x[1])
-    
+    blocks_gdf["max_radius"]    = results.apply(lambda x: x[1])
+
     # Convert the 'optimal_point' column from Shapely objects to WKT strings
     blocks_gdf["optimal_point"] = blocks_gdf["optimal_point"].apply(
         lambda geom: geom.wkt if geom is not None else None
     )
-    
+
     return blocks_gdf
 
 
@@ -213,9 +225,8 @@ def compute_azimuth_partition(df):
     return df
 
 
-def calculate_azimuths(city_name, YOUR_NAME, grid_size):
+def calculate_azimuths(city_name, YOUR_NAME):
     paths = {
-        'grid': f'{GRIDS_PATH}/{city_name}/{city_name}_{str(grid_size)}m_grid.geoparquet',
         'blocks': f'{BLOCKS_PATH}/{city_name}/{city_name}_blocks_{YOUR_NAME}.geoparquet',
         'buildings_with_distances': f'{BUILDINGS_PATH}/{city_name}/Overture_building_{city_name}_with_distances.geoparquet',
         'buildings_with_distances_azimuths': f'{BUILDINGS_PATH}/{city_name}/Overture_building_{city_name}_with_distances_and_azimuths.geoparquet',
@@ -594,3 +605,238 @@ def calculate_tortuosity(roads_df, intersections_df):
     )
     
     return roads_with_both
+
+
+# ---------------------------------------------------------------------
+# K-blocks helpers (single-block K-complexity)
+# ---------------------------------------------------------------------
+
+def _k_ensure_poly(geom):
+    """Ensure a clean single Polygon (largest part if MultiPolygon)."""
+    if geom is None:
+        return None
+    geom = make_valid(geom)
+    if isinstance(geom, MultiPolygon):
+        geoms = list(geom.geoms)
+        if not geoms:
+            return None
+        geom = max(geoms, key=lambda p: p.area)
+    return geom
+
+
+def _k_prep_buildings(geoms):
+    """Convert building geometries to centroid points."""
+    pts = []
+    for g in geoms:
+        if g is None:
+            continue
+        g = make_valid(g)
+        if isinstance(g, (Polygon, MultiPolygon)):
+            c = g.centroid
+            if not c.is_empty:
+                pts.append(c)
+        elif isinstance(g, Point):
+            if not g.is_empty:
+                pts.append(g)
+    if not pts:
+        return None, 0
+    mp = MultiPoint(pts)
+    return mp, len(pts)
+
+
+def _k_prep_streets(geoms):
+    """Flatten LineString / MultiLineString geoms into a MultiLineString."""
+    lines = []
+    for g in geoms:
+        if g is None:
+            continue
+        g = make_valid(g)
+        if isinstance(g, LineString):
+            if not g.is_empty:
+                lines.append(g)
+        elif isinstance(g, MultiLineString):
+            for seg in g.geoms:
+                if not seg.is_empty:
+                    lines.append(seg)
+    if not lines:
+        return None
+    return MultiLineString(lines)
+
+
+def compute_k_single_block(block_id,
+                           block_geom,
+                           buildings_geoms,
+                           streets_geoms,
+                           buffer_radius=100.0):
+    """
+    Shapely-based version of the original compute_k:
+
+    - builds a Voronoi tessellation from building centroids
+    - clips by the block polygon
+    - peels parcels into layers from the boundary / street-connected side
+    - returns k_complexity = number of parcel layers, plus some network info.
+    """
+    # ---------------- Block / buildings / streets prep ----------------
+    block = _k_ensure_poly(block_geom)
+    if block is None or block.is_empty:
+        return {
+            "block_id": block_id,
+            "on_network_street_length": 0.0,
+            "off_network_street_length": 0.0,
+            "nearest_external_street": float("nan"),
+            "building_count": 0,
+            "building_layers": "0",
+            "k_complexity": 1,
+        }
+
+    bldg_points, bldg_count = _k_prep_buildings(buildings_geoms)
+    if bldg_points is None or bldg_count == 0:
+        return {
+            "block_id": block_id,
+            "on_network_street_length": 0.0,
+            "off_network_street_length": 0.0,
+            "nearest_external_street": float("nan"),
+            "building_count": 0,
+            "building_layers": "0",
+            "k_complexity": 1,
+        }
+
+    streets = _k_prep_streets(streets_geoms)
+    on_len = 0.0
+    off_len = 0.0
+    nearest = float("nan")
+    is_conn = False
+
+    # ---------------- Network access metrics ----------------
+    from shapely.geometry import LineString, MultiLineString
+
+    # ---------------- Network access metrics ----------------
+    if streets is not None and not streets.is_empty:
+        clipped = streets.intersection(block)
+        if not clipped.is_empty:
+            # extract only valid line segments with ≥ 2 coords
+            line_parts = []
+
+            def _collect_lines(geom):
+                if isinstance(geom, LineString):
+                    # guard against 1-point “lines”
+                    if len(geom.coords) > 1:
+                        line_parts.append(geom)
+                elif isinstance(geom, MultiLineString):
+                    for seg in geom.geoms:
+                        if not seg.is_empty and len(seg.coords) > 1:
+                            line_parts.append(seg)
+                elif hasattr(geom, "geoms"):
+                    for g in geom.geoms:
+                        _collect_lines(g)
+
+            _collect_lines(clipped)
+
+            if not line_parts:
+                # effectively “no usable streets in block”
+                on_len = 0.0
+                off_len = 0.0
+                nearest = float("nan")
+                is_conn = False
+            else:
+                merged = linemerge(MultiLineString(line_parts))
+                internal_buf = merged.buffer(buffer_radius / 2.0)
+                external_buf = block.exterior.buffer(buffer_radius)
+
+                # streets that touch the external buffer (i.e., connected outwards)
+                ext_touch = [s for s in streets.geoms if s.intersects(external_buf)]
+                if ext_touch:
+                    ext_net = unary_union(ext_touch)
+                    full_net = unary_union([merged, ext_net])
+                    on_geom = full_net.intersection(internal_buf)
+                    off_geom = full_net.difference(internal_buf)
+
+                    on_len = 0.0 if on_geom.is_empty else on_geom.length
+                    off_len = 0.0 if off_geom.is_empty else off_geom.length
+
+                    centroid_all = unary_union([p for p in bldg_points.geoms])
+                    nearest = centroid_all.distance(ext_net)
+                    is_conn = on_len > 0.0
+                else:
+                    on_len = 0.0
+                    off_len = 0.0 if clipped.is_empty else clipped.length
+                    nearest = float("nan")
+                    is_conn = False
+        else:
+            # no intersection with block at all
+            on_len = 0.0
+            off_len = 0.0
+            nearest = float("nan")
+            is_conn = False
+    else:
+        # no streets near this block
+        on_len = 0.0
+        off_len = 0.0
+        nearest = float("nan")
+        is_conn = False
+
+
+    # ---------------- Voronoi parcels inside the block ----------------
+    vor = voronoi_diagram(bldg_points, envelope=block)
+    parcels = []
+    for cell in vor.geoms:
+        inter = make_valid(cell.intersection(block))
+        if inter.is_empty:
+            continue
+        if isinstance(inter, Polygon):
+            parcels.append(inter)
+        elif isinstance(inter, MultiPolygon):
+            parcels.extend([p for p in inter.geoms if not p.is_empty])
+
+    if not parcels:
+        return {
+            "block_id": block_id,
+            "on_network_street_length": on_len,
+            "off_network_street_length": off_len,
+            "nearest_external_street": nearest,
+            "building_count": bldg_count,
+            "building_layers": "1",
+            "k_complexity": 1,
+        }
+
+    remaining = parcels.copy()
+    layers = []
+
+    # ---- First ring: parcels touching access buffer or boundary ----
+    if is_conn and streets is not None and not streets.is_empty:
+        access_buf = merged.buffer(1.0)
+        ring = [p for p in remaining if p.intersects(access_buf)]
+        if not ring:
+            # fallback: parcels touching block boundary
+            ring = [p for p in remaining if p.touches(block.boundary)]
+    else:
+        ring = [p for p in remaining if p.touches(block.boundary)]
+        if not ring:
+            ring = remaining.copy()
+
+    layers.append(len(ring))
+    remaining = [p for p in remaining if p not in ring]
+
+    # ---- Interior rings: peel by adjacency ----
+    while remaining:
+        union_prev = unary_union(ring)
+        next_ring = [p for p in remaining if p.touches(union_prev)]
+        if not next_ring:
+            # last interior bulk
+            layers.append(len(remaining))
+            break
+        layers.append(len(next_ring))
+        remaining = [p for p in remaining if p not in next_ring]
+        ring = next_ring
+
+    k_val = len(layers)
+
+    return {
+        "block_id": block_id,
+        "on_network_street_length": on_len,
+        "off_network_street_length": off_len,
+        "nearest_external_street": nearest,
+        "building_count": bldg_count,
+        "building_layers": ",".join(str(x) for x in layers),
+        "k_complexity": k_val,
+    }
