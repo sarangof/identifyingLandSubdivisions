@@ -462,57 +462,50 @@ def compute_sequential_differences(angles):
     extended = np.concatenate([angles, [angles[0] + 360]])
     return np.diff(extended)
 
+
 def compute_intersection_metric(group, street_count_mapping):
     """
     Computes the metric for one intersection.
-    
-    Parameters:
-      group: DataFrame group (with a column 'bearing') for a given intersection.
-      street_count_mapping: dict mapping intersection_id to its street_count.
-      
-    Process:
-      1. Get the unique bearings (the "true" angles).
-      2. Use the provided street_count (if available) to confirm the number of unique angles.
-      3. Sort the unique angles and compute the circular differences.
-      4. For 3‑way intersections (street_count==3): select the smallest difference.
-         For 4‑way intersections (street_count==4): select the two smallest differences and average them.
-      5. Compute the absolute difference between the selected value(s) and 90°.
-    """
-    inter_id = group.name  # group name is the intersection_id
-    # Get expected street count for this intersection
-    expected_sc = street_count_mapping.get(inter_id, None)
-    
-    # Deduplicate angles
-    unique_angles = np.unique(group['bearing'].values)
-    sc = len(unique_angles)
-    
-    # If we have an expected street count, use that if possible.
-    # (It might differ if data are noisy.)
-    if expected_sc is not None and expected_sc in (3, 4):
-        sc = expected_sc
-    else:
-        # Only process intersections with 3 or 4 unique angles
-        if sc not in (3, 4):
-            return np.nan
 
-    # Ensure we have exactly sc unique angles
+    STRICT VERSION:
+    - Only evaluate intersections whose expected street_count is 3 or 4
+    - And only if the number of unique bearings observed from incident edges
+      equals that expected street_count (no imputation, no coercion).
+
+    Process:
+      1. Expected degree = street_count (must be 3 or 4)
+      2. Deduplicate bearings actually observed from incident edges
+      3. Require observed_count == expected_count
+      4. Sort bearings, compute circular differences
+      5. For 3-way: metric = |90 - min(diff)|
+         For 4-way: metric = mean(|90 - two smallest diffs|)
+    """
+    inter_id = group.name
+    expected_sc = street_count_mapping.get(inter_id, None)
+
+    # Only accept intersections labeled 3-way or 4-way
+    if expected_sc not in (3, 4):
+        return np.nan
+
+    # Deduplicate bearings derived from matched incident edges
+    unique_angles = np.unique(group["bearing"].values)
+    observed_sc = len(unique_angles)
+
+    # STRICT: require observed incident bearings to match the expected street_count
+    if observed_sc != expected_sc:
+        return np.nan
+
     angles = np.sort(unique_angles)
-    
-    # Compute circular differences
     diffs = compute_sequential_differences(angles)
-    
-    if sc == 3:
-        # For a 3-way, select the smallest difference
+
+    if expected_sc == 3:
         selected_diff = np.min(diffs)
-        metric = abs(90 - selected_diff)
-    elif sc == 4:
-        # For a 4-way, select the two smallest differences and average the absolute differences from 90°
-        selected_diffs = np.sort(diffs)[:2]
-        metric = np.mean(np.abs(90 - selected_diffs))
-    else:
-        metric = np.nan
-    
-    return metric
+        return abs(90 - selected_diff)
+
+    # expected_sc == 4
+    selected_diffs = np.sort(diffs)[:2]
+    return np.mean(np.abs(90 - selected_diffs))
+
 
 
 def compute_intersection_mapping(intersection_angles, street_count_mapping):

@@ -110,26 +110,55 @@ def building_and_intersection_metrics(city_name, YOUR_NAME, boundary_eps=0.75):
     blocks_small_overlay = (
         blocks[['geometry']].compute().reset_index()[['block_id','geometry']]
     )
+
+    # ---- Blocks overlay for intersection counting (tolerance) ----
+    COUNT_BUFFER_M = 0.75  # meters; start with 0.5–1.0 in projected CRS
+    blocks_for_ic = blocks_small_overlay.copy()
+    blocks_for_ic["geometry"] = blocks_for_ic.geometry.buffer(COUNT_BUFFER_M)
+
+
     # For boundary overlays: boundary buffer polygon per block (block_id as COLUMN)
     blocks_boundary_overlay = blocks_small_overlay.copy()
     # buffer the boundary a tiny amount to capture co-linear boundary segments robustly
-    blocks_boundary_overlay['geometry'] = blocks_boundary_overlay.geometry.boundary.buffer(boundary_eps)
+    blocks_boundary_overlay['geometry'] = (blocks_boundary_overlay.geometry.boundary)
+
 
     # For sjoin (points on segments): use index = block_id ONLY
     blocks_small_sjoin = blocks[['geometry']].compute()  # index = block_id
     blocks_small_sjoin.index.name = 'block_id'
 
     # -------- Partition fns --------
-    def building_area_partition(bldg_part: gpd.GeoDataFrame, blocks_sm_ov: gpd.GeoDataFrame) -> pd.DataFrame:
-        clipped = gpd.overlay(bldg_part, blocks_sm_ov, how='intersection')
+    def building_area_partition(
+        bldg_part: gpd.GeoDataFrame,
+        blocks_sm_ov: gpd.GeoDataFrame
+    ) -> pd.DataFrame:
+        clipped = gpd.overlay(bldg_part, blocks_sm_ov, how="intersection")
+
         if clipped.empty:
-            return pd.DataFrame(columns=['built_area', 'n_buildings'], index=pd.Index([], name='block_id'))
-        clipped['clipped_area'] = clipped.geometry.area
-        out = (clipped.groupby('block_id')
-                     .agg(built_area=('clipped_area', 'sum'),
-                          n_buildings=('geometry', 'size')))
-        out.index.name = 'block_id'
+            return pd.DataFrame(
+                columns=["built_area", "n_buildings"],
+                index=pd.Index([], name="block_id")
+            )
+
+        # clean tiny self-intersections before union
+        clipped["geometry"] = clipped.geometry.buffer(0)
+
+        # union fragments per block BEFORE measuring area 
+        union_geom = clipped.groupby("block_id")["geometry"].apply(lambda s: s.unary_union)
+        built_area = union_geom.area.rename("built_area")
+
+        # Building count: If there is a stable building id column, use it; otherwise keep fragment-count
+        if "id" in clipped.columns:
+            n_buildings = clipped.groupby("block_id")["id"].nunique().rename("n_buildings")
+        elif "building_id" in clipped.columns:
+            n_buildings = clipped.groupby("block_id")["building_id"].nunique().rename("n_buildings")
+        else:
+            n_buildings = clipped.groupby("block_id").size().rename("n_buildings")
+
+        out = pd.concat([built_area, n_buildings], axis=1)
+        out.index.name = "block_id"
         return out
+
 
     def road_segments_partition(roads_part: gpd.GeoDataFrame,
                                 blocks_sm_ov: gpd.GeoDataFrame,
@@ -140,54 +169,9 @@ def building_and_intersection_metrics(city_name, YOUR_NAME, boundary_eps=0.75):
           - boundary clips (roads ∩ buffered boundary)
         Columns: ['block_id','geometry']
         """
-        # Interior segments
         inside = gpd.overlay(roads_part, blocks_sm_ov, how='intersection')
         inside = inside[['block_id','geometry']]
-        # Boundary-following segments (enclosing)
-        boundary = gpd.overlay(roads_part, blocks_bd_ov, how='intersection')
-        boundary = boundary[['block_id','geometry']]
-
-        if inside.empty and boundary.empty:
-            return gpd.GeoDataFrame({'block_id': pd.Series([], dtype='int64'),
-                                     'geometry': gpd.GeoSeries([], dtype='geometry')},
-                                     geometry='geometry')
-
-        segs = pd.concat([inside, boundary], ignore_index=True)
-        # Remove empties and zero-length artifacts
-        segs = segs[~segs.geometry.is_empty]
-        segs = segs[segs.geometry.length > 0]
-        return segs
-
-    # intersections will be counted *on associated road segments* (not polygon)
-    def intersections_on_segments_partition(pnts_part: gpd.GeoDataFrame,
-                                            assoc_segments_pd: gpd.GeoDataFrame) -> pd.DataFrame:
-        """
-        Join intersections to associated road segments; count by street_count thresholds.
-        Deduplicate per (block_id, osmid) if osmid exists to avoid double counts from multiple segments.
-        Returns index=block_id with columns n_intersections, intersections_3plus, intersections_4way.
-        """
-        if pnts_part.empty or assoc_segments_pd.empty:
-            cols = ['n_intersections', 'intersections_3plus', 'intersections_4way']
-            return pd.DataFrame(columns=cols, index=pd.Index([], name='block_id'))
-
-        left = pnts_part[['geometry', 'street_count']].copy()
-        if 'osmid' in pnts_part.columns:
-            left['osmid'] = pnts_part['osmid'].astype('int64', errors='ignore')
-
-        j = gpd.sjoin(left, assoc_segments_pd[['block_id','geometry']], predicate='intersects', how='inner')
-        # De-dup (intersection might touch multiple segments in the same block)
-        if 'osmid' in j.columns:
-            j = j.drop_duplicates(subset=['block_id','osmid'])
-        else:
-            # fall back: drop dup by geometry coords per block (coarse but prevents explosion)
-            j = j.drop_duplicates(subset=['block_id','geometry'])
-
-        g2 = j[j.street_count >= 2].groupby('block_id').size().rename('n_intersections')
-        g3 = j[j.street_count >= 3].groupby('block_id').size().rename('intersections_3plus')
-        g4 = j[j.street_count == 4].groupby('block_id').size().rename('intersections_4way')
-        out = pd.concat([g2, g3, g4], axis=1)
-        out.index.name = 'block_id'
-        return out
+        return inside[~inside.geometry.is_empty & (inside.geometry.length > 0)]
 
     # -------- Metadata (Dask) --------
     meta_ba = pd.DataFrame({
@@ -232,36 +216,85 @@ def building_and_intersection_metrics(city_name, YOUR_NAME, boundary_eps=0.75):
     ).persist()
 
     # Compute total length per block from associated segments
-    assoc_with_len = assoc_segments.map_partitions(
-        lambda df: df.assign(seg_len_m=df.geometry.length),
-        meta=pd.DataFrame({
-            'block_id': pd.Series(dtype='int64'),
-            'geometry': gpd.GeoSeries(dtype='geometry'),
-            'seg_len_m': pd.Series(dtype='float64')
-        })
-    ).persist()
+    # Compute total length per block from associated segments
+    # IMPORTANT: keep block_id as a COLUMN (never index) until AFTER the groupby
+    def seglen_partition(df: gpd.GeoDataFrame) -> pd.DataFrame:
+        # Return a plain pandas DF with RangeIndex
+        if df.empty:
+            return pd.DataFrame(
+                {
+                    "block_id": pd.Series([], dtype="int64"),
+                    "seg_len_m": pd.Series([], dtype="float64"),
+                }
+            )
 
-    agg_len = (
-        assoc_with_len[['block_id','seg_len_m']]
-        .reset_index()
-        .groupby('block_id')
-        .sum()
-        .reset_index()
-        .set_index('block_id')
+        out = pd.DataFrame(
+            {
+                "block_id": df["block_id"].astype("int64", errors="ignore"),
+                "seg_len_m": df.geometry.length.astype("float64"),
+            }
+        )
+        # Make 100% sure index is not named 'block_id'
+        out = out.reset_index(drop=True)
+        out.index.name = None
+        return out
+
+    meta_len = pd.DataFrame(
+        {
+            "block_id": pd.Series(dtype="int64"),
+            "seg_len_m": pd.Series(dtype="float64"),
+        }
     )
 
-    blocks = blocks.join(agg_len.rename(columns={'seg_len_m':'total_len_m'}), how='left')
+    seglens = assoc_segments.map_partitions(seglen_partition, meta=meta_len).persist()
+
+    # Aggregate: result is index=block_id ONLY (safe for joining to blocks)
+    agg_len = (
+        seglens.groupby("block_id")["seg_len_m"]
+        .sum()
+        .rename("total_len_m")
+        .to_frame()
+    )
+    agg_len = agg_len.rename_axis("block_id")
+
+    blocks = blocks.join(agg_len, how="left")
+
+
     blocks['total_len_m'] = blocks['total_len_m'].fillna(0.0)
     blocks['road_length'] = blocks['total_len_m'] / 1000.0  # km
     blocks['has_roads']   = blocks['road_length'] > 0
 
-    # -------- Intersections → counted only on associated segments --------
-    # Bring associated segments to pandas for a robust sjoin with points
-    assoc_segments_pd = assoc_segments.compute()
-    # Map intersections partitions to counts-on-segments
+    def intersections_in_block_partition(pnts_part: gpd.GeoDataFrame, blocks_ov: gpd.GeoDataFrame) -> pd.DataFrame:
+        if pnts_part.empty:
+            cols = ['n_intersections', 'intersections_3plus', 'intersections_4way']
+            return pd.DataFrame(columns=cols, index=pd.Index([], name='block_id'))
+
+        left = pnts_part[['geometry', 'street_count']].copy()
+        if 'osmid' in pnts_part.columns:
+            left['osmid'] = pnts_part['osmid']
+
+        j = gpd.sjoin(left, blocks_ov[['block_id','geometry']], predicate='intersects', how='inner')
+
+        # Dedup within block
+        if 'osmid' in j.columns:
+            j = j.drop_duplicates(subset=['block_id','osmid'])
+        else:
+            j = j.drop_duplicates(subset=['block_id','geometry'])
+
+        g2 = j[j.street_count >= 2].groupby('block_id').size().rename('n_intersections')
+        g3 = j[j.street_count >= 3].groupby('block_id').size().rename('intersections_3plus')
+        g4 = j[j.street_count == 4].groupby('block_id').size().rename('intersections_4way')
+        out = pd.concat([g2, g3, g4], axis=1)
+        out.index.name = 'block_id'
+        return out
+
+
     parts_i = intersections.map_partitions(
-        intersections_on_segments_partition, assoc_segments_pd, meta=meta_ic
+        intersections_in_block_partition,
+        blocks_for_ic,
+        meta=meta_ic
     ).persist()
+
 
     agg_i = (
         parts_i.reset_index()
@@ -280,6 +313,7 @@ def building_and_intersection_metrics(city_name, YOUR_NAME, boundary_eps=0.75):
     blocks['m3_std'] = blocks['m3_raw'].map_partitions(standardize_metric_3, meta=('m3','float64'))
 
     blocks['m4_raw'] = blocks['intersections_4way'] / blocks['intersections_3plus']            # 4-way share
+    blocks['m4_raw'] = blocks['m4_raw'].replace([np.inf, -np.inf], np.nan)
     m4_med = blocks['m4_raw'].dropna().quantile(0.5).compute()
     if pd.isna(m4_med):
         m4_med = 0.0
@@ -348,7 +382,7 @@ def building_distance_metrics(city_name, YOUR_NAME):
     if 'geom' in blocks.columns:
         blocks = blocks.drop(columns=['geom'])
 
-    # Ensure unique block_id, as INDEX ONLY
+    # Ensure unique block_id, as index only
     if 'fid' in blocks.columns and blocks['fid'].dropna().is_unique:
         blocks = blocks.rename(columns={'fid': 'block_id'})
     elif 'block_id' not in blocks.columns:
@@ -356,13 +390,22 @@ def building_distance_metrics(city_name, YOUR_NAME):
         blocks['block_id'] = blocks.index.astype('int64')
     blocks = blocks.set_index('block_id', drop=True)
 
+    def _ensure_block_id_index_only(df):
+        # block_id must exist ONLY as the index, never as a column
+        if 'block_id' in df.columns:
+            df = df.drop(columns=['block_id'])
+        df.index.name = 'block_id'
+        return df
+
+    blocks = _ensure_block_id_index_only(blocks)
+
+
     # Buildings with precomputed distances
     buildings = load_dataset(paths['buildings_dist'], epsg=epsg)
     # Robust dtypes
     buildings['distance_to_nearest_road'] = buildings['distance_to_nearest_road'].astype('float64')
 
     # ---------- Make small pandas block frame for sjoin ----------
-    # index = block_id (no 'block_id' column) → avoids "cannot insert block_id" error
     blocks_small_sjoin = blocks[['geometry']].compute()  # pandas GeoDF; index is block_id
 
     # ---------- Partition function ----------
@@ -646,6 +689,11 @@ def metrics_roads_intersections(city_name, YOUR_NAME):
         .rename(columns={'block_id': 'index_right'})          # overlayPartition expects 'index_right'
         [['index_right', 'geometry']]
     )
+
+    # Improve intersection counting due to small mismatches
+    blocks_small_overlay["geometry"] = blocks_small_overlay.geometry.buffer(0)
+
+
     # For sjoin: use index=block_id ONLY (no 'block_id' column)
     blocks_small_sjoin = blocks[['geometry']].compute()
     blocks_small_sjoin.index.name = 'block_id'
@@ -653,34 +701,58 @@ def metrics_roads_intersections(city_name, YOUR_NAME):
     # ======================================================================
     # M9: Average intersection angle per block
     # ======================================================================
-    intersections['osmid'] = intersections['osmid'].astype('int64')
 
-    # Compute angles between connecting roads at each intersection (helper you already have)
-    # - roads is Dask; intersections is pandas (as in your original)
-    angles_df = compute_intersection_angles(roads, intersections)
-    # Map osmid -> average angle (helper you already have)
-    street_count_mapping = intersections.set_index('osmid')['street_count'].to_dict()
+    # --- Keep only 3-way / 4-way intersections up front (strict metric definition) ---
+    intersections['osmid'] = intersections['osmid'].astype('int64')
+    intersections_sc = intersections[intersections['street_count'].isin([3, 4])].copy()
+
+    # Bearings from incident edges (roads is Dask; intersections_sc is pandas)
+    angles_df = compute_intersection_angles(roads, intersections_sc)
+
+    # STRICT: mapping only for intersections where observed bearings count == street_count
+    street_count_mapping = intersections_sc.set_index('osmid')['street_count'].to_dict()
     intersection_angle_mapping = compute_intersection_mapping(angles_df, street_count_mapping).compute()
 
-    intersections_with_angles = intersections.merge(
+    intersections_with_angles = intersections_sc.merge(
         intersection_angle_mapping.rename('average_angle'),
         left_on='osmid', right_index=True, how='left'
     )
 
-    # Join intersections to blocks (pandas → pandas sjoin)
-    j_int = gpd.sjoin(intersections_with_angles, blocks_small_sjoin[['geometry']],
-                      predicate='within', how='inner')
-    # Right index becomes index of blocks_small_sjoin → in GeoPandas it is stored as 'index_right'
+    # --- Assign intersections to blocks (avoid losing boundary points) ---
+    # within() excludes points exactly on the boundary; buffer fixes that.
+    blocks_for_m9 = blocks_small_sjoin[['geometry']].copy()
+    blocks_for_m9['geometry'] = blocks_for_m9.geometry.buffer(0.5)  # meters (epsg is projected here)
+
+    j_int = gpd.sjoin(
+        intersections_with_angles,
+        blocks_for_m9,
+        predicate='within',
+        how='inner'
+    )
+
     if 'index_right' in j_int.columns:
         j_int = j_int.rename(columns={'index_right': 'block_id'})
-    # Average per block_id (pandas)
+
+    # Keep only intersections that actually got a strict angle value
+    j_ok = j_int[j_int['average_angle'].notna()].copy()
+
+    # Per-block mean angle metric
     m9_per_block = (
-        j_int.groupby('block_id')['average_angle']
-             .mean()
-             .rename('m9_raw')
+        j_ok.groupby('block_id')['average_angle']
+            .mean()
+            .rename('m9_raw')
     )
-    # Convert to Dask for a clean join
-    m9_df = dd.from_pandas(m9_per_block.reset_index().set_index('block_id'), npartitions=1)
+
+    # Per-block count of contributing intersections
+    m9_n_per_block = (
+        j_ok.groupby('block_id')
+            .size()
+            .rename('m9_n_intersections')
+    )
+
+    m9_out = pd.concat([m9_per_block, m9_n_per_block], axis=1)
+    m9_df = dd.from_pandas(m9_out.reset_index().set_index('block_id'), npartitions=1)
+
 
     # ======================================================================
     # M8: Road tortuosity per block
@@ -727,13 +799,18 @@ def metrics_roads_intersections(city_name, YOUR_NAME):
     blocks['m8_std'] = blocks['m8_raw'].map_partitions(standardize_metric_8, meta=('m8', 'float64'))
 
     # Join M9
-    blocks = blocks.join(m9_df[['m9_raw']], how='left')
-    # Fill with median of non-null
+    blocks = blocks.join(m9_df[['m9_raw', 'm9_n_intersections']], how='left')
+    blocks['m9_n_intersections'] = blocks['m9_n_intersections'].fillna(0).astype('int64')
+
+    # Keep m9_raw as NaN when nothing valid contributed (your preference)
+    # Standardize on an imputed series so std exists, but raw preserves missingness
     m9_median = blocks['m9_raw'].dropna().quantile(0.5).compute()
     if pd.isna(m9_median):
         m9_median = 0.0
-    blocks['m9_raw'] = blocks['m9_raw'].fillna(m9_median)
-    blocks['m9_std'] = blocks['m9_raw'].map_partitions(standardize_metric_9, meta=('m9', 'float64'))
+
+    m9_for_std = blocks['m9_raw'].fillna(m9_median)
+    blocks['m9_std'] = m9_for_std.map_partitions(standardize_metric_9, meta=('m9', 'float64'))
+
 
     # ======================================================================
     # Write out (dataset directory)
@@ -755,8 +832,6 @@ def metrics_roads_intersections(city_name, YOUR_NAME):
     blocks.to_parquet(out, write_index=True, compute=True)
     return out
 
-
-from dask import delayed  # already in your imports, keep it
 
 # =====================================================================
 # Block-level K-complexity (no grid dependency)

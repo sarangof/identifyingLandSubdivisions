@@ -18,24 +18,23 @@ From the root of the repository:
     * Note: Choose a number of cpus above the number of cities you want to run, so they will all run in parrellel. Options are 1, 2, 4, 8, 12, 16, 20, 24... (See https://instances.vantage.sh/ for more.)
 
 
-# How to run
-0. Set up the environment.
-1. Run `gather_data_cities.py`
-3. From `pre_processing.py`, run the following functions: `calculate_building_distances_to_roads()`, `produce_blocks()`, `produce_azimuths()`
-4. `pre_process_all_cities.py`
-5. Run metric calculations, for example:
-```
-cities = ["Nairobi", "Medellin", "Accra", "Bamako", "Belo_Horizonte", "Bogota", "Campinas", "Cape_Town", "Abidjan", "Luanda"]
-cities = [city.replace(' ', '_') for city in cities]
+# Run the following notebooks in order
+0. `gather_1000_cities_search_areas.py`
+1. `gather_data_executor.ipynb`
+2. `calculate_blocks_executor.ipynb`
+3. `pre_processing_executor.ipynb`
+4. `metric_calculation_executor.ipynb`
+5. `post_processing_executor.ipynb`
 
-tasks = []
-for city in cities:
-    tasks.append(building_and_intersection_metrics(city,grid_size,YOUR_NAME))
-    tasks.append(building_distance_metrics(city, grid_size, YOUR_NAME))
-    tasks.append(compute_m6_m7(city, grid_size, YOUR_NAME))
-    tasks.append(metrics_roads_intersections(city, grid_size, YOUR_NAME))
 
-results = compute(*tasks)
-```
+# Main files
+0. `getting_1000_cities_search_areas.py`
+1. `gather_data_cities.py`
+2. `auxiliary_functions.py`
+3. `pre_processing.py`
+4. `metrics_calculation.py`
+5. `standardize_metrics.py`
+6. `post_processing_auxiliaries.py`
 
-6. Run `consolidate_irregularity_index()`
+# Analysis files
+* `validation_small_scale_test`

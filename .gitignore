@@ -25,3 +25,5 @@ data
 .parquet
 .geoparquet
 .geojson
+/unused_code/*
+MDE_*

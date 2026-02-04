@@ -1,0 +1,1239 @@
+run_id,city,status,elapsed_s,host,exists_roads,exists_intersections,exists_natural,error
+ils-20260115_041620-80b3fcad,Aba__Nigeria,PARTIAL,73.187,ip-10-0-197-151,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Abacher__Chad,OK,118.848,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Abakaliki__Nigeria,OK,61.88,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Abengourou__Cote_d_Ivoire,PARTIAL,327.504,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Abeokuta__Nigeria,OK,196.399,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Abidjan__Cote_d_Ivoire,OK,1806.073,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Abiriba__Nigeria,PARTIAL,338.469,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Abuja__Nigeria,PARTIAL,356.171,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Acapulco__Mexico,OK,698.211,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Acarigua__Venezuela,OK,362.461,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Accra__Ghana,OK,3574.848,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Adama__Ethiopia,OK,59.614,ip-10-0-194-49,True,True,True,
+ils-20260115_041620-80b3fcad,Addis_Ababa__Ethiopia,OK,3881.89,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Adigrat__Ethiopia,OK,30.007,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Ado_Ekiti__Nigeria,OK,132.432,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Ado__Nigeria,PARTIAL,327.496,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Adwa__Ethiopia,OK,86.028,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Agadez__Niger,PARTIAL,327.495,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Agbor__Nigeria,PARTIAL,327.53,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Ago_Iwoye__Nigeria,PARTIAL,9.934,ip-10-0-195-225,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Agona_Swedru__Ghana,OK,25.23,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Agua_Prieta__Mexico,OK,158.36,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Aguas_Lindas_de_Goias__Brazil,OK,165.19,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Aguascalientes__Mexico,OK,1543.718,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Akugba__Nigeria,PARTIAL,329.265,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Akure__Nigeria,OK,319.319,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Alaba_Kulito__Ethiopia,PARTIAL,8.199,ip-10-0-204-197,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Alagoinhas__Brazil,OK,274.931,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Aletawendo__Ethiopia,PARTIAL,12.99,ip-10-0-204-197,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Am_Timan__Chad,PARTIAL,331.734,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Amakofia__Nigeria,PARTIAL,327.474,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Amassoma__Nigeria,OK,6.21,ip-10-0-198-112,True,True,True,
+ils-20260115_041620-80b3fcad,Ambato__Ecuador,OK,519.135,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Ambatolampy_Tsimahafotsy__Madagascar,PARTIAL,331.733,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Ambo__Ethiopia,OK,14.656,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Ambovombe__Madagascar,PARTIAL,4.53,ip-10-0-195-225,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Anaco__Venezuela,PARTIAL,331.58,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Anapolis__Brazil,OK,116.54,ip-10-0-198-112,True,True,True,
+ils-20260115_041620-80b3fcad,Ankoro__Democratic_Republic_of_the_Congo,PARTIAL,327.496,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Ankpa__Nigeria,PARTIAL,10.377,ip-10-0-194-125,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Antananarivo__Madagascar,OK,423.793,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Antofagasta__Chile,PARTIAL,326.809,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Apartado__Colombia,OK,15.959,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Apatzingan__Mexico,OK,174.395,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Apucarana__Brazil,OK,37.654,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Aracaju__Brazil,PARTIAL,339.896,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Aracatuba__Brazil,OK,337.791,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Araguaina__Brazil,OK,274.629,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Araguari__Brazil,OK,208.645,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Aramoko_Ekiti__Nigeria,PARTIAL,259.249,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Arapiraca__Brazil,OK,189.199,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Arapongas__Brazil,OK,490.581,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Araraquara__Brazil,OK,629.69,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Araras__Brazil,OK,50.46,ip-10-0-203-245,True,True,True,
+ils-20260115_041620-80b3fcad,Araruama__Brazil,PARTIAL,339.249,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Arauca__Colombia,OK,193.921,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Arba_Minch__Ethiopia,PARTIAL,326.639,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Areka__Ethiopia,PARTIAL,327.503,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Arequipa__Peru,OK,1075.496,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Argungu__Nigeria,PARTIAL,326.811,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Arica__Chile,PARTIAL,327.428,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Armenia__Colombia,OK,207.653,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Arsi_Negelle__Ethiopia,PARTIAL,12.497,ip-10-0-194-125,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Arua__Uganda,OK,75.013,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Arusha__Tanzania,OK,997.433,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Asaba__Nigeria,PARTIAL,327.444,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Asassa__Ethiopia,PARTIAL,9.654,ip-10-0-207-26,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Asella__Ethiopia,OK,22.263,ip-10-0-203-35,True,True,True,
+ils-20260115_041620-80b3fcad,Asmara__Eritrea,OK,263.915,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Asosa__Ethiopia,OK,52.232,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Asuncion__Paraguay,PARTIAL,352.087,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Atakpame__Togo,PARTIAL,326.21,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Ati__Chad,OK,115.148,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Atibaia__Brazil,OK,275.234,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Auchi__Nigeria,OK,57.112,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Ayacucho__Peru,PARTIAL,328.114,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Ayangba__Nigeria,PARTIAL,5.514,ip-10-0-194-125,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Aykel__Ethiopia,OK,80.678,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Azare__Nigeria,PARTIAL,16.204,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Babahoyo__Ecuador,OK,24.564,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Bafoussam__Cameroon,OK,447.944,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Bage__Brazil,OK,107.861,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Bahia_Blanca__Argentina,PARTIAL,331.569,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Bahir_Dar__Ethiopia,PARTIAL,325.765,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Baidoa__Somalia,PARTIAL,331.6,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Bajoga__Nigeria,PARTIAL,11.984,ip-10-0-207-26,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Balneario_Camboriu__Brazil,PARTIAL,331.614,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Bamako__Mali,PARTIAL,387.703,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Bamenda__Cameroon,PARTIAL,335.696,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Bandundu__Democratic_Republic_of_the_Congo,OK,60.717,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Banfora__Burkina_Faso,PARTIAL,326.562,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Bangui__Central_African_Republic,OK,233.254,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Bani__Dominican_Republic,OK,83.811,ip-10-0-203-35,True,True,True,
+ils-20260115_041620-80b3fcad,Banki__Cameroon,OK,15.806,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Baraka__Democratic_Republic_of_the_Congo,OK,12.815,ip-10-0-203-245,True,True,True,
+ils-20260115_041620-80b3fcad,Barbacena__Brazil,PARTIAL,331.58,ip-10-0-203-35,False,False,True,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Barcelona__Venezuela,PARTIAL,327.48,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Barinas__Venezuela,OK,189.15,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Barquisimeto__Venezuela,PARTIAL,327.338,ip-10-0-203-35,False,False,True,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Barrancabermeja__Colombia,OK,159.086,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Barranquilla__Colombia,OK,597.245,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Barreiras__Brazil,PARTIAL,388.957,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Barretos__Brazil,PARTIAL,325.458,ip-10-0-199-206,False,False,True,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Basankusu__Democratic_Republic_of_the_Congo,OK,7.914,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Bata__Equatorial_Guinea,OK,214.876,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Bauchi__Nigeria,PARTIAL,329.156,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Bauru__Brazil,OK,416.5,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Bayamo__Cuba,OK,141.392,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Beira__Mozambique,PARTIAL,584.486,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Beledweyne__Somalia,OK,148.049,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Belem__Brazil,PARTIAL,135.001,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Belo_Horizonte__Brazil,PARTIAL,327.48,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Benguela__Angola,OK,376.357,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Beni__Democratic_Republic_of_the_Congo,PARTIAL,327.584,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Benin_City__Nigeria,OK,1248.104,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Berbera__Somalia,PARTIAL,10.634,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Berekum__Ghana,PARTIAL,393.128,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Bertoua__Cameroon,PARTIAL,388.971,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Betou__Republic_of_Congo,PARTIAL,327.482,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Biantubu__Nigeria,PARTIAL,333.226,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Bida__Nigeria,OK,68.208,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Biliri__Nigeria,PARTIAL,9.209,ip-10-0-197-151,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Birigui__Brazil,OK,263.0,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Birni_N_Konni__Niger,OK,81.468,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Birnin_Kebbi__Nigeria,PARTIAL,15.859,ip-10-0-197-151,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Biruaca__Venezuela,PARTIAL,327.51,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Bishoftu__Ethiopia,PARTIAL,327.497,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Bissau__Guinea_Bissau,OK,99.843,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Biu__Nigeria,OK,40.236,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Blantyre__Malawi,OK,314.413,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Bloemfontein__South_Africa,OK,847.27,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Blumenau__Brazil,OK,453.658,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Bo__Sierra_Leone,OK,42.375,ip-10-0-203-245,True,True,True,
+ils-20260115_041620-80b3fcad,Boa_Vista__Brazil,OK,104.646,ip-10-0-203-245,True,True,True,
+ils-20260115_041620-80b3fcad,Bobo_Dioulasso__Burkina_Faso,PARTIAL,532.308,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Boditi__Ethiopia,PARTIAL,327.517,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Bodo__Nigeria,OK,14.381,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Boende__Democratic_Republic_of_the_Congo,OK,7.816,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Bogota__Colombia,OK,2652.211,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Bohicon__Benin,PARTIAL,30.499,ip-10-0-194-125,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Boma__Democratic_Republic_of_the_Congo,OK,96.824,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Bondoukou__Cote_d_Ivoire,PARTIAL,327.506,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Bongor__Chad,PARTIAL,327.531,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Bonny__Nigeria,PARTIAL,327.51,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Bonsa_Bota__Ethiopia,PARTIAL,328.363,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Bor__South_Sudan,OK,64.223,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Borama__Somalia,OK,165.669,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Bori__Nigeria,OK,11.271,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Bosaso__Somalia,PARTIAL,327.496,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Botucatu__Brazil,PARTIAL,331.664,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Bouafle__Cote_d_Ivoire,OK,76.708,ip-10-0-203-35,True,True,True,
+ils-20260115_041620-80b3fcad,Bouake__Cote_d_Ivoire,PARTIAL,550.67,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Braganca_Paulista__Brazil,OK,700.593,ip-10-0-203-35,True,True,True,
+ils-20260115_041620-80b3fcad,Bridgetown__Barbados,OK,454.241,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Bronville__South_Africa,OK,276.511,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Bucaramanga__Colombia,PARTIAL,339.794,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Buenos_Aires__Argentina,PARTIAL,339.763,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Buga__Colombia,OK,60.275,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Bugama__Nigeria,PARTIAL,9.789,ip-10-0-195-225,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Bujumbura__Burundi,OK,150.785,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Bukala__Tanzania,PARTIAL,532.298,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Bukavu__Democratic_Republic_of_the_Congo,PARTIAL,325.69,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Bukoba__Tanzania,OK,41.597,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Bulawayo__Zimbabwe,OK,405.983,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Bule_Hora__Ethiopia,PARTIAL,12.769,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Bumba__Democratic_Republic_of_the_Congo,OK,13.448,ip-10-0-203-245,True,True,True,
+ils-20260115_041620-80b3fcad,Bunia__Democratic_Republic_of_the_Congo,OK,82.69,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Burao__Somalia,OK,87.354,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Busia__Kenya,PARTIAL,327.497,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Buta__Democratic_Republic_of_the_Congo,PARTIAL,331.597,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Butembo__Democratic_Republic_of_the_Congo,PARTIAL,327.494,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Butusande__Democratic_Republic_of_the_Congo,PARTIAL,328.474,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Buurhakaba__Somalia,OK,19.353,ip-10-0-203-245,True,True,True,
+ils-20260115_041620-80b3fcad,Caaguazu__Paraguay,OK,77.626,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Cabimas__Venezuela,OK,146.102,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Cabinda__Angola,OK,193.333,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Cabo_Frio__Brazil,OK,279.993,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Cabo_San_Lucas__Mexico,OK,437.549,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Cabudwaaq__Ethiopia,PARTIAL,327.489,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Cachoeiro_de_Itapemirim__Brazil,PARTIAL,325.452,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Cafunfo__Angola,OK,10.103,ip-10-0-198-112,True,True,True,
+ils-20260115_041620-80b3fcad,Cajamarca__Peru,PARTIAL,327.496,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Calabar__Nigeria,PARTIAL,532.37,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Calabozo__Venezuela,PARTIAL,327.511,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Calama__Chile,PARTIAL,327.505,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Cali__Colombia,PARTIAL,328.477,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Camacari__Brazil,PARTIAL,336.107,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Camaguey__Cuba,PARTIAL,326.502,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Campeche__Mexico,PARTIAL,326.397,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Campina_Grande__Brazil,PARTIAL,326.414,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Campinas__Brazil,OK,4626.93,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Campo_Grande__Brazil,OK,796.969,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Campos_dos_Goytacazes__Brazil,OK,285.687,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Cancun__Mexico,PARTIAL,15.637,ip-10-0-195-225,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Cap_Haitien__Haiti,OK,178.984,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Cape_Coast__Ghana,OK,62.37,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Cape_Town__South_Africa,OK,3604.993,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Caracas__Venezuela,OK,657.657,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Cardenas__Mexico,PARTIAL,22.924,ip-10-0-204-197,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Carora__Venezuela,OK,58.777,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Cartagena__Colombia,PARTIAL,135.655,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Cartago__Colombia,PARTIAL,335.822,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Cartago__Costa_Rica,PARTIAL,330.245,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Caruaru__Brazil,OK,184.724,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Carupano__Venezuela,OK,192.928,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Cascavel__Brazil,OK,412.156,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Castanhal__Brazil,OK,257.829,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Catanduva__Brazil,OK,260.4,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Catia_La_Mar__Venezuela,PARTIAL,326.303,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Caxias__Brazil,OK,111.721,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Caxias_do_Sul__Brazil,PARTIAL,327.509,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Cazombo__Angola,PARTIAL,327.502,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Ceilandia__Brazil,PARTIAL,327.5,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Celaya__Mexico,PARTIAL,325.63,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Chaguanas__Trinidad_and_Tobago,OK,73.229,ip-10-0-194-49,True,True,True,
+ils-20260115_041620-80b3fcad,Chapeco__Brazil,PARTIAL,347.24,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Charallave__Venezuela,OK,94.435,ip-10-0-194-49,True,True,True,
+ils-20260115_041620-80b3fcad,Chetumal__Mexico,PARTIAL,6.89,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Chia__Colombia,OK,159.149,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Chiclayo__Peru,OK,625.056,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Chiguayante__Chile,OK,70.079,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Chihuahua__Mexico,OK,618.037,ip-10-0-203-35,True,True,True,
+ils-20260115_041620-80b3fcad,Chillan__Chile,PARTIAL,325.321,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Chilpancingo__Mexico,PARTIAL,327.505,ip-10-0-198-112,False,False,True,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Chimaltenango__Guatemala,OK,59.593,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Chimbote__Peru,PARTIAL,22.111,ip-10-0-207-26,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Chimoio__Mozambique,PARTIAL,327.481,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Chinandega__Nicaragua,PARTIAL,327.634,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Chincha_Alta__Peru,OK,176.056,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Chingola__Zambia,OK,105.01,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Chipata__Zambia,OK,30.126,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Chiro__Ethiopia,PARTIAL,87.886,ip-10-0-204-197,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Choluteca__Honduras,PARTIAL,393.051,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Choma__Zambia,OK,217.62,ip-10-0-194-49,True,True,True,
+ils-20260115_041620-80b3fcad,Ciego_de_Avila__Cuba,PARTIAL,328.721,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Cienfuegos__Cuba,PARTIAL,344.14,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Cinkasse__Burkina_Faso,PARTIAL,329.634,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,City_of_Loja__Ecuador,OK,237.521,ip-10-0-203-245,True,True,True,
+ils-20260115_041620-80b3fcad,Ciudad_Acuna__Mexico,OK,348.26,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Ciudad_Bolivar__Venezuela,OK,285.759,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Ciudad_Guayana__Venezuela,PARTIAL,328.583,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Ciudad_Obregon__Mexico,OK,301.97,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Ciudad_Ojeda__Venezuela,OK,112.831,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Ciudad_Valles__Mexico,OK,39.947,ip-10-0-194-49,True,True,True,
+ils-20260115_041620-80b3fcad,Ciudad_Victoria__Mexico,PARTIAL,326.261,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Ciudad_del_Carmen__Mexico,PARTIAL,327.581,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Ciudad_del_Este__Paraguay,PARTIAL,326.374,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Coatzacoalcos__Mexico,PARTIAL,359.224,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Coban__Guatemala,OK,63.888,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Cochabamba__Bolivia,PARTIAL,417.524,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Colan__Panama,OK,92.251,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Colima__Mexico,OK,384.683,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Colina_de_Laranjeiras__Brazil,OK,569.504,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Comayagua__Honduras,OK,143.421,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Comitan__Mexico,OK,260.152,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Comodoro_Rivadavia__Argentina,OK,189.732,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Conakry__Guinea,PARTIAL,327.523,ip-10-0-194-49,False,False,True,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Concepcion__Chile,PARTIAL,327.504,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Concordia__Argentina,PARTIAL,530.864,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Conselheiro_Lafaiete__Brazil,PARTIAL,539.894,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Copiapo__Chile,OK,145.566,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Cordoba__Argentina,PARTIAL,329.631,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Cordoba__Mexico,PARTIAL,329.628,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Coro__Venezuela,OK,130.282,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Coronel_Fabriciano__Brazil,OK,116.379,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Coronel__Chile,OK,95.601,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Corrientes__Argentina,OK,227.017,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Corumba__Brazil,PARTIAL,326.258,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Cotonou__Benin,PARTIAL,326.246,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Criciuma__Brazil,OK,580.87,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Cua__Venezuela,PARTIAL,327.522,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Cuauhtemoc__Mexico,PARTIAL,331.536,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Cuautla__Mexico,OK,613.687,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Cubal__Angola,OK,105.269,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Cucuta__Colombia,OK,467.006,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Cuenca__Ecuador,OK,215.234,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Cuernavaca__Mexico,OK,1569.091,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Cuiaba__Brazil,OK,1798.706,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Culiacan__Mexico,OK,896.318,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Cumana__Venezuela,OK,327.53,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Curico__Chile,OK,312.261,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Curitiba__Brazil,PARTIAL,327.494,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Cusco__Peru,PARTIAL,327.444,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Dadaab__Kenya,PARTIAL,330.193,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Dakar__Senegal,OK,677.22,ip-10-0-198-112,True,True,True,
+ils-20260115_041620-80b3fcad,Daloa__Cote_d_Ivoire,PARTIAL,330.095,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Damaturu__Nigeria,PARTIAL,327.291,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Dambarta__Nigeria,PARTIAL,13.995,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Dambidollo__Ethiopia,PARTIAL,536.553,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Damboa__Nigeria,PARTIAL,4.603,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Dapaong__Togo,OK,694.534,ip-10-0-203-35,True,True,True,
+ils-20260115_041620-80b3fcad,Dar_es_Salaam__Tanzania,OK,3392.997,ip-10-0-203-35,True,True,True,
+ils-20260115_041620-80b3fcad,Dasgahbur__Ethiopia,OK,136.3,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Daura__Nigeria,PARTIAL,5.942,ip-10-0-204-197,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,David__Panama,PARTIAL,331.095,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Debark__Ethiopia,PARTIAL,327.566,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Debre_Birhan__Ethiopia,OK,108.561,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Debre_Markos__Ethiopia,OK,223.655,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Delicias__Mexico,OK,414.455,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Demba__Democratic_Republic_of_the_Congo,PARTIAL,327.901,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Dessie__Ethiopia,PARTIAL,331.597,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Dikwa__Nigeria,PARTIAL,446.277,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Dilla__Ethiopia,PARTIAL,327.777,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Dilolo__Democratic_Republic_of_the_Congo,OK,7.737,ip-10-0-194-49,True,True,True,
+ils-20260115_041620-80b3fcad,Diourbel__Senegal,OK,401.729,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Dire_Dawa__Ethiopia,OK,176.612,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Divinopolis__Brazil,PARTIAL,536.515,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Divo__Cote_d_Ivoire,PARTIAL,327.841,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Djibouti__Djibouti,PARTIAL,326.102,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Djougou__Benin,PARTIAL,326.979,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Doba__Chad,PARTIAL,393.107,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Dodolla__Ethiopia,PARTIAL,23.246,ip-10-0-204-197,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Dodoma__Tanzania,OK,857.85,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Dogondoutchi__Niger,PARTIAL,327.591,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Doka_Ashafa__Nigeria,PARTIAL,327.494,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Doma__Nigeria,PARTIAL,330.622,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Dosso__Niger,PARTIAL,327.497,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Douala__Cameroon,OK,646.256,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Dourados__Brazil,OK,549.972,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Dschang__Cameroon,OK,182.959,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Duekoue__Cote_d_Ivoire,OK,78.258,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Dundo__Angola,OK,128.842,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Durame__Ethiopia,PARTIAL,327.519,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Durango__Mexico,PARTIAL,339.781,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Durban__South_Africa,OK,1181.329,ip-10-0-203-245,True,True,True,
+ils-20260115_041620-80b3fcad,Dutse__Nigeria,PARTIAL,327.505,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,East_London__South_Africa,OK,355.295,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Ebolowa__Cameroon,OK,67.032,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Ebute_Irele__Nigeria,PARTIAL,6.039,ip-10-0-197-151,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Edendale__South_Africa,OK,677.562,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Effon_Alaiye__Nigeria,PARTIAL,200.716,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Egbe__Nigeria,PARTIAL,5.96,ip-10-0-194-125,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Ejigbo__Nigeria,PARTIAL,11.334,ip-10-0-194-125,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Eket__Nigeria,OK,132.168,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Ekogboro__Nigeria,OK,20.013,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Ekpoma__Nigeria,PARTIAL,528.204,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,El_Alto_La_Paz__Bolivia,PARTIAL,327.489,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,El_Progreso__Honduras,PARTIAL,331.598,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,El_Vigia__Venezuela,PARTIAL,329.074,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,El_Wak__Kenya,PARTIAL,331.619,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,El_esfuerzo__Colombia,PARTIAL,327.459,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Eldoret__Kenya,PARTIAL,327.471,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Emalahleni__South_Africa,OK,82.532,ip-10-0-194-49,True,True,True,
+ils-20260115_041620-80b3fcad,Embalenhle__South_Africa,OK,128.686,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Embu__Kenya,PARTIAL,85.635,ip-10-0-194-125,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Emure__Nigeria,OK,62.309,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Encarnacion__Paraguay,OK,340.489,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Ensenada__Mexico,PARTIAL,327.506,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Enugu__Nigeria,PARTIAL,343.882,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Enwan__Nigeria,PARTIAL,5.669,ip-10-0-195-225,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Epe__Nigeria,PARTIAL,10.112,ip-10-0-195-225,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Erigavo__Somalia,PARTIAL,5.369,ip-10-0-195-225,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Eruwa_Titun__Nigeria,OK,35.797,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Escuintla__Guatemala,OK,222.55,ip-10-0-198-112,True,True,True,
+ils-20260115_041620-80b3fcad,Esmeraldas__Ecuador,PARTIAL,325.442,ip-10-0-198-112,False,False,True,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Esteli__Nicaragua,OK,83.498,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Evaton__South_Africa,OK,784.787,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Facatativa__Colombia,OK,82.777,ip-10-0-203-35,True,True,True,
+ils-20260115_041620-80b3fcad,Fada_N_Gourma__Burkina_Faso,PARTIAL,328.468,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Faya_Largeau__Chad,OK,7.084,ip-10-0-203-35,True,True,True,
+ils-20260115_041620-80b3fcad,Feira_de_Santana__Brazil,OK,920.242,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Fik__Ethiopia,PARTIAL,16.103,ip-10-0-195-225,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Filtu__Ethiopia,PARTIAL,63.999,ip-10-0-194-125,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Florencia__Colombia,OK,87.731,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Flores__Guatemala,PARTIAL,326.594,ip-10-0-203-35,False,False,True,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Florianopolis__Brazil,PARTIAL,350.878,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Fomboni__Comoros,OK,66.322,ip-10-0-203-35,True,True,True,
+ils-20260115_041620-80b3fcad,Formosa__Argentina,OK,331.671,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Formosa__Brazil,OK,334.598,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Fort_de_France__France,PARTIAL,327.509,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Fortaleza__Brazil,PARTIAL,363.314,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Foumban__Cameroon,OK,13.201,ip-10-0-198-112,True,True,True,
+ils-20260115_041620-80b3fcad,Franca__Brazil,PARTIAL,335.681,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Francisco_Morato__Brazil,PARTIAL,327.505,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Francistown__Botswana,PARTIAL,331.33,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Freetown__Sierra_Leone,PARTIAL,342.711,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Fresnillo__Mexico,PARTIAL,331.581,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Fungurume__Democratic_Republic_of_the_Congo,PARTIAL,327.171,ip-10-0-199-206,False,False,True,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Funtua__Nigeria,PARTIAL,328.609,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Fusagasuga__Colombia,PARTIAL,331.59,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Gabela__Angola,PARTIAL,388.922,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Gaborone__Botswana,PARTIAL,343.876,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Gagnoa__Cote_d_Ivoire,PARTIAL,327.497,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Galkayo__Somalia,PARTIAL,589.648,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Gama__Brazil,OK,360.451,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Gamboru__Cameroon,OK,245.867,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Ganda__Angola,PARTIAL,327.513,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Gao__Mali,PARTIAL,327.363,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Garanhuns__Brazil,PARTIAL,327.505,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Garcia__Mexico,PARTIAL,328.065,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Garissa__Kenya,OK,120.477,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Garoua__Cameroon,PARTIAL,327.95,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Gashua__Nigeria,PARTIAL,327.362,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Gaya__Niger,OK,205.033,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Gboko__Nigeria,OK,215.823,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Geidam__Nigeria,PARTIAL,329.641,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Geita__Tanzania,PARTIAL,12.932,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Gemena__Democratic_Republic_of_the_Congo,OK,89.883,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,George__South_Africa,OK,37.091,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Georgetown__Guyana,OK,513.642,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Girardot__Colombia,PARTIAL,327.497,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Gitega__Burundi,PARTIAL,327.493,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Gode__Ethiopia,OK,116.488,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Goiania__Brazil,OK,3997.587,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Goma__Rwanda_Democratic_Republic_of_the_Congo,PARTIAL,328.768,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Gombe__Nigeria,PARTIAL,328.504,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Gombi__Nigeria,PARTIAL,125.099,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Gonaives__Haiti,OK,19.246,ip-10-0-194-49,True,True,True,
+ils-20260115_041620-80b3fcad,Gonder__Ethiopia,OK,70.841,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Governador_Valadares__Brazil,OK,404.628,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Guadalajara__Mexico,PARTIAL,328.136,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Guanajuato__Mexico,OK,315.257,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Guanare__Venezuela,OK,130.933,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Guantanamo__Cuba,OK,31.817,ip-10-0-194-49,True,True,True,
+ils-20260115_041620-80b3fcad,Guarapuava__Brazil,OK,56.731,ip-10-0-194-49,True,True,True,
+ils-20260115_041620-80b3fcad,Guaratingueta__Brazil,PARTIAL,331.605,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Guarenas__Venezuela,PARTIAL,331.286,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Guatemala_City__Guatemala,OK,2714.462,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Guayaquil__Ecuador,OK,2083.202,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Guaymas__Mexico,PARTIAL,16.71,ip-10-0-195-225,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Guider__Cameroon,OK,164.088,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Gulu__Uganda,OK,54.154,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Gumel__Nigeria,PARTIAL,130.987,ip-10-0-207-26,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Gurue__Mozambique,OK,13.262,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Gusau__Nigeria,PARTIAL,399.209,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Gwagwalada__Nigeria,OK,339.48,ip-10-0-203-35,True,True,True,
+ils-20260115_041620-80b3fcad,Gwoza__Nigeria,PARTIAL,388.074,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Hadejia__Nigeria,PARTIAL,4.818,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Hagadera_Refugee_Camp__Kenya,PARTIAL,91.166,ip-10-0-207-26,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Harar__Ethiopia,PARTIAL,13.727,ip-10-0-207-26,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Harare__Zimbabwe,OK,1552.122,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Hargeisa__Somalia,OK,213.047,ip-10-0-198-112,True,True,True,
+ils-20260115_041620-80b3fcad,Havana__Cuba,PARTIAL,546.484,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Hawassa__Ethiopia,PARTIAL,593.12,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Hermosillo__Mexico,OK,408.844,ip-10-0-198-112,True,True,True,
+ils-20260115_041620-80b3fcad,Heroica_Nogales__Mexico,OK,321.133,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Hidalgo_del_Parral__Mexico,OK,101.649,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Higuey__Dominican_Republic,OK,32.928,ip-10-0-203-245,True,True,True,
+ils-20260115_041620-80b3fcad,Ho__Ghana,PARTIAL,327.473,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Hohoe__Ghana,PARTIAL,325.145,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Holguin__Cuba,PARTIAL,526.464,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Hossana__Ethiopia,PARTIAL,5.728,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Huacho__Peru,PARTIAL,327.523,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Huambo__Angola,PARTIAL,335.694,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Huancayo__Peru,OK,374.247,ip-10-0-203-35,True,True,True,
+ils-20260115_041620-80b3fcad,Huanuco__Peru,OK,46.673,ip-10-0-203-35,True,True,True,
+ils-20260115_041620-80b3fcad,Huaraz__Peru,OK,85.997,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Ibadan__Nigeria,OK,3856.713,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Ibague__Colombia,OK,585.355,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Ibarra__Ecuador,OK,294.01,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Idah__Nigeria,PARTIAL,327.498,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Idanre__Nigeria,OK,222.415,ip-10-0-203-35,True,True,True,
+ils-20260115_041620-80b3fcad,Idiofa__Democratic_Republic_of_the_Congo,OK,10.429,ip-10-0-203-35,True,True,True,
+ils-20260115_041620-80b3fcad,Idiroko__Nigeria,OK,75.533,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Ido_Ekiti__Nigeria,PARTIAL,10.267,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Ifakara__Tanzania,OK,202.133,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Ife__Nigeria,OK,294.44,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Iganga__Uganda,PARTIAL,331.614,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Igbe__Nigeria,PARTIAL,327.446,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Igbo_Ora__Nigeria,OK,128.232,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Igboho__Nigeria,PARTIAL,527.759,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Iguala__Mexico,OK,67.95,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Ijagbo_Offa__Nigeria,OK,238.901,ip-10-0-198-112,True,True,True,
+ils-20260115_041620-80b3fcad,Ijebu_Igbo__Nigeria,PARTIAL,331.678,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Ijebu_Ode__Nigeria,PARTIAL,326.676,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Ijero_Ekiti__Nigeria,PARTIAL,4.766,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Ikerre__Nigeria,PARTIAL,327.393,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Ikire__Nigeria,OK,29.905,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Ikole__Nigeria,PARTIAL,5.973,ip-10-0-207-26,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Ikom__Nigeria,OK,68.043,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Ikot_Ekpene__Nigeria,OK,124.281,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Ilaro__Nigeria,PARTIAL,26.541,ip-10-0-207-26,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Ilawe_Ekiti__Nigeria,OK,30.412,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Ile_Oluji__Nigeria,PARTIAL,327.034,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Ilebo__Democratic_Republic_of_the_Congo,PARTIAL,327.692,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Ilesa__Nigeria,PARTIAL,327.499,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Ilorin__Nigeria,OK,653.738,ip-10-0-203-35,True,True,True,
+ils-20260115_041620-80b3fcad,Imperatriz__Brazil,OK,606.229,ip-10-0-203-35,True,True,True,
+ils-20260115_041620-80b3fcad,Impfondo__Republic_of_Congo,PARTIAL,5.528,ip-10-0-204-197,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Indaiatuba__Brazil,OK,262.178,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Ipatinga__Brazil,OK,288.36,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Ipiales__Colombia,OK,43.578,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Iquique__Chile,PARTIAL,26.167,ip-10-0-204-197,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Iragbiji__Nigeria,PARTIAL,327.542,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Irapuato__Mexico,PARTIAL,327.502,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Irri__Nigeria,PARTIAL,331.589,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Isanlu_Mopo__Nigeria,PARTIAL,4.011,ip-10-0-207-26,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Ise__Nigeria,PARTIAL,327.398,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Iseyin__Nigeria,OK,322.737,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Ishiagu__Nigeria,PARTIAL,8.673,ip-10-0-197-151,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Isiro__Democratic_Republic_of_the_Congo,PARTIAL,332.076,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Itabuna__Brazil,PARTIAL,326.88,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Itaguai__Brazil,OK,29.152,ip-10-0-194-49,True,True,True,
+ils-20260115_041620-80b3fcad,Itajai__Brazil,PARTIAL,328.881,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Itapetininga__Brazil,PARTIAL,326.479,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Itapoa__Brazil,OK,32.301,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Itu__Brazil,PARTIAL,327.003,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Iwere__Nigeria,PARTIAL,331.599,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Iwo__Nigeria,PARTIAL,388.945,ip-10-0-203-245,False,False,True,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Jalingo__Nigeria,PARTIAL,326.038,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Jaragua_do_Sul__Brazil,OK,208.712,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Jau__Brazil,OK,275.957,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Jega__Nigeria,PARTIAL,585.025,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Jequie__Brazil,PARTIAL,528.17,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Ji_Parana__Brazil,PARTIAL,327.506,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Jijiga__Ethiopia,PARTIAL,329.473,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Jimeta__Nigeria,OK,100.796,ip-10-0-198-112,True,True,True,
+ils-20260115_041620-80b3fcad,Jimma__Ethiopia,PARTIAL,326.33,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Jinja__Uganda,OK,258.154,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Jinka__Ethiopia,OK,40.945,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Joao_Pessoa__Brazil,PARTIAL,327.511,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Johannesburg__South_Africa,PARTIAL,328.388,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Joinville__Brazil,PARTIAL,339.43,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Jos__Nigeria,OK,118.774,ip-10-0-198-112,True,True,True,
+ils-20260115_041620-80b3fcad,Jouberton__South_Africa,OK,142.206,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Juazeiro_do_Norte__Brazil,OK,349.393,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Juba__South_Sudan,OK,764.684,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Juiz_de_Fora__Brazil,OK,408.374,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Juliaca__Peru,OK,594.216,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Jundiai__Brazil,OK,571.747,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Kabba__Nigeria,PARTIAL,7.511,ip-10-0-204-197,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kabinda__Democratic_Republic_of_the_Congo,PARTIAL,5.023,ip-10-0-204-197,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kabondo_Dianda__Democratic_Republic_of_the_Congo,PARTIAL,9.766,ip-10-0-207-26,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kabongo__Democratic_Republic_of_the_Congo,PARTIAL,3.537,ip-10-0-207-26,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kabwe__Zambia,PARTIAL,532.32,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kaduna__Nigeria,PARTIAL,327.501,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kafanchan__Nigeria,PARTIAL,327.17,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kahama__Tanzania,OK,109.553,ip-10-0-203-35,True,True,True,
+ils-20260115_041620-80b3fcad,Kahemba__Democratic_Republic_of_the_Congo,PARTIAL,63.323,ip-10-0-207-26,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kakamega__Kenya,OK,81.394,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Kakanda__Democratic_Republic_of_the_Congo,PARTIAL,392.977,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kalemie__Democratic_Republic_of_the_Congo,OK,37.944,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Kalimva__Democratic_Republic_of_the_Congo,OK,72.298,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Kaltungo__Nigeria,PARTIAL,388.919,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kambove__Democratic_Republic_of_the_Congo,PARTIAL,335.673,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kamina__Democratic_Republic_of_the_Congo,OK,22.466,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Kamituga__Democratic_Republic_of_the_Congo,PARTIAL,327.428,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kampala__Uganda,PARTIAL,327.485,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kamsar__Guinea,PARTIAL,331.508,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kananga__Democratic_Republic_of_the_Congo,PARTIAL,328.572,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kankan__Guinea,OK,67.54,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Kano__Nigeria,OK,4063.716,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Kanyabayonga__Democratic_Republic_of_the_Congo,OK,7.816,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Kanyama__Democratic_Republic_of_the_Congo,PARTIAL,4.691,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kaolack__Senegal,OK,73.642,ip-10-0-203-245,True,True,True,
+ils-20260115_041620-80b3fcad,Kapiri_Mposhi__Zambia,PARTIAL,327.848,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kapoeta__South_Sudan,OK,20.148,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Kara__Togo,OK,83.753,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Karyari__Chad,PARTIAL,327.541,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kasaji__Democratic_Republic_of_the_Congo,OK,7.808,ip-10-0-203-245,True,True,True,
+ils-20260115_041620-80b3fcad,Kasama__Zambia,OK,95.819,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Kasenga__Democratic_Republic_of_the_Congo,OK,9.634,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Kasongo__Democratic_Republic_of_the_Congo,PARTIAL,13.873,ip-10-0-197-151,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kasumbalesa__Democratic_Republic_of_the_Congo,PARTIAL,328.434,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Katoro__Tanzania,PARTIAL,11.176,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Katsina__Nigeria,OK,372.226,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Katsiro__Nigeria,PARTIAL,6.541,ip-10-0-207-26,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kaura_Namoda__Nigeria,PARTIAL,326.568,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kaya__Burkina_Faso,OK,21.22,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Kayanza__Burundi,PARTIAL,327.615,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kayes__Mali,OK,239.967,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Kebri_Dehar__Ethiopia,PARTIAL,8.945,ip-10-0-207-26,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Keffi__Nigeria,PARTIAL,15.653,ip-10-0-207-26,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kefole__Ethiopia,PARTIAL,9.726,ip-10-0-207-26,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kelo__Chad,PARTIAL,330.538,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kenema__Sierra_Leone,OK,42.441,ip-10-0-198-112,True,True,True,
+ils-20260115_041620-80b3fcad,Kenge__Democratic_Republic_of_the_Congo,PARTIAL,5.297,ip-10-0-197-151,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Keren__Eritrea,OK,98.181,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Kibre_Mengist__Ethiopia,OK,15.843,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Kigali__Rwanda,OK,684.167,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Kikwit__Democratic_Republic_of_the_Congo,PARTIAL,326.529,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kilima_Hewa__Tanzania,PARTIAL,327.521,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kilwa__Democratic_Republic_of_the_Congo,PARTIAL,331.604,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kimberley__South_Africa,OK,150.627,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Kindia__Guinea,OK,26.268,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Kindu__Democratic_Republic_of_the_Congo,OK,19.867,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Kingston__Jamaica,OK,52.191,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Kinshasa__Democratic_Republic_of_the_Congo_Republic_of_Congo,OK,3117.684,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Kintampo__Ghana,OK,23.149,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Kinzao__Democratic_Republic_of_the_Congo,PARTIAL,8.273,ip-10-0-197-151,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kipushi__Democratic_Republic_of_the_Congo,OK,13.585,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Kirumba__Democratic_Republic_of_the_Congo,OK,150.266,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Kisangani__Democratic_Republic_of_the_Congo,OK,189.813,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Kisantu__Democratic_Republic_of_the_Congo,OK,70.597,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Kishi__Nigeria,PARTIAL,12.915,ip-10-0-207-26,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kisii__Kenya,OK,143.72,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Kismayo__Somalia,PARTIAL,9.788,ip-10-0-207-26,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kissidougou__Guinea,OK,22.437,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Kisumu__Kenya,PARTIAL,327.679,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kitale__Kenya,PARTIAL,7.123,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kitenge__Democratic_Republic_of_the_Congo,PARTIAL,2.985,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kitwe__Zambia,PARTIAL,339.797,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kobo__Ethiopia,PARTIAL,327.483,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Koforidua__Ghana,PARTIAL,335.655,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Koidu_Town__Sierra_Leone,OK,119.122,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Koko_Town__Nigeria,PARTIAL,329.744,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Koko__Nigeria,PARTIAL,199.456,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kolda__Senegal,PARTIAL,327.507,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kolwezi__Democratic_Republic_of_the_Congo,PARTIAL,329.031,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kombolcha__Ethiopia,PARTIAL,6.544,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kongolo__Democratic_Republic_of_the_Congo,OK,30.175,ip-10-0-198-112,True,True,True,
+ils-20260115_041620-80b3fcad,Kontagora__Nigeria,PARTIAL,353.265,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Korhogo__Cote_d_Ivoire,OK,468.561,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Koudougou__Burkina_Faso,OK,207.297,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Koumra__Chad,PARTIAL,393.049,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Koutiala__Mali,PARTIAL,331.591,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kpalime__Togo,OK,39.601,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Kribi__Cameroon,PARTIAL,327.034,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Kuito__Angola,OK,155.133,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Kumasi__Ghana,OK,1977.556,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Kumba__Cameroon,OK,30.862,ip-10-0-198-112,True,True,True,
+ils-20260115_041620-80b3fcad,Kumbo__Cameroon,OK,28.555,ip-10-0-198-112,True,True,True,
+ils-20260115_041620-80b3fcad,KwaMhlanga__South_Africa,OK,177.027,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,KwaNobuhle__South_Africa,OK,196.051,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Kwilu_Ngongo__Democratic_Republic_of_the_Congo,OK,13.668,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,La_Ceiba__Honduras,OK,176.125,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,La_Paz__Mexico,PARTIAL,339.624,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,La_Piedad_de_Cabadas__Mexico,OK,64.467,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,La_Plata__Argentina,OK,226.354,ip-10-0-194-49,True,True,True,
+ils-20260115_041620-80b3fcad,La_Rioja__Argentina,OK,447.268,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,La_Romana__Dominican_Republic,OK,107.834,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,La_Serena__Chile,OK,181.25,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,La_Vega__Dominican_Republic,PARTIAL,327.502,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,La_Victoria__Venezuela,PARTIAL,331.55,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Labe__Guinea,OK,112.474,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Lafia__Nigeria,OK,139.745,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Lages__Brazil,PARTIAL,327.59,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Lagos__Nigeria,PARTIAL,360.277,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Lagos_de_Moreno__Mexico,PARTIAL,528.216,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Langtang__Nigeria,PARTIAL,6.915,ip-10-0-207-26,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Las_Anod__Somalia,PARTIAL,327.07,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Las_Delicias__Venezuela,OK,83.595,ip-10-0-203-245,True,True,True,
+ils-20260115_041620-80b3fcad,Las_Tunas__Cuba,OK,239.767,ip-10-0-203-245,True,True,True,
+ils-20260115_041620-80b3fcad,Lawmu_Umunze__Nigeria,PARTIAL,335.697,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Lazaro_Cardenas__Mexico,PARTIAL,331.528,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Le_Tampon__France,OK,112.495,ip-10-0-194-49,True,True,True,
+ils-20260115_041620-80b3fcad,Leon__Mexico,OK,459.602,ip-10-0-194-49,True,True,True,
+ils-20260115_041620-80b3fcad,Leon__Nicaragua,OK,188.344,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Lerinin__Nigeria,OK,81.187,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Les_Abymes__France,OK,606.68,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Libreville__Gabon,OK,323.46,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Lichinga__Mozambique,PARTIAL,327.644,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Likasi__Democratic_Republic_of_the_Congo,PARTIAL,342.329,ip-10-0-199-206,False,False,True,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Lilian_Ngoyi_Village__South_Africa,OK,126.486,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Lilongwe__Malawi,OK,526.884,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Lima__Peru,PARTIAL,328.771,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Limbe__Cameroon,PARTIAL,328.437,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Limeira__Brazil,PARTIAL,326.412,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Linhares__Brazil,OK,41.411,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Lira__Uganda,OK,37.133,ip-10-0-203-245,True,True,True,
+ils-20260115_041620-80b3fcad,Lisala__Democratic_Republic_of_the_Congo,OK,249.29,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Livingstone__Zambia,OK,101.977,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Lobito__Angola,OK,88.094,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Lokoja__Nigeria,OK,120.8,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Lome__Togo,OK,553.216,ip-10-0-198-112,True,True,True,
+ils-20260115_041620-80b3fcad,Londrina__Brazil,PARTIAL,327.506,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Los_Angeles__Chile,OK,172.928,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Los_Baldeon__Peru,OK,301.772,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Los_Mochis__Mexico,OK,423.378,ip-10-0-194-49,True,True,True,
+ils-20260115_041620-80b3fcad,Los_Teques__Venezuela,PARTIAL,327.578,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Louga__Senegal,PARTIAL,19.387,ip-10-0-207-26,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Lourdes__El_Salvador,PARTIAL,327.987,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Luanda__Angola,PARTIAL,326.723,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Luanshya__Zambia,OK,76.657,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Luau__Angola,PARTIAL,83.159,ip-10-0-195-225,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Lubango__Angola,OK,368.51,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Lubao__Democratic_Republic_of_the_Congo,PARTIAL,7.928,ip-10-0-204-197,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Lubumbashi__Democratic_Republic_of_the_Congo,OK,1182.664,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Lucapa__Angola,OK,129.069,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Luena__Angola,OK,225.217,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Luena__Democratic_Republic_of_the_Congo,OK,69.007,ip-10-0-203-35,True,True,True,
+ils-20260115_041620-80b3fcad,Luiza__Democratic_Republic_of_the_Congo,PARTIAL,331.578,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Lusaka__Zambia,PARTIAL,327.51,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Luziania__Brazil,OK,221.913,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Lwambo__Democratic_Republic_of_the_Congo,OK,19.362,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Lwebo__Democratic_Republic_of_the_Congo,PARTIAL,327.507,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,MBour__Senegal,OK,388.821,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,M_agui__Cote_d_Ivoire,PARTIAL,15.557,ip-10-0-207-26,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,M_banza_Congo__Angola,PARTIAL,84.491,ip-10-0-207-26,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Macae__Brazil,OK,231.144,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Macapa__Brazil,OK,84.565,ip-10-0-203-245,True,True,True,
+ils-20260115_041620-80b3fcad,Maceio__Brazil,PARTIAL,327.494,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Machala__Ecuador,PARTIAL,327.511,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Madaoua__Niger,PARTIAL,329.407,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Mafikeng__South_Africa,PARTIAL,328.123,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Magaria__Niger,PARTIAL,327.444,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Mahagi__Democratic_Republic_of_the_Congo,OK,127.688,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Mahajanga__Madagascar,OK,73.403,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Maicao__Colombia,OK,145.544,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Maiduguri__Nigeria,OK,311.09,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Makeni__Sierra_Leone,OK,37.195,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Makurdi__Nigeria,OK,73.663,ip-10-0-194-49,True,True,True,
+ils-20260115_041620-80b3fcad,Malabo__Equatorial_Guinea,OK,28.13,ip-10-0-194-49,True,True,True,
+ils-20260115_041620-80b3fcad,Malakal__South_Sudan,PARTIAL,329.857,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Malanje__Angola,PARTIAL,6.27,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Maldonado__Uruguay,OK,293.166,ip-10-0-203-245,True,True,True,
+ils-20260115_041620-80b3fcad,Malemba_Nkulu__Democratic_Republic_of_the_Congo,PARTIAL,327.483,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Malindi__Kenya,PARTIAL,326.529,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Malumfashi__Nigeria,PARTIAL,5.025,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Man__Cote_d_Ivoire,OK,15.657,ip-10-0-194-49,True,True,True,
+ils-20260115_041620-80b3fcad,Managua__Nicaragua,PARTIAL,328.517,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Manaus__Brazil,OK,926.624,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Mandera__Kenya,PARTIAL,9.988,ip-10-0-207-26,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Mandeville__Jamaica,PARTIAL,10.714,ip-10-0-207-26,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Manizales__Colombia,OK,275.487,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Mankweng__South_Africa,OK,169.612,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Manono__Democratic_Republic_of_the_Congo,OK,214.21,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Mansa__Zambia,PARTIAL,334.312,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Manta__Ecuador,OK,97.123,ip-10-0-198-112,True,True,True,
+ils-20260115_041620-80b3fcad,Manzanillo__Cuba,OK,283.035,ip-10-0-203-35,True,True,True,
+ils-20260115_041620-80b3fcad,Manzanillo__Mexico,PARTIAL,327.516,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Manzini__Swaziland,PARTIAL,329.13,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Maputo__Mozambique,OK,4228.201,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Mar_del_Plata__Argentina,OK,333.31,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Maraba__Brazil,OK,369.125,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Maracaibo__Venezuela,OK,1054.872,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Maracay__Venezuela,PARTIAL,387.84,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Maradi__Niger,OK,239.159,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Marilia__Brazil,PARTIAL,327.516,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Maringa__Brazil,PARTIAL,327.514,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Maroua__Cameroon,OK,401.033,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Masaka__Uganda,PARTIAL,10.494,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Masaya__Nicaragua,PARTIAL,327.173,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Maseru__Lesotho,PARTIAL,327.506,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Massawa__Eritrea,PARTIAL,327.513,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Masuri__Nigeria,OK,5.693,ip-10-0-203-245,True,True,True,
+ils-20260115_041620-80b3fcad,Masvingo__Zimbabwe,OK,18.938,ip-10-0-203-245,True,True,True,
+ils-20260115_041620-80b3fcad,Matadi__Democratic_Republic_of_the_Congo,OK,290.697,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Matagalpa__Nicaragua,OK,37.795,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Matala__Angola,OK,82.359,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Matanzas__Cuba,PARTIAL,327.525,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Maturin__Venezuela,PARTIAL,327.95,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Maxixe__Mozambique,OK,132.895,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Mazatenango__Guatemala,OK,102.057,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Mazatlan__Mexico,OK,631.848,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Mbale__Uganda,OK,69.797,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Mbandaka__Democratic_Republic_of_the_Congo,PARTIAL,327.52,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Mbanza_Ngungu__Democratic_Republic_of_the_Congo,PARTIAL,327.481,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Mbarara__Uganda,PARTIAL,457.304,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Mbeya__Tanzania,OK,495.95,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Mbuji_Mayi__Democratic_Republic_of_the_Congo,OK,165.183,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Medellin__Colombia,PARTIAL,376.722,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Mekele__Ethiopia,PARTIAL,326.624,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Meki__Ethiopia,PARTIAL,334.53,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Mendoza__Argentina,OK,429.745,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Menongue__Angola,PARTIAL,585.147,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Merca__Somalia,OK,30.543,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Merida__Mexico,OK,1811.615,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Merida__Venezuela,OK,529.615,ip-10-0-194-49,True,True,True,
+ils-20260115_041620-80b3fcad,Meru__Kenya,OK,229.795,ip-10-0-198-112,True,True,True,
+ils-20260115_041620-80b3fcad,Mexicali__Mexico,OK,1075.653,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Milagro__Ecuador,OK,178.893,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Milange__Mozambique,OK,19.406,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Minatitlan__Mexico,OK,199.0,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Minna__Nigeria,OK,260.57,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Misau__Nigeria,PARTIAL,10.352,ip-10-0-194-125,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Moatize__Mozambique,OK,14.747,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Moca__Dominican_Republic,OK,101.185,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Mocuba__Mozambique,OK,27.526,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Mogadishu__Somalia,PARTIAL,25.561,ip-10-0-194-125,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Mogho__Nigeria,PARTIAL,326.531,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Mogi_Guacu__Brazil,PARTIAL,342.719,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Mojo__Ethiopia,PARTIAL,326.035,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Mokolo__Cameroon,OK,24.142,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Mokopane__South_Africa,OK,211.591,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Mokwa__Nigeria,PARTIAL,9.111,ip-10-0-194-125,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Mombasa__Kenya,PARTIAL,326.764,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Monclova__Mexico,OK,109.869,ip-10-0-198-112,True,True,True,
+ils-20260115_041620-80b3fcad,Mongbwalu__Democratic_Republic_of_the_Congo,OK,14.629,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Mongo__Chad,OK,19.707,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Mongu_Arna__Nigeria,PARTIAL,254.745,ip-10-0-194-125,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Mongu__Zambia,PARTIAL,327.212,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Monrovia__Liberia,PARTIAL,343.731,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Montego_Bay__Jamaica,PARTIAL,327.495,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Montepuez__Mozambique,PARTIAL,7.017,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Monteria__Colombia,OK,364.015,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Montero__Bolivia,OK,207.297,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Monterrey__Mexico,PARTIAL,327.516,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Montes_Claros__Brazil,PARTIAL,335.699,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Montevideo__Uruguay,PARTIAL,326.468,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Morelia__Mexico,OK,328.652,ip-10-0-194-49,True,True,True,
+ils-20260115_041620-80b3fcad,Morocho__Ethiopia,PARTIAL,6.294,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Morogoro__Tanzania,OK,129.578,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Moroni__Comoros,OK,94.491,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Moshi__Tanzania,PARTIAL,404.152,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Mossoro__Brazil,PARTIAL,350.939,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Mota__Ethiopia,PARTIAL,533.814,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Moundou__Chad,OK,290.974,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Mpanda__Tanzania,OK,214.28,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Mpumalanga__South_Africa,OK,64.04,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Mtwara__Tanzania,OK,61.656,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Mubi__Nigeria,PARTIAL,327.493,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Mufulira__Zambia,OK,32.575,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Mukanga__Democratic_Republic_of_the_Congo,OK,14.009,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Mukubu__Democratic_Republic_of_the_Congo,PARTIAL,329.048,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Mulongo__Democratic_Republic_of_the_Congo,OK,6.272,ip-10-0-203-245,True,True,True,
+ils-20260115_041620-80b3fcad,Murubona__Tanzania,OK,39.784,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Musanze__Rwanda,OK,51.923,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Musoma__Tanzania,OK,272.086,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Mutare__Zimbabwe,OK,72.219,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Mwadingusha__Democratic_Republic_of_the_Congo,PARTIAL,327.898,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Mwanza__Tanzania,PARTIAL,391.901,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Mweka__Democratic_Republic_of_the_Congo,OK,42.92,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Mwene_Ditu__Democratic_Republic_of_the_Congo,PARTIAL,7.225,ip-10-0-194-125,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Mzuzu__Malawi,OK,71.584,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,N_Djamena__Chad,PARTIAL,339.79,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,N_dalatando__Angola,OK,20.29,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Naas__South_Africa,OK,186.878,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Nacala__Mozambique,PARTIAL,383.916,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Nairobi__Kenya,PARTIAL,329.971,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Naivasha__Kenya,PARTIAL,10.875,ip-10-0-194-125,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Nakuru__Kenya,OK,505.985,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Namibe__Angola,OK,84.935,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Nampula__Mozambique,PARTIAL,339.875,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Nassau__Bahamas,PARTIAL,327.618,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Natal__Brazil,OK,911.09,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Navojoa__Mexico,OK,193.182,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Ndalama__Democratic_Republic_of_the_Congo,OK,19.76,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Ndiuka__Tanzania,OK,396.885,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Ndola__Zambia,PARTIAL,327.532,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Neiva__Colombia,OK,255.197,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Nekemte__Ethiopia,OK,41.947,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Neuquen__Argentina,PARTIAL,335.794,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Ngandajika__Democratic_Republic_of_the_Congo,PARTIAL,3.851,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Ngaoundere__Cameroon,OK,244.027,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Ngo__Nigeria,PARTIAL,4.163,ip-10-0-195-225,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Ngozi__Burundi,OK,19.345,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Nguru__Nigeria,PARTIAL,9.668,ip-10-0-194-125,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Niamey__Niger,OK,417.944,ip-10-0-203-245,True,True,True,
+ils-20260115_041620-80b3fcad,Nimule__South_Sudan,PARTIAL,327.503,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Ningi__Nigeria,PARTIAL,3.938,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Nkongsamba__Cameroon,PARTIAL,5.779,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Nouadhibou__Mauritania,PARTIAL,327.492,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Nouakchott__Mauritania,OK,1105.166,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Nova_Friburgo__Brazil,OK,91.902,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Nsukka__Nigeria,PARTIAL,25.377,ip-10-0-194-125,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Nuevo_Arraijan__Panama,OK,355.963,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Nuevo_Laredo__Mexico,PARTIAL,326.007,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Numan__Nigeria,OK,23.961,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Nyunzu__Democratic_Republic_of_the_Congo,PARTIAL,327.498,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Nzerekore__Guinea,OK,50.897,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Oaxaca__Mexico,OK,1024.035,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Obinomba__Nigeria,PARTIAL,325.81,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Oboama_Nguru__Nigeria,OK,88.771,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Obuasi__Ghana,PARTIAL,327.524,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Obudu__Nigeria,PARTIAL,331.584,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Ocotlan__Mexico,OK,316.256,ip-10-0-203-35,True,True,True,
+ils-20260115_041620-80b3fcad,Ogbomosho__Nigeria,PARTIAL,343.319,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Ogharefe__Nigeria,PARTIAL,328.795,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Ogwashi_Uku__Nigeria,PARTIAL,328.111,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Ojaima__Nigeria,OK,10.674,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Oka_Akoko__Nigeria,PARTIAL,7.157,ip-10-0-195-225,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Okene__Nigeria,OK,228.784,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Okitipupa__Nigeria,PARTIAL,74.473,ip-10-0-207-26,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Okrika__Nigeria,OK,24.417,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Omenama__Nigeria,OK,14.88,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Omoko__Nigeria,OK,27.024,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Omu_Aran__Nigeria,PARTIAL,7.97,ip-10-0-195-225,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Omuo_Obadore__Nigeria,PARTIAL,18.19,ip-10-0-195-225,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Ondjiva__Angola,OK,160.722,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Ondo__Nigeria,PARTIAL,327.49,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Onitsha__Nigeria,OK,5358.736,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Onne__Nigeria,OK,11.468,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Ore__Nigeria,PARTIAL,11.874,ip-10-0-207-26,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Orizaba__Mexico,OK,386.293,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Oron__Nigeria,OK,17.193,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Oruro__Bolivia,OK,625.991,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Osizweni__South_Africa,OK,245.842,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Osogbo__Nigeria,OK,396.552,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Osorno__Chile,PARTIAL,327.517,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Otukpo__Nigeria,PARTIAL,327.506,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Otun__Nigeria,PARTIAL,334.241,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Ouagadougou__Burkina_Faso,OK,1353.718,ip-10-0-203-35,True,True,True,
+ils-20260115_041620-80b3fcad,Ouahigouya__Burkina_Faso,OK,144.087,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Ouanaminthe__Haiti,OK,363.465,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Ourinhos__Brazil,PARTIAL,330.27,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Owo__Nigeria,PARTIAL,326.496,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Oyo__Nigeria,OK,198.506,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Ozizza__Nigeria,OK,23.789,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Paardekraal__South_Africa,PARTIAL,335.704,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Paarl__South_Africa,OK,94.912,ip-10-0-203-35,True,True,True,
+ils-20260115_041620-80b3fcad,Pachuca__Mexico,PARTIAL,327.658,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Pala__Chad,OK,86.781,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Palmas__Brazil,OK,385.894,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Palmira__Colombia,OK,131.083,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Panama_City__Panama,OK,1111.143,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Parakou__Benin,OK,168.327,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Paramaribo__Suriname,OK,196.97,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Parana__Argentina,OK,209.265,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Paranagua__Brazil,OK,73.346,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Parauapebas__Brazil,OK,145.689,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Parnaiba__Brazil,OK,317.539,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Parque_Santa_Rita__Brazil,OK,191.779,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Passo_Fundo__Brazil,PARTIAL,327.525,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Passos__Brazil,PARTIAL,327.477,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Pasto__Colombia,PARTIAL,326.24,ip-10-0-199-206,False,False,True,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Patos_de_Minas__Brazil,OK,102.311,ip-10-0-203-245,True,True,True,
+ils-20260115_041620-80b3fcad,Pedro_Juan_Caballero__Brazil,OK,128.069,ip-10-0-203-245,True,True,True,
+ils-20260115_041620-80b3fcad,Pelotas__Brazil,OK,456.504,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Pereira__Colombia,OK,242.81,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Petit_Goave__Haiti,PARTIAL,528.256,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Petrolina__Brazil,OK,241.636,ip-10-0-203-245,True,True,True,
+ils-20260115_041620-80b3fcad,Petropolis__Brazil,PARTIAL,327.517,ip-10-0-194-49,False,False,True,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Phuthaditjhaba__South_Africa,PARTIAL,327.499,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Piedecuesta__Colombia,PARTIAL,331.612,ip-10-0-198-112,False,False,True,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Piedras_Negras__Mexico,OK,427.759,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Pinar_del_Rio__Cuba,PARTIAL,327.527,ip-10-0-198-112,False,False,True,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Piracicaba__Brazil,PARTIAL,336.073,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Piura__Peru,PARTIAL,327.513,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Planaltina__Brazil,OK,112.268,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Playa_del_Carmen__Mexico,OK,146.919,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Pobe__Benin,PARTIAL,327.503,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Pocos_de_Caldas__Brazil,PARTIAL,334.048,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Pointe_Noire__Republic_of_Congo,PARTIAL,327.517,ip-10-0-203-35,False,False,True,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Polokwane__South_Africa,PARTIAL,327.466,ip-10-0-194-49,False,False,True,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Ponce__Puerto_Rico,PARTIAL,327.504,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Ponta_Grossa__Brazil,OK,584.62,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Popayan__Colombia,OK,148.08,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Porlamar__Venezuela,OK,162.597,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Port_Elizabeth__South_Africa,OK,629.751,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Port_Gentil__Gabon,OK,10.741,ip-10-0-203-35,True,True,True,
+ils-20260115_041620-80b3fcad,Port_Harcourt__Nigeria,OK,1044.36,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Port_Louis__Mauritius,OK,421.039,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Port_au_Prince__Haiti,PARTIAL,326.701,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Port_de_Paix__Haiti,OK,10.561,ip-10-0-194-49,True,True,True,
+ils-20260115_041620-80b3fcad,Port_of_Spain__Trinidad_and_Tobago,OK,411.457,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Porto_Alegre__Brazil,OK,4022.026,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Porto_Amelia__Mozambique,OK,124.197,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Porto_Novo__Benin,OK,549.552,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Porto_Velho__Brazil,OK,314.167,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Portoviejo__Ecuador,PARTIAL,327.466,ip-10-0-198-112,False,False,True,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Posadas__Argentina,PARTIAL,329.123,ip-10-0-198-112,False,False,True,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Potchefstroom__South_Africa,OK,115.509,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Potengi__Brazil,OK,429.437,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Potiskum__Nigeria,PARTIAL,589.655,ip-10-0-203-245,False,False,True,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Potosi__Bolivia,PARTIAL,335.014,ip-10-0-203-245,False,False,True,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Pouso_Alegre__Brazil,PARTIAL,135.032,ip-10-0-199-206,False,False,True,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Poza_Rica__Mexico,PARTIAL,327.129,ip-10-0-199-206,False,False,True,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Praia_Grande__Brazil,OK,444.998,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Presidente_Prudente__Brazil,OK,336.759,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Pucallpa__Peru,PARTIAL,331.582,ip-10-0-203-245,False,False,True,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Puebla__Mexico,OK,4733.47,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Puerto_Ayacucho__Venezuela,OK,28.113,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Puerto_Cabello__Venezuela,OK,19.264,ip-10-0-198-112,True,True,True,
+ils-20260115_041620-80b3fcad,Puerto_Montt__Chile,OK,61.098,ip-10-0-198-112,True,True,True,
+ils-20260115_041620-80b3fcad,Puerto_Plata__Dominican_Republic,OK,53.298,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Puerto_Vallarta__Mexico,OK,292.949,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Puno__Peru,PARTIAL,335.634,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Punta_Arenas__Chile,PARTIAL,327.488,ip-10-0-198-112,False,False,True,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Punto_Fijo__Venezuela,PARTIAL,331.593,ip-10-0-203-35,False,False,True,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Pweto__Democratic_Republic_of_the_Congo,OK,40.477,ip-10-0-198-112,True,True,True,
+ils-20260115_041620-80b3fcad,Qoryooley__Somalia,OK,15.883,ip-10-0-198-112,True,True,True,
+ils-20260115_041620-80b3fcad,Quelimane__Mozambique,OK,12.591,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Queretaro__Mexico,PARTIAL,327.511,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Quetzaltenango__Guatemala,PARTIAL,343.903,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Quevedo__Ecuador,PARTIAL,327.511,ip-10-0-194-49,False,False,True,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Quibdo__Colombia,OK,15.815,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Quiha__Ethiopia,PARTIAL,326.258,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Quito__Ecuador,PARTIAL,326.6,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Rancagua__Chile,PARTIAL,327.51,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Recife__Brazil,PARTIAL,134.98,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Renk__South_Sudan,PARTIAL,134.996,ip-10-0-203-245,False,False,True,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Resende__Brazil,OK,139.372,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Resistencia__Argentina,OK,315.321,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Reynosa__Mexico,OK,769.757,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Ribeirao_Preto__Brazil,OK,635.828,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Rio_Branco__Brazil,OK,235.037,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Rio_Claro__Brazil,OK,195.43,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Rio_Cuarto__Argentina,OK,168.136,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Rio_Gallegos__Argentina,OK,193.848,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Rio_Grande__Brazil,OK,51.041,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Rio_Verde__Brazil,OK,293.468,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Rio_das_Ostras__Brazil,OK,313.112,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Rio_de_Janeiro__Brazil,OK,6209.181,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Riobamba__Ecuador,OK,239.775,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Riohacha__Colombia,OK,101.815,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Rivera__Brazil,OK,146.334,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Robe__Ethiopia,OK,15.134,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Rondonopolis__Brazil,OK,373.71,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Rosario__Argentina,PARTIAL,326.731,ip-10-0-203-35,False,False,True,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Rubaya__Democratic_Republic_of_the_Congo,OK,11.954,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Rubuchi__Nigeria,OK,225.833,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Rumbek__South_Sudan,PARTIAL,5.05,ip-10-0-194-125,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Rustenburg__South_Africa,OK,160.631,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Sagamu__Nigeria,OK,97.076,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Sahagun__Colombia,PARTIAL,7.342,ip-10-0-204-197,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Saint_Denis__France,OK,213.049,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Saint_Louis__Senegal,OK,162.71,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Saint_Marc__Haiti,OK,32.095,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Saki__Nigeria,OK,77.773,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Salamanca__Mexico,PARTIAL,327.477,ip-10-0-194-49,False,False,True,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Salta__Argentina,PARTIAL,341.564,ip-10-0-194-49,False,False,True,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Saltillo__Mexico,OK,1369.509,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Salto__Brazil,OK,134.343,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Salubindza__South_Africa,OK,99.832,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Salvador__Brazil,OK,1355.784,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Samunakar__Nigeria,OK,16.366,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,San_Antonio__Chile,OK,146.476,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,San_Carlos__Venezuela,OK,24.673,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,San_Carlos_de_Bariloche__Argentina,OK,76.398,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,San_Cristobal__Venezuela,OK,149.384,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,San_Cristobal_de_las_Casas__Mexico,PARTIAL,351.167,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,San_Fernando__Trinidad_and_Tobago,PARTIAL,462.339,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,San_Fernando_del_Valle_de_Catamarca__Argentina,OK,116.254,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,San_Francisco_de_Macoris__Dominican_Republic,PARTIAL,388.92,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,San_Francisco_del_Rincon__Mexico,PARTIAL,327.516,ip-10-0-203-245,False,False,True,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,San_Jose__Costa_Rica,OK,82.677,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,San_Jose_del_Cabo__Mexico,OK,486.066,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,San_Juan__Argentina,PARTIAL,327.563,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,San_Juan__Puerto_Rico,PARTIAL,327.511,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,San_Juan_de_Los_Morros__Venezuela,PARTIAL,327.508,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,San_Juan_del_Rio__Mexico,PARTIAL,528.212,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,San_Luis_Potosi__Mexico,PARTIAL,405.169,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,San_Luis_Rio_Colorado__Mexico,PARTIAL,395.808,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,San_Luis__Argentina,OK,117.382,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,San_Luis__Mexico,OK,67.813,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,San_Marcos__Guatemala,OK,95.135,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,San_Miguel__El_Salvador,OK,169.905,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,San_Miguel_de_Tucuman__Argentina,OK,491.648,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,San_Nicolas_de_los_Arroyos__Argentina,PARTIAL,327.452,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,San_Pedro_Sula__Honduras,OK,475.848,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,San_Pedro__Cote_d_Ivoire,OK,68.467,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,San_Pedro_de_Macoris__Dominican_Republic,PARTIAL,327.506,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,San_Rafael__Argentina,PARTIAL,327.457,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,San_Salvador__El_Salvador,OK,395.507,ip-10-0-203-35,True,True,True,
+ils-20260115_041620-80b3fcad,San_Salvador_de_Jujuy__Argentina,OK,414.254,ip-10-0-203-35,True,True,True,
+ils-20260115_041620-80b3fcad,Sancti_Spiritus__Cuba,OK,56.644,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Sandoa__Democratic_Republic_of_the_Congo,PARTIAL,326.446,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Sangasumi__Nigeria,PARTIAL,328.839,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Santa_Ana__El_Salvador,OK,106.232,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Santa_Clara__Cuba,OK,66.134,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Santa_Cruz_de_la_Sierra__Bolivia,OK,2398.193,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Santa_Cruz_do_Capibaribe__Brazil,OK,85.239,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Santa_Elena__Ecuador,OK,329.327,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Santa_Fe__Argentina,PARTIAL,328.88,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Santa_Maria__Brazil,PARTIAL,326.794,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Santa_Marta__Colombia,OK,103.599,ip-10-0-203-35,True,True,True,
+ils-20260115_041620-80b3fcad,Santa_Rosa__Argentina,OK,24.091,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Santa_Teresa_del_Tuy__Venezuela,OK,166.612,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Santana__Brazil,PARTIAL,331.615,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Santarem__Brazil,OK,127.397,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Santiago__Chile,OK,65.941,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Santiago_de_Cuba__Cuba,PARTIAL,327.512,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Santiago_de_los_Caballeros__Dominican_Republic,PARTIAL,388.456,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Santiago_del_Estero__Argentina,OK,901.809,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Santo_Domingo__Dominican_Republic,OK,1792.876,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Santo_Domingo__Ecuador,OK,993.62,ip-10-0-194-49,True,True,True,
+ils-20260115_041620-80b3fcad,Santos__Brazil,OK,579.099,ip-10-0-194-49,True,True,True,
+ils-20260115_041620-80b3fcad,Sao_Carlos__Brazil,PARTIAL,335.69,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Sao_Goncalo__Brazil,OK,879.321,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Sao_Jose_do_Rio_Preto__Brazil,OK,622.883,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Sao_Jose_dos_Campos__Brazil,OK,645.399,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Sao_Luis__Brazil,PARTIAL,343.865,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Sao_Paulo__Brazil,PARTIAL,343.883,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Sao_Tome__Sao_Tome_and_Principe,PARTIAL,331.604,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Sapele__Nigeria,PARTIAL,335.685,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Sarh__Chad,OK,35.073,ip-10-0-198-112,True,True,True,
+ils-20260115_041620-80b3fcad,Sasolburg__South_Africa,PARTIAL,327.483,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Saurimo__Angola,OK,535.353,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Segou__Mali,OK,637.265,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Serrekunda__Gambia,OK,465.634,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Sertaozinho__Brazil,OK,155.35,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Sete_Lagoas__Brazil,OK,213.685,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Shakiso__Ethiopia,OK,114.379,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Shashamane__Ethiopia,PARTIAL,69.16,ip-10-0-207-26,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Shema__Nigeria,PARTIAL,6.544,ip-10-0-197-151,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Shinyanga__Tanzania,OK,217.925,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Shire__Ethiopia,OK,70.914,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Siguiri__Guinea,OK,89.71,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Sikasso__Mali,OK,155.082,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Sikhalasenkosi__South_Africa,OK,97.941,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Silao__Mexico,OK,178.808,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Sincelejo__Colombia,PARTIAL,327.494,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Sinfra__Cote_d_Ivoire,OK,264.843,ip-10-0-203-245,True,True,True,
+ils-20260115_041620-80b3fcad,Singida__Tanzania,OK,139.842,ip-10-0-194-49,True,True,True,
+ils-20260115_041620-80b3fcad,Sinop__Brazil,PARTIAL,388.926,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Sobradinho__Brazil,OK,86.871,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Sobral__Brazil,OK,123.515,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Socoura__Mali,OK,37.859,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Sodo__Ethiopia,OK,57.951,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Sokode__Togo,OK,25.505,ip-10-0-198-112,True,True,True,
+ils-20260115_041620-80b3fcad,Sokoto__Nigeria,PARTIAL,327.501,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Solwezi__Zambia,PARTIAL,327.495,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Somanya__Ghana,OK,32.365,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Somerset_West__South_Africa,OK,196.99,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Songea__Tanzania,PARTIAL,554.561,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Sonsonate__El_Salvador,PARTIAL,528.247,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Sorocaba__Brazil,OK,1002.063,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Soubre__Cote_d_Ivoire,OK,40.842,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Soyo__Angola,OK,57.398,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Stesa_AH__South_Africa,OK,127.134,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Sucre__Bolivia,OK,219.341,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Sullana__Peru,PARTIAL,326.586,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Sululta__Ethiopia,PARTIAL,336.055,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Sumbawanga__Tanzania,PARTIAL,328.591,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Sumbe__Angola,PARTIAL,326.237,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Sunyani__Ghana,PARTIAL,335.69,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Tabora__Tanzania,PARTIAL,347.974,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Tacna__Peru,OK,156.501,ip-10-0-203-245,True,True,True,
+ils-20260115_041620-80b3fcad,Tahoua__Niger,OK,20.8,ip-10-0-203-245,True,True,True,
+ils-20260115_041620-80b3fcad,Takoradi_Sekondi_Takoradi__Ghana,OK,254.556,ip-10-0-194-49,True,True,True,
+ils-20260115_041620-80b3fcad,Talca__Chile,PARTIAL,386.319,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Tamale__Ghana,OK,662.679,ip-10-0-203-35,True,True,True,
+ils-20260115_041620-80b3fcad,Tambacounda__Senegal,OK,121.41,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Tampico__Mexico,OK,620.847,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Tandil__Argentina,OK,82.252,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Tanga__Tanzania,OK,177.073,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Tapachula__Mexico,OK,188.639,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Taquaralto__Brazil,OK,230.966,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Tarapoto__Peru,OK,23.213,ip-10-0-203-245,True,True,True,
+ils-20260115_041620-80b3fcad,Tarija__Bolivia,OK,283.417,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Tarzoho__Nigeria,PARTIAL,4.366,ip-10-0-207-26,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Taubate__Brazil,OK,659.796,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Tchin_Tabaradene__Niger,OK,25.877,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Techiman__Ghana,OK,633.813,ip-10-0-203-35,True,True,True,
+ils-20260115_041620-80b3fcad,Tecoman__Mexico,OK,606.751,ip-10-0-203-35,True,True,True,
+ils-20260115_041620-80b3fcad,Tegucigalpa__Honduras,PARTIAL,326.63,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Tehuacan__Mexico,PARTIAL,326.549,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Teixeira_de_Freitas__Brazil,PARTIAL,335.699,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Temuco__Chile,PARTIAL,327.498,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Tenkodogo__Burkina_Faso,OK,24.041,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Teofilo_Otoni__Brazil,OK,44.629,ip-10-0-198-112,True,True,True,
+ils-20260115_041620-80b3fcad,Tepatitlan__Mexico,OK,41.983,ip-10-0-198-112,True,True,True,
+ils-20260115_041620-80b3fcad,Tepi__Ethiopia,PARTIAL,327.475,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Tepic__Mexico,PARTIAL,387.688,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Teresina__Brazil,PARTIAL,343.901,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Teresopolis__Brazil,PARTIAL,335.822,ip-10-0-203-245,False,False,True,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Tessaoua__Niger,PARTIAL,327.603,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Tete__Mozambique,PARTIAL,327.556,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Texmelucan__Mexico,OK,89.488,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Teziutlan__Mexico,PARTIAL,331.746,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Thies__Senegal,PARTIAL,335.689,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Thika__Kenya,PARTIAL,327.481,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Tijuana__Mexico,OK,5515.369,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Timbuktu__Mali,OK,56.421,ip-10-0-194-49,True,True,True,
+ils-20260115_041620-80b3fcad,Tiquisio__Colombia,PARTIAL,6.67,ip-10-0-204-197,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Tivaouane__Senegal,PARTIAL,7.121,ip-10-0-194-125,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Togechane__Ethiopia,OK,159.376,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Toledo__Brazil,PARTIAL,334.598,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Toluca__Mexico,PARTIAL,405.322,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Torit__South_Sudan,OK,32.719,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Torreon__Mexico,PARTIAL,343.866,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Touba__Senegal,PARTIAL,327.491,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Trelew__Argentina,OK,184.031,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Tres_Lagoas__Brazil,OK,185.701,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Trinidad__Bolivia,OK,269.146,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Trujillo__Peru,OK,1065.756,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Tshela__Democratic_Republic_of_the_Congo,PARTIAL,326.279,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Tshikapa__Democratic_Republic_of_the_Congo,PARTIAL,327.102,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Tshimbulu__Democratic_Republic_of_the_Congo,PARTIAL,330.651,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Tubarao__Brazil,PARTIAL,334.206,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Tucupita__Venezuela,OK,11.694,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Tuga_Nama__Nigeria,PARTIAL,77.501,ip-10-0-194-125,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Tula_de_Allende__Mexico,OK,354.315,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Tulancingo__Mexico,OK,428.656,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Tulua__Colombia,OK,177.593,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Tumbes__Peru,OK,38.621,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Tunduma__Zambia,OK,201.418,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Tunja__Colombia,PARTIAL,327.502,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Tuxpam__Mexico,OK,246.3,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Tuxtepec__Mexico,OK,28.417,ip-10-0-194-49,True,True,True,
+ils-20260115_041620-80b3fcad,Tuxtla_Gutierrez__Mexico,OK,556.858,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Uberaba__Brazil,OK,549.37,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Uberlandia__Brazil,OK,502.585,ip-10-0-198-112,True,True,True,
+ils-20260115_041620-80b3fcad,Uduagba__Nigeria,PARTIAL,331.568,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Ugep__Nigeria,OK,9.939,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Ughelli__Nigeria,OK,21.552,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Uige__Angola,PARTIAL,335.719,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Umu_Lawlaw__Nigeria,PARTIAL,326.208,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Umuahia__Nigeria,PARTIAL,328.185,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Umuarama__Brazil,OK,56.503,ip-10-0-203-35,True,True,True,
+ils-20260115_041620-80b3fcad,Uriangato__Mexico,OK,191.181,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Uribia__Colombia,OK,35.758,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Uromi__Nigeria,PARTIAL,331.599,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Uruapan__Mexico,PARTIAL,335.688,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Uruguaiana__Brazil,OK,87.522,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Uvira__Democratic_Republic_of_the_Congo,OK,83.228,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Uyo__Nigeria,PARTIAL,18.372,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Valdivia__Chile,PARTIAL,326.417,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Valencia__Venezuela,PARTIAL,327.605,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Valera__Venezuela,OK,65.142,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Valle_de_la_Pascua__Venezuela,OK,77.108,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Valledupar__Colombia,OK,50.275,ip-10-0-203-245,True,True,True,
+ils-20260115_041620-80b3fcad,Vanderbijlpark__South_Africa,PARTIAL,335.667,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Varginha__Brazil,OK,147.334,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Veracruz__Mexico,OK,854.338,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Vila_Velha__Brazil,OK,1050.433,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Villa_Maria__Argentina,OK,111.68,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Villa_Mercedes__Argentina,OK,275.335,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Villahermosa__Mexico,OK,843.031,ip-10-0-207-26,True,True,True,
+ils-20260115_041620-80b3fcad,Villanueva__Honduras,PARTIAL,330.262,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Villavicencio__Colombia,OK,371.493,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Vina_del_Mar__Chile,OK,785.941,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Vitoria_da_Conquista__Brazil,OK,316.436,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Vitoria_de_Santo_Antao__Brazil,OK,128.307,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Volta_Redonda__Brazil,OK,347.692,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Vosman__South_Africa,OK,56.212,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Wa__Ghana,OK,169.252,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Wajir__Kenya,PARTIAL,75.973,ip-10-0-204-197,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Waku_Kungo__Angola,OK,33.776,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Waliso__Ethiopia,PARTIAL,71.936,ip-10-0-197-151,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Warri__Nigeria,PARTIAL,327.494,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Wau__South_Sudan,PARTIAL,327.497,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Weldiya__Ethiopia,PARTIAL,327.501,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Wells_Estate__South_Africa,PARTIAL,327.499,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Whydah__Benin,PARTIAL,388.928,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Willemstad__Curazao,PARTIAL,355.167,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Windhoek__Namibia,PARTIAL,333.292,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Winneba__Ghana,OK,14.479,ip-10-0-198-112,True,True,True,
+ils-20260115_041620-80b3fcad,Worcester__South_Africa,OK,65.975,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Wudil__Nigeria,PARTIAL,327.45,ip-10-0-199-206,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Wukari__Nigeria,OK,16.279,ip-10-0-199-206,True,True,True,
+ils-20260115_041620-80b3fcad,Xai_Xai__Mozambique,PARTIAL,338.638,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Xalapa__Mexico,PARTIAL,328.282,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Xawo_Tako__Somalia,PARTIAL,11.552,ip-10-0-194-125,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Yacuiba__Argentina,OK,254.665,ip-10-0-194-125,True,True,True,
+ils-20260115_041620-80b3fcad,Yagoua__Cameroon,PARTIAL,326.816,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Yambio__South_Sudan,OK,15.286,ip-10-0-203-245,True,True,True,
+ils-20260115_041620-80b3fcad,Yamoussoukro__Cote_d_Ivoire,PARTIAL,326.63,ip-10-0-194-49,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Yaounde__Cameroon,OK,402.572,ip-10-0-194-49,True,True,True,
+ils-20260115_041620-80b3fcad,Yei__South_Sudan,OK,189.258,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,Yenagoa__Nigeria,OK,108.963,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Yendi__Ghana,OK,32.264,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Yirgalem__Ethiopia,PARTIAL,335.683,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Yopal__Colombia,PARTIAL,327.401,ip-10-0-198-112,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Zacatecas__Mexico,OK,488.247,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Zamora__Mexico,OK,240.487,ip-10-0-204-197,True,True,True,
+ils-20260115_041620-80b3fcad,Zanzibar_City__Tanzania,OK,360.383,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Zaria__Nigeria,OK,305.602,ip-10-0-197-151,True,True,True,
+ils-20260115_041620-80b3fcad,Ziguinchor__Senegal,OK,77.972,ip-10-0-203-245,True,True,True,
+ils-20260115_041620-80b3fcad,Zinder__Niger,OK,142.115,ip-10-0-203-245,True,True,True,
+ils-20260115_041620-80b3fcad,Zipaquira__Colombia,PARTIAL,374.948,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Zitacuaro__Mexico,PARTIAL,327.408,ip-10-0-203-35,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Ziway__Ethiopia,PARTIAL,9.952,ip-10-0-203-245,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,Zomba__Malawi,OK,112.574,ip-10-0-203-245,True,True,True,
+ils-20260115_041620-80b3fcad,Zuru__Nigeria,PARTIAL,18.327,ip-10-0-195-225,False,False,False,Some expected outputs missing after run
+ils-20260115_041620-80b3fcad,eGobhoza__South_Africa,OK,226.472,ip-10-0-195-225,True,True,True,
+ils-20260115_041620-80b3fcad,kazaure__Nigeria,PARTIAL,4.684,ip-10-0-197-151,False,False,False,Some expected outputs missing after run

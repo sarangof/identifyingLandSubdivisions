@@ -12,6 +12,12 @@ import s3fs
 import fsspec
 import traceback
 import neatnet
+from osmnx._errors import InsufficientResponseError
+
+
+ox.settings.timeout = 300              # requests timeout for Overpass calls
+ox.settings.overpass_rate_limit = True # let osmnx pause when it detects limits
+
 
 fs = s3fs.S3FileSystem(anon=False)
 
@@ -112,99 +118,115 @@ def filter_osm_network(
 
     return roads, inter
 
+
+
+class NoRoadsError(RuntimeError):
+    """Raised when the OSM road graph is empty for a city polygon."""
+    pass
+
+
 def osm_command(city_name, search_area, utm_proj_city):
-    # … build G & call graph_to_gdfs …
-    if len(search_area) > 0:
-        polygon = search_area.geometry.iloc[0]
-        G = ox.graph_from_polygon(
-            polygon=polygon,
-            custom_filter=(
-                '["highway"~"motorway|trunk|primary|secondary|'
-                'tertiary|none|unclassified|residential|living_street|'
-                'primary_link|secondary_link|tertiary_link|trunk_link|motorway_link|road"]'
-            ),
-            retain_all=True
-        )
-    else:
+    """
+    Run OSMnx queries for a city.
+    Roads/intersections are REQUIRED.
+    Natural features are OPTIONAL and must never fail the city.
+    """
+
+    if len(search_area) == 0:
         raise ValueError(f"Search area for {city_name} is empty.")
-    
-    custom_filter = [
-        '["waterway"~"stream|ditch|river|canal|dam|weir|rapids|waterfall"]'
-    ]
-    
-    if len(search_area) > 0:
-        polygon = search_area.geometry.iloc[0]
-        G_natural_features = ox.graph_from_polygon(
+
+    polygon = search_area.geometry.iloc[0]
+
+    # ---------------------------
+    # 1) ROADS + INTERSECTIONS (REQUIRED)
+    # ---------------------------
+    G = ox.graph_from_polygon(
+        polygon=polygon,
+        custom_filter=(
+            '["highway"~"motorway|trunk|primary|secondary|'
+            'tertiary|none|unclassified|residential|living_street|'
+            'primary_link|secondary_link|tertiary_link|'
+            'trunk_link|motorway_link|road"]'
+        ),
+        retain_all=True
+    )
+
+    osm_intersections, osm_roads = ox.graph_to_gdfs(G)
+
+    # REQUIRED: fail early if no roads came back
+    if osm_roads is None or len(osm_roads) == 0:
+        raise ValueError(f"[{city_name}] NO_ROADS: OSMnx returned 0 road edges for this polygon.")
+    if osm_intersections is None or len(osm_intersections) == 0:
+        raise ValueError(f"[{city_name}] NO_INTERSECTIONS: OSMnx returned 0 nodes for this polygon.")
+
+    # Clean + neatify roads
+    osm_roads_to_neatify = osm_roads.to_crs(utm_proj_city).reset_index(drop=False)
+    osm_roads_geom = osm_roads_to_neatify[["osmid", "u", "v", "geometry"]]
+    osm_roads = neatnet.neatify(osm_roads_geom).to_crs("EPSG:4326")
+
+    # REQUIRED: fail if neatify wiped everything
+    if osm_roads is None or len(osm_roads) == 0:
+        raise ValueError(f"[{city_name}] NO_ROADS_AFTER_NEATIFY: roads became empty after neatify().")
+
+    osm_intersections = osm_intersections.reset_index()
+
+    osm_roads = remove_list_columns(osm_roads)
+    osm_intersections = remove_list_columns(osm_intersections)
+
+    if "osmid" not in osm_intersections:
+        osm_intersections["osmid"] = None
+
+    # ---------------------------
+    # 2) NATURAL FEATURES (OPTIONAL — NEVER FAIL)
+    # ---------------------------
+    custom_filter = ['["waterway"~"stream|ditch|river|canal|dam|weir|rapids|waterfall"]']
+
+    try:
+        G_nf = ox.graph_from_polygon(
             polygon=polygon,
             custom_filter=custom_filter,
             retain_all=True
-            
         )
-    else:
-        raise ValueError(f"Search area for {city_name} is empty.")
-    
+        _, osm_natural_features = ox.graph_to_gdfs(G_nf)
+        osm_natural_features = remove_list_columns(osm_natural_features)
+        print(f"🌿 Natural features found for {city_name}")
 
+    except (InsufficientResponseError, ValueError):
+        # ✅ This covers the exact error in your logs:
+        # ValueError: Found no graph nodes within the requested polygon. 
+        osm_natural_features = gpd.GeoDataFrame(geometry=[], crs="EPSG:4326")
+        print(f"🌿 No natural features for {city_name} (expected)")
 
-    osm_intersections, osm_roads = ox.graph_to_gdfs(G)
-    osm_intersections_natural_fatures, osm_natural_fatures = ox.graph_to_gdfs(G_natural_features)
-    
-    osm_roads_to_neatify = osm_roads.to_crs(utm_proj_city).reset_index(drop=False)
-    osm_roads_to_neatify_geometry = osm_roads_to_neatify[["osmid", "u", "v", "geometry"]]
-    osm_roads = neatnet.neatify(osm_roads_to_neatify_geometry).to_crs('EPSG:4326')
-    print("neatify OWAAAAA")
-    
-    osm_intersections = osm_intersections.reset_index()
-    osm_roads         = remove_list_columns(osm_roads)
-    osm_intersections = remove_list_columns(osm_intersections)
+    except Exception as e:
+        # optional: also never fail city on any other nf weirdness
+        osm_natural_features = gpd.GeoDataFrame(geometry=[], crs="EPSG:4326")
+        print(f"🌿 Natural features failed for {city_name} but continuing: {repr(e)}")
 
-    osm_intersections_natural_fatures = osm_intersections_natural_fatures.reset_index()
-    osm_natural_fatures         = remove_list_columns(osm_natural_fatures)
-    osm_intersections_natural_fatures = remove_list_columns(osm_intersections_natural_fatures)
-
-    # ensure 'osmid' always exists
-    if 'osmid' not in osm_intersections:
-        osm_intersections['osmid'] = None
-
-    if 'osmid' not in osm_intersections_natural_fatures:
-        osm_intersections_natural_fatures['osmid'] = None
-
-    '''
-    included = [
-      'trunk','motorway','primary','secondary','tertiary',
-      'primary_link','secondary_link','tertiary_link',
-      'trunk_link','motorway_link','residential',
-      'unclassified','road','living_street'
-    ]
-    
-    roads_filt, inters_filt = filter_osm_network(
-        osm_roads, osm_intersections, included
-    )
-    '''
-    roads_filt = osm_roads
-    natural_fatures_filt = osm_natural_fatures
-    inters_filt = osm_intersections
-
-    # save gathered data
+    # ---------------------------
+    # 3) SAVE OUTPUTS (ALWAYS)
+    # ---------------------------
     s3_save(
-      file=roads_filt,
-      output_file=f"{city_name}_OSM_roads.geoparquet",
-      output_temp_path=".",
-      remote_path=f"{ROADS_PATH}/{city_name}/{city_name}_OSM_roads.geoparquet"
-    )
-    s3_save(
-      file=inters_filt,
-      output_file=f"{city_name}_OSM_intersections.geoparquet",
-      output_temp_path=".",
-      remote_path=f"{INTERSECTIONS_PATH}/{city_name}/{city_name}_OSM_intersections.geoparquet"
+        file=osm_roads,
+        output_file=f"{city_name}_OSM_roads.geoparquet",
+        output_temp_path=".",
+        remote_path=f"{ROADS_PATH}/{city_name}/{city_name}_OSM_roads.geoparquet"
     )
 
     s3_save(
-      file=natural_fatures_filt,
-      output_file=f"{city_name}_OSM_natural_features_and_railroads.geoparquet",
-      output_temp_path=".",
-      remote_path=f"{NATURAL_FEATURES_PATH}/{city_name}/{city_name}_OSM_natural_features_and_railroads.geoparquet"
+        file=osm_intersections,
+        output_file=f"{city_name}_OSM_intersections.geoparquet",
+        output_temp_path=".",
+        remote_path=f"{INTERSECTIONS_PATH}/{city_name}/{city_name}_OSM_intersections.geoparquet"
     )
 
+    s3_save(
+        file=osm_natural_features,
+        output_file=f"{city_name}_OSM_natural_features_and_railroads.geoparquet",
+        output_temp_path=".",
+        remote_path=f"{NATURAL_FEATURES_PATH}/{city_name}/{city_name}_OSM_natural_features_and_railroads.geoparquet"
+    )
+
+    print(f"✅ OSM completed for {city_name}")
 
 
 def overturemaps_download_and_save(bbox_str, request_type: str, output_dir, city_name: str):
