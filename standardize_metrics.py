@@ -32,7 +32,7 @@ def standardize_metric_7(series):
     return (1.-((series - 30.)/170.))
 
 def standardize_metric_8(series):
-    series = np.where(series < 0.85, 0.85, series)
+    series = np.where(series < 0.9, 0.9, series)
     return series
 
 def standardize_metric_9(series):
