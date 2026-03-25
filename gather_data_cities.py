@@ -203,6 +203,30 @@ def osm_command(city_name, search_area, utm_proj_city):
         print(f"🌿 Natural features failed for {city_name} but continuing: {repr(e)}")
 
     # ---------------------------
+    # 2b) COASTLINE + BEACH (OPTIONAL — NEVER FAIL)
+    # ---------------------------
+    try:
+        coast_tags = {"natural": ["coastline", "beach"]}
+        osm_coast = ox.features_from_polygon(polygon, tags=coast_tags)
+
+        # normalize output
+        osm_coast = osm_coast.reset_index(drop=False)  # keep osm_id if present
+        osm_coast = remove_list_columns(osm_coast)
+
+        print(f"🌊 Coast/beach features found for {city_name}: {len(osm_coast)}")
+    except Exception as e:
+        osm_coast = gpd.GeoDataFrame(geometry=[], crs="EPSG:4326")
+        print(f"🌊 Coast/beach features failed for {city_name} but continuing: {repr(e)}")
+
+    # Save separately 
+    s3_save(
+        file=osm_coast,
+        output_file=f"{city_name}_OSM_coastline_beach.geoparquet",
+        output_temp_path=".",
+        remote_path=f"{NATURAL_FEATURES_PATH}/{city_name}/{city_name}_OSM_coastline_beach.geoparquet"
+    )
+
+    # ---------------------------
     # 3) SAVE OUTPUTS (ALWAYS)
     # ---------------------------
     s3_save(
