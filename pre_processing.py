@@ -16,9 +16,13 @@ import traceback
 import os
 from shapely.ops import unary_union, polygonize
 from auxiliary_functions import *
+from cloudpathlib import S3Path
+
 
 MAIN_PATH = "s3://wri-cities-sandbox/identifyingLandSubdivisions/data"
 INPUT_PATH = f'{MAIN_PATH}/input'
+URBAN_EXTENT_PATH = f"{INPUT_PATH}/urban_extent"
+URBAN_EXTENT_200M_BUFFER_PATH = f"{INPUT_PATH}/urban_extent_200m_buffer"
 CITY_INFO_PATH = f'{INPUT_PATH}/city_info'
 EXTENTS_PATH = f'{CITY_INFO_PATH}/extents'
 BUILDINGS_PATH = f'{INPUT_PATH}/buildings'
@@ -105,40 +109,103 @@ AUX FUNCTIONS TO CREATE BLOCKS
 (USED BY METRICS 6, 7 AND 8)
 '''
 
+
 @delayed
-def produce_blocks(city_name,YOUR_NAME):
+def produce_blocks(city_name, YOUR_NAME):
     # Construct file paths for the city
     paths = {
-        #'grid': f'{GRIDS_PATH}/{city_name}/{city_name}_{str(grid_size)}m_grid.geoparquet',
         'buildings': f'{BUILDINGS_PATH}/{city_name}/Overture_building_{city_name}.geoparquet',
         'roads': f'{ROADS_PATH}/{city_name}/{city_name}_OSM_roads.geoparquet',
         'intersections': f'{INTERSECTIONS_PATH}/{city_name}/{city_name}_OSM_intersections.geoparquet',
-        'natural_features': f'{NATURAL_FEATURES_PATH}/{city_name}/{city_name}_OSM_natural_features_and_railroads.geoparquet'
+        'natural_features': f'{NATURAL_FEATURES_PATH}/{city_name}/{city_name}_OSM_natural_features_and_railroads.geoparquet',
+        'city_dir' : f"{INPUT_PATH}/city_info",
+        'ue_path' : f"{INPUT_PATH}/urban_extent/{city_name}/{city_name}_urban_extent.geoparquet",
+        'ue200_path' : f"{INPUT_PATH}/urban_extent_200m_buffer/{city_name}/{city_name}_urban_extent_200m_buffer.geoparquet"
     }
-    
+
+    MIN_BLOCK_AREA_M2 = 700
+
     epsg = get_epsg(city_name).compute()
-    
+
     roads = load_dataset(paths['roads'], epsg=epsg).compute()
     natural_features = load_dataset(paths['natural_features'], epsg=epsg).compute()
-    
-    blocks = get_blocks(pd.concat([roads,natural_features], ignore_index=True))
 
-    # Now add the inscribed circle information.
-    blocks = add_inscribed_circle_info(blocks)
-    
-    # Define the output path for the blocks geoparquet
+    if not S3Path(paths['ue_path']).exists():
+        raise FileNotFoundError(f"Missing urban extent for {city_name}")
+
+    if not S3Path(paths['ue200_path']).exists():
+        raise FileNotFoundError(f"Missing 200m buffer for {city_name}")
+
+    urban_extent_200m = gpd.read_parquet(paths['ue200_path']).to_crs(epsg)
+
+    ue200_geom = urban_extent_200m.geometry.iloc[0]
+
+    # -----------------------------
+    # A) BASELINE BLOCKS (unchanged)
+    # -----------------------------
+    linework_all = pd.concat([roads, natural_features], ignore_index=True)
+
+    base_blocks = get_blocks(linework_all)
+
+    base_blocks = add_inscribed_circle_info(base_blocks)
+    base_blocks = base_blocks.set_crs(epsg, allow_override=True)
+
+    base_blocks["is_fill_block"] = False
+    base_blocks["fill_method"] = None
+
+    # 3) Compute fill geometry = UE200 minus union(base_blocks)
+    base_union = unary_union(base_blocks.geometry).buffer(0.)
+    try:
+        fill_geom = ue200_geom.difference(base_union)
+    except Exception:
+        fill_geom = ue200_geom
+
+    # Clean
+    try:
+        fill_geom = fill_geom.buffer(0)
+    except Exception:
+        pass
+
+    # 4) Generate fill blocks from existing linework + fill boundary; fallback to fill polygons
+    fill_blocks = make_fill_blocks_from_linework(
+        linework_gdf=linework_all,
+        fill_geom=fill_geom,
+        crs=epsg,
+        min_area_m2=1.0
+    )
+
+    # Add inscribed circle info for fill blocks too (consistent schema)
+    if fill_blocks is not None and len(fill_blocks) > 0:
+        try:
+            fill_blocks = add_inscribed_circle_info(fill_blocks)
+        except Exception:
+            pass
+        fill_blocks = fill_blocks.set_crs(epsg, allow_override=True)
+    else:
+        fill_blocks = gpd.GeoDataFrame(columns=base_blocks.columns, geometry="geometry", crs=epsg)
+
+    # 5) Combine
+    blocks = pd.concat([base_blocks, fill_blocks], ignore_index=True)
+    blocks = gpd.GeoDataFrame(blocks, geometry="geometry", crs=epsg)
+
+    # 6) Compute block area safely in m² and discard tiny blocks
+    if blocks.crs is None:
+        raise ValueError(f"Blocks for {city_name} have no CRS; cannot compute area safely.")
+
+    if blocks.crs.is_geographic:
+        blocks["block_area"] = blocks.to_crs(6933).geometry.area
+    else:
+        blocks["block_area"] = blocks.geometry.area
+
+    blocks = blocks[blocks["block_area"] >= MIN_BLOCK_AREA_M2].copy()
+
+    # -----------------------------
+    # SAVE
+    # -----------------------------
     path_blocks = f'{BLOCKS_PATH}/{city_name}/{city_name}_blocks_{YOUR_NAME}.geoparquet'
-
-    blocks = blocks.set_crs(epsg, allow_override=True)
-
-    # Convert the geometry column to WKT before saving
-    #blocks["geometry"] = blocks["geometry"].apply(lambda geom: geom.wkt if geom is not None else None)
-    
-    # Save the blocks dataset. 
     blocks.to_parquet(path_blocks, index=False)
-    
-    # Optionally, return the output path or any summary info.
-    return blocks
+    return path_blocks
+
 
 
 @delayed
