@@ -6,12 +6,11 @@ from dask import delayed, compute, visualize
 import geopandas as gpd
 from dask.diagnostics import ProgressBar
 #from metrics_calculation import calculate_minimum_distance_to_roads_option_B
-from shapely.geometry import (MultiLineString, LineString, Point,Polygon, MultiPolygon, MultiPoint)
+from shapely.geometry import (MultiLineString, LineString, Point,Polygon, MultiPolygon, MultiPoint, GeometryCollection)
 from shapely.algorithms.polylabel import polylabel
 from shapely.ops import (polygonize, nearest_points,voronoi_diagram, linemerge, unary_union)
 from shapely.validation import make_valid
 from shapely import wkb
-
 
 #from shapely.geometry import Polygon, LineString, Point, MultiPolygon, MultiLineString, GeometryCollection
 from scipy.optimize import fminbound, minimize
@@ -178,7 +177,6 @@ def add_inscribed_circle_info(blocks_gdf, tolerance=1.0):
 
     return blocks_gdf
 
-
 def get_blocks(roads):
     """
     Create urban blocks from a grid and road network.
@@ -204,6 +202,188 @@ def get_blocks(roads):
     blocks_gdf = blocks_gdf[~blocks_gdf.is_empty]
     
     return blocks_gdf
+
+def _to_lines(geom):
+    """
+    Convert mixed geometry to linework suitable for polygonization.
+    - LineString/MultiLineString: keep
+    - Polygon/MultiPolygon: use boundary
+    - GeometryCollection: recurse
+    - Points/None/empty: drop
+    """
+    if geom is None or geom.is_empty:
+        return []
+
+    gtype = geom.geom_type
+
+    if gtype in ("LineString", "MultiLineString"):
+        return [geom]
+
+    if gtype in ("Polygon", "MultiPolygon"):
+        b = geom.boundary
+        if b is None or b.is_empty:
+            return []
+        return [b]
+
+    if gtype == "GeometryCollection":
+        out = []
+        for gg in geom.geoms:
+            out.extend(_to_lines(gg))
+        return out
+
+    # Point / MultiPoint etc.
+    return []
+
+
+def extract_linework(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """
+    Convert a GeoDataFrame with mixed geometries to linework-only GeoDataFrame
+    (roads + natural features boundaries, etc.) for polygonization.
+    """
+    if gdf is None or len(gdf) == 0:
+        return gpd.GeoDataFrame(geometry=[], crs=getattr(gdf, "crs", None))
+
+    lines = []
+    for geom in gdf.geometry:
+        lines.extend(_to_lines(geom))
+
+    # explode MultiLineString into parts to help polygonize
+    exploded = []
+    for ln in lines:
+        if ln is None or ln.is_empty:
+            continue
+        if ln.geom_type == "MultiLineString":
+            exploded.extend([g for g in ln.geoms if g is not None and not g.is_empty])
+        else:
+            exploded.append(ln)
+
+    return gpd.GeoDataFrame(geometry=exploded, crs=gdf.crs)
+
+
+def make_fill_blocks_from_linework(
+    linework_gdf: gpd.GeoDataFrame,
+    fill_geom,
+    crs,
+    min_area_m2: float = 1.0
+) -> gpd.GeoDataFrame:
+    """
+    Create blocks inside `fill_geom` by polygonizing:
+      (clipped linework) + (fill_geom.boundary)
+
+    Fallback: if polygonize yields nothing usable, return fill_geom (exploded) as blocks.
+
+    Returns GeoDataFrame with geometry + metadata cols:
+      - is_fill_block (True)
+      - fill_method ("polygonized" or "fallback_fill_polygon")
+    """
+    if fill_geom is None or fill_geom.is_empty:
+        return gpd.GeoDataFrame({"geometry": []}, geometry="geometry", crs=crs)
+
+    # ---- clean & ensure polygonal fill ----
+    try:
+        fill_clean = fill_geom.buffer(0)
+    except Exception:
+        fill_clean = fill_geom
+
+    if fill_clean.is_empty:
+        return gpd.GeoDataFrame({"geometry": []}, geometry="geometry", crs=crs)
+
+    # ---- linework: extract + clip to fill ----
+    lw = extract_linework(linework_gdf)
+    clipped_lines = []
+
+    if lw is not None and len(lw) > 0:
+        for geom in lw.geometry:
+            if geom is None or geom.is_empty:
+                continue
+            try:
+                inter = geom.intersection(fill_clean)
+            except Exception:
+                continue
+            if inter is None or inter.is_empty:
+                continue
+            clipped_lines.extend(_to_lines(inter))
+
+    # ---- add boundary lines to "close" polygons ----
+    boundary = fill_clean.boundary
+    boundary_lines = _to_lines(boundary)
+
+    all_lines = []
+    all_lines.extend(clipped_lines)
+    all_lines.extend(boundary_lines)
+
+    # If there is no linework at all, fallback immediately
+    if len(all_lines) == 0:
+        # explode fill into parts if MultiPolygon
+        if fill_clean.geom_type == "MultiPolygon":
+            geoms = list(fill_clean.geoms)
+        else:
+            geoms = [fill_clean]
+
+        out = gpd.GeoDataFrame(
+            {"geometry": geoms, "is_fill_block": True, "fill_method": "fallback_fill_polygon"},
+            geometry="geometry",
+            crs=crs,
+        )
+        out = out[~out.is_empty]
+        return out
+
+    # ---- polygonize ----
+    try:
+        merged = unary_union(all_lines)
+        polys = list(polygonize(merged))
+    except Exception:
+        polys = []
+
+    # Filter to those that intersect fill and clip them back to fill
+    kept = []
+    for p in polys:
+        if p is None or p.is_empty:
+            continue
+        if p.area < min_area_m2:
+            continue
+        if not p.intersects(fill_clean):
+            continue
+        try:
+            pp = p.intersection(fill_clean)
+        except Exception:
+            pp = p
+        if pp is None or pp.is_empty:
+            continue
+
+        # intersection can yield MultiPolygon / GeometryCollection
+        if pp.geom_type == "Polygon":
+            kept.append(pp)
+        elif pp.geom_type == "MultiPolygon":
+            kept.extend([g for g in pp.geoms if g is not None and not g.is_empty and g.area >= min_area_m2])
+        elif pp.geom_type == "GeometryCollection":
+            for gg in pp.geoms:
+                if gg.geom_type == "Polygon" and (not gg.is_empty) and gg.area >= min_area_m2:
+                    kept.append(gg)
+
+    if len(kept) == 0:
+        # fallback to fill polygon(s)
+        if fill_clean.geom_type == "MultiPolygon":
+            geoms = list(fill_clean.geoms)
+        else:
+            geoms = [fill_clean]
+
+        out = gpd.GeoDataFrame(
+            {"geometry": geoms, "is_fill_block": True, "fill_method": "fallback_fill_polygon"},
+            geometry="geometry",
+            crs=crs,
+        )
+        out = out[~out.is_empty]
+        return out
+
+    out = gpd.GeoDataFrame(
+        {"geometry": kept, "is_fill_block": True, "fill_method": "polygonized"},
+        geometry="geometry",
+        crs=crs,
+    )
+    out = out[~out.is_empty]
+    return out
+
 
 '''
 PRE-PROCESSING: CALCULATE BUILDING AZIMUTH
