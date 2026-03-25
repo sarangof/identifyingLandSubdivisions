@@ -5,6 +5,12 @@ import geopandas as gpd
 from cloudpathlib import S3Path
 from standardize_metrics import *
 import dask.dataframe as dd
+import os, uuid
+import dask_geopandas as dgpd
+import geopandas as gpd
+
+from standardize_metrics import *
+
 
 # ------------------------------------------------------------------------------
 # PATHS
@@ -75,25 +81,7 @@ def _load_metric_dataset(path, is_file=False):
 
     return df
 
-def minmax_normalize_std_columns(df):
-    """
-    Create _final columns from _std columns using min–max normalization.
-    """
-    std_cols = [c for c in df.columns if c.endswith("_std")]
 
-    for c in std_cols:
-        min_val = df[c].min()
-        max_val = df[c].max()
-
-        if max_val == min_val:
-            # Degenerate case: constant metric
-            df[c.replace("_std", "_final")] = 0.0
-        else:
-            df[c.replace("_std", "_final")] = (
-                (df[c] - min_val) / (max_val - min_val)
-            )
-
-    return df
 
 # ------------------------------------------------------------------------------
 # MERGE ALL METRIC OUTPUTS PER CITY
@@ -183,7 +171,7 @@ def finalize_metrics(df):
     # --------------------------------------------------
     # 2. Min–max normalize _std → _final  
     # --------------------------------------------------
-    df = minmax_normalize_std_columns(df)
+    #df = minmax_normalize_std_columns(df) #no longer working
 
     # --------------------------------------------------
     # 3. Compute regularity index from _final columns
@@ -241,3 +229,130 @@ def post_process_city(city_name, YOUR_NAME):
 
 
 
+
+
+
+def safe_merge_on_index(left, right, right_prefix=None):
+    """
+    Merge right into left on index without suffix collisions.
+    - Drops geometry from right
+    - If right_prefix is provided, prefixes ALL right columns before merge
+    - Drops any overlaps to avoid MergeError from duplicate suffixes
+    """
+    if right is None:
+        return left
+
+    right2 = right.drop(columns="geometry", errors="ignore")
+
+    if right_prefix:
+        right2 = right2.rename(columns={c: f"{right_prefix}{c}" for c in right2.columns})
+
+    overlap = [c for c in right2.columns if c in left.columns]
+    if overlap:
+        right2 = right2.drop(columns=overlap, errors="ignore")
+
+    return left.merge(right2, left_index=True, right_index=True, how="left")
+
+
+def write_parquet_to_s3_atomic(gdf, out_s3_uri: str, fs, city_name: str):
+    """
+    Robust single-file S3 write:
+    local -> put(tmp) -> mv(tmp->final)
+    Prevents 0-byte final objects.
+    """
+    local_tmp = f"/tmp/{city_name}_{uuid.uuid4().hex}.geoparquet"
+    out_tmp = out_s3_uri + ".tmp"
+
+    # remove 0-byte leftover at final if any
+    try:
+        if fs.exists(out_s3_uri) and fs.info(out_s3_uri).get("Size", 0) == 0:
+            fs.rm(out_s3_uri)
+    except Exception:
+        pass
+
+    # write local first
+    gdf.to_parquet(local_tmp, engine="pyarrow", index=False)
+
+    # upload then swap into place
+    fs.put(local_tmp, out_tmp)
+    fs.mv(out_tmp, out_s3_uri)
+
+    try:
+        os.remove(local_tmp)
+    except Exception:
+        pass
+
+def apply_metric_standardization(df):
+    """
+    Adds m{i}_std from m{i}_raw using the per-metric functions in standardize_metrics.py.
+    Expects keys like 'metric_1', 'metric_2', ...
+    """
+    import re
+
+    for key, std_func in standardization_functions.items():
+        m = re.match(r"metric_(\d+)$", str(key))
+        if not m:
+            continue
+
+        i = int(m.group(1))
+        raw_col = f"m{i}_raw"
+        std_col = f"m{i}_std"
+
+        if raw_col not in df.columns:
+            continue
+
+        df[std_col] = df[raw_col].map_partitions(
+            std_func,
+            meta=(std_col, "float64")
+        )
+
+    return df
+
+
+def consolidate_city_to_all(city_name: str, YOUR_NAME: str):
+    """
+    PASS 2:
+    Read the per-metric-group outputs, merge safely (k_* prefixed),
+    add *_std (per-city), and write ONE consolidated file.
+    """
+    base = f"{OUTPUT_PATH_RASTER}/{city_name}/{city_name}"
+
+    p_12        = f"{base}_block_metrics_1_2_{YOUR_NAME}"
+    p_345101112 = f"{base}_block_metrics_3_4_5_10_11_12_{YOUR_NAME}"
+    p_67        = f"{base}_block_metrics_6_7_{YOUR_NAME}"
+    p_89        = f"{base}_block_metrics_8_9_{YOUR_NAME}"
+    p_k         = f"{base}_block_metrics_k_{YOUR_NAME}.geoparquet"
+
+    out = f"{base}_block_metrics_ALL_{YOUR_NAME}.geoparquet"
+
+    # skip if exists and non-empty
+    try:
+        if fs.exists(out) and fs.info(out).get("Size", 0) > 0:
+            return out
+    except Exception:
+        pass
+
+    # geometry master
+    g_base = dgpd.read_parquet(p_345101112)
+
+    g_12 = dgpd.read_parquet(p_12)
+    g_67 = dgpd.read_parquet(p_67)
+    g_89 = dgpd.read_parquet(p_89)
+    g_k  = dgpd.read_parquet(p_k)
+
+    df = g_base
+    df = safe_merge_on_index(df, g_12)
+    df = safe_merge_on_index(df, g_67)
+    df = safe_merge_on_index(df, g_89)
+
+    # prefix ALL k-block cols to avoid collisions (optimal_point, max_radius, etc.)
+    df = safe_merge_on_index(df, g_k, right_prefix="k_")
+
+    # per-city standardization (NOT global)
+    df = apply_metric_standardization(df)
+
+    pdf = df.compute()
+    gdf = gpd.GeoDataFrame(pdf, geometry="geometry", crs=g_base.crs)
+
+    write_parquet_to_s3_atomic(gdf, out, fs, city_name=city_name)
+    return out
