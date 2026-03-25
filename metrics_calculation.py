@@ -614,6 +614,12 @@ def compute_m6_m7(city_name, YOUR_NAME):
 
     # Join back to blocks
     blocks = blocks.join(m6_series, how='left')
+    # Re-wrap to GeoDataFrame in case join dropped the GeoDataFrame type on some partitions
+    _crs = f"EPSG:{epsg}"
+    blocks = blocks.map_partitions(
+        lambda df: gpd.GeoDataFrame(df, geometry='geometry', crs=_crs) if not isinstance(df, gpd.GeoDataFrame) else df,
+        meta=blocks._meta,
+    )
 
     # Fill NA with median (or 0 if all NA), then standardize
     m6_med = blocks['m6_raw'].dropna().quantile(0.5).compute()
@@ -800,6 +806,12 @@ def metrics_roads_intersections(city_name, YOUR_NAME):
 
     # Join M9
     blocks = blocks.join(m9_df[['m9_raw', 'm9_n_intersections']], how='left')
+    # Re-wrap to GeoDataFrame in case join dropped the GeoDataFrame type on some partitions
+    _crs = f"EPSG:{epsg}"
+    blocks = blocks.map_partitions(
+        lambda df: gpd.GeoDataFrame(df, geometry='geometry', crs=_crs) if not isinstance(df, gpd.GeoDataFrame) else df,
+        meta=blocks._meta,
+    )
     blocks['m9_n_intersections'] = blocks['m9_n_intersections'].fillna(0).astype('int64')
 
     # Keep m9_raw as NaN when nothing valid contributed (your preference)
