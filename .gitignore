@@ -22,6 +22,9 @@ data
 .prj
 .cpg
 .zip
+.svg
+.png
+.jpeg
 .parquet
 .geoparquet
 .geojson
