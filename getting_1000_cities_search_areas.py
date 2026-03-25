@@ -1,5 +1,6 @@
 import os
 import re
+import ee
 import sqlite3
 import tempfile
 import traceback
@@ -9,6 +10,7 @@ from difflib import SequenceMatcher, get_close_matches
 import pandas as pd
 import geopandas as gpd
 from shapely.ops import unary_union
+from shapely.geometry import shape
 
 from cloudpathlib import S3Path
 import s3fs
@@ -27,7 +29,8 @@ SEARCH_BUFFER_PATH = os.path.join(INPUT_PATH, "city_info", "search_buffers")
 GPKG_PATH = "../data/Sumans_data/combined_cities.gpkg"
 GPKG_LAYER = None  # None = auto-pick first layer
 
-CITIES_CSV = "../data/city_lists/cities_ssa_latam.csv"
+#CITIES_CSV = "../data/city_lists/cities_ssa_latam.csv"
+CITIES_CSV = "../data/city_lists/cities_ssa_validation.csv"
 CITIES_CSV_SEP = ";"
 CITIES_CSV_ENCODING = "utf-8"
 
@@ -136,6 +139,26 @@ def name_key(s: str) -> str:
     s = re.sub(r"[^a-z0-9]+", "", s)
     return s
 
+def wri_join_key(s: str) -> str:
+    """
+    Canonical join key between combined_cities and WRI naming conventions.
+    Rules:
+    - start from raw combined_cities name
+    - replace '_' with space
+    - lowercase
+    - strip diacritics
+    - remove non-alphanumerics
+    """
+    if s is None:
+        return ""
+
+    s = str(s).replace("_", " ").strip().lower()
+    s = unicodedata.normalize("NFKD", s)
+    s = "".join(ch for ch in s if not unicodedata.combining(ch))
+    s = re.sub(r"[^a-z0-9]+", "", s)
+    return s
+
+
 
 def _sim(a: str, b: str) -> float:
     return SequenceMatcher(None, a, b).ratio()
@@ -226,6 +249,32 @@ def main():
     print("CSV rows:", len(city_df))
     print("Unique CSV city keys:", city_df["csv_city_key"].nunique())
     print("CSV duplicated city keys:", (city_df.groupby("csv_city_key").size().gt(1)).sum())
+
+    # ---- Load WRI naming conventions (authoritative for UE queries) ----
+    WRI_NAMES_CSV = "../data/city_lists/WRI_city_naming_conventions.csv"
+
+    wri_df = pd.read_csv(WRI_NAMES_CSV,sep=';')
+
+    # Expect columns:
+    # - combined_city_name  (underscored, like combined_cities)
+    # - city_name_wri       (exact string for GEE query)
+
+    wri_df["combined_city_name"] = wri_df["combined_city_name"].astype(str).str.strip()
+    wri_df["city_name_wri"] = wri_df["city_name_wri"].astype(str).str.strip()
+
+    wri_df["wri_join_key"] = wri_df["combined_city_name"].apply(wri_join_key)
+
+
+
+
+
+    # Build lookup: join_key -> city_name_wri
+    wri_lookup = dict(
+        zip(wri_df["wri_join_key"], wri_df["city_name_wri"])
+    )
+
+    print(f"WRI naming conventions loaded: {len(wri_lookup)} entries")
+
 
     # ---- Read distinct GPKG city_name -> key index ----
     gpkg_city_raw = get_distinct_cities_sqlite(GPKG_PATH, layer, CITY_COL_GPKG)
@@ -391,7 +440,15 @@ def main():
     # ---- Build buffers + upload (one output per CSV row) ----
     n_ok = n_skip = n_fail = 0
 
+
     with tempfile.TemporaryDirectory() as tmpdir:
+
+        # --- GEE collection
+
+        ee.Initialize(project='city-extent')
+        urban_extent_fc = ee.FeatureCollection(
+            "projects/wri-datalab/cities/urban_land_use/data/global_cities_Aug2024/urbanextents_unions_2020"
+        )
         for _, row in df_plan.iterrows():
             gpkg_city_raw = row["gpkg_city_raw"]
             csv_city_raw = row.get("csv_city_raw", "")
@@ -401,11 +458,27 @@ def main():
             country_token = s3_safe_token(csv_country_raw) if csv_country_raw else ""
             folder_token = f"{city_token}__{country_token}" if country_token else city_token
 
+            # ---- Resolve WRI city_name_large (NO GUESSING) ----
+            join_key = wri_join_key(gpkg_city_raw)
+
+            wri_city_name_large = wri_lookup.get(join_key)
+
+            if not wri_city_name_large:
+                raise ValueError(
+                    f"No WRI naming convention match for gpkg_city_raw='{gpkg_city_raw}' "
+                    f"(join_key='{join_key}')"
+                )
+
+            
+
             out_dir_s3 = f"{SEARCH_BUFFER_PATH}/{folder_token}"
             out_file_s3 = f"{out_dir_s3}/{folder_token}_search_buffer.geoparquet"
 
-            if SKIP_IF_EXISTS and s3_exists(out_file_s3):
-                print(f"⏭️  Exists, skipping: {out_file_s3}")
+            ue_file_s3   = f"{INPUT_PATH}/urban_extent/{folder_token}/{folder_token}_urban_extent.geoparquet"
+            ue200_file_s3 = f"{INPUT_PATH}/urban_extent_200m_buffer/{folder_token}/{folder_token}_urban_extent_200m_buffer.geoparquet"
+
+            if SKIP_IF_EXISTS and s3_exists(out_file_s3) and s3_exists(ue_file_s3) and s3_exists(ue200_file_s3):
+                print(f"⏭️  Exists (search+ue+ue200), skipping: {folder_token}")
                 n_skip += 1
                 continue
 
@@ -439,8 +512,8 @@ def main():
                     pd.DataFrame({
                         "city_name": [folder_token],
                         "csv_city_raw": [csv_city_raw],
+                        "wri_city_name_large": [wri_city_name_large],
                         "csv_country_raw": [csv_country_raw],
-                        "gpkg_city_raw": [gpkg_city_raw],
                         "csv_city_key": [row.get("csv_city_key", "")],
                         "match_method": [row.get("match_method", "")],
                         "row_index": [row.get("row_index", -1)],
@@ -449,12 +522,77 @@ def main():
                     crs=gdf_city.crs
                 )
 
+
                 local_path = os.path.join(tmpdir, f"{folder_token}_search_buffer.geoparquet")
                 out_gdf.to_parquet(local_path)
-
                 S3Path(out_dir_s3).mkdir(parents=True, exist_ok=True)
                 S3Path(out_file_s3).upload_from(local_path)
                 print(f"✅ Wrote: {out_file_s3}   (row_index={row.get('row_index')}, gpkg='{gpkg_city_raw}')")
+
+
+
+                # ============================================================
+                # FETCH + SAVE WRI URBAN EXTENT (moved from produce_blocks)
+                # ============================================================
+
+
+                wri_name = wri_city_name_large
+
+                city_fc = urban_extent_fc.filter(
+                    ee.Filter.eq("city_name_large", wri_name)
+                )
+
+                if city_fc.size().getInfo() == 0:
+                    raise ValueError(
+                        f"No WRI urban extent found for '{wri_name}' "
+                        f"(city={folder_token})"
+                    )
+
+                # Union + buffer
+                ue_geom = city_fc.union(ee.ErrorMargin(1)).geometry()
+                ue200_geom = ue_geom.buffer(200)
+
+                # Convert to shapely (WGS84)
+                ue_shp = shape(ue_geom.getInfo())
+                ue200_shp = shape(ue200_geom.getInfo())
+
+                # Build GeoDataFrames
+                ue_gdf = gpd.GeoDataFrame(
+                    [{"city_name": folder_token, "source": "wri_urban_extent_2020"}],
+                    geometry=[ue_shp],
+                    crs="EPSG:4326"
+                )
+
+                ue200_gdf = gpd.GeoDataFrame(
+                    [{"city_name": folder_token, "buffer_m": 200, "source": "wri_urban_extent_2020"}],
+                    geometry=[ue200_shp],
+                    crs="EPSG:4326"
+                )
+
+
+                ue_dir_s3 = f"{INPUT_PATH}/urban_extent/{folder_token}"
+                ue200_dir_s3 = f"{INPUT_PATH}/urban_extent_200m_buffer/{folder_token}"
+
+                ue_file_s3 = f"{ue_dir_s3}/{folder_token}_urban_extent.geoparquet"
+                ue200_file_s3 = f"{ue200_dir_s3}/{folder_token}_urban_extent_200m_buffer.geoparquet"
+
+                # Local temp files
+                ue_local = os.path.join(tmpdir, f"{folder_token}_urban_extent.geoparquet")
+                ue200_local = os.path.join(tmpdir, f"{folder_token}_urban_extent_200m_buffer.geoparquet")
+
+                ue_gdf.to_parquet(ue_local, index=False)
+                ue200_gdf.to_parquet(ue200_local, index=False)
+
+                S3Path(ue_dir_s3).mkdir(parents=True, exist_ok=True)
+                S3Path(ue200_dir_s3).mkdir(parents=True, exist_ok=True)
+
+                S3Path(ue_file_s3).upload_from(ue_local)
+                S3Path(ue200_file_s3).upload_from(ue200_local)
+
+
+
+
+
                 n_ok += 1
                 if (n_ok + n_skip + n_fail) % 50 == 0:
                     print(f"…progress: OK={n_ok} SKIP={n_skip} FAIL={n_fail}")
