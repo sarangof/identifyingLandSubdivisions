@@ -3,7 +3,7 @@
 Urban Regularity Index — Dimensionality Analysis & Calibrated Cascade
 ==========================================================================
 
-Freddy's pipeline for:
+Pipeline for:
   1. PCA — how many independent signals exist in the 13 metrics?
   2. Factor Analysis — what are the latent constructs?
   3. Regularization paths — which metrics are robustly important?
