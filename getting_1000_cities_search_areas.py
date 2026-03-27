@@ -29,8 +29,8 @@ SEARCH_BUFFER_PATH = os.path.join(INPUT_PATH, "city_info", "search_buffers")
 GPKG_PATH = "../data/Sumans_data/combined_cities.gpkg"
 GPKG_LAYER = None  # None = auto-pick first layer
 
-#CITIES_CSV = "../data/city_lists/cities_ssa_latam.csv"
-CITIES_CSV = "../data/city_lists/cities_ssa_validation.csv"
+CITIES_CSV = "../data/city_lists/cities_ssa_latam.csv"
+#CITIES_CSV = "../data/city_lists/cities_ssa_validation.csv"
 CITIES_CSV_SEP = ";"
 CITIES_CSV_ENCODING = "utf-8"
 
@@ -464,12 +464,23 @@ def main():
             wri_city_name_large = wri_lookup.get(join_key)
 
             if not wri_city_name_large:
-                raise ValueError(
-                    f"No WRI naming convention match for gpkg_city_raw='{gpkg_city_raw}' "
-                    f"(join_key='{join_key}')"
-                )
+                # Fuzzy fallback: find the closest WRI key
+                best_wri_key = None
+                best_wri_score = 0.0
+                for wk in wri_lookup:
+                    sc = _sim(join_key, wk)
+                    if sc > best_wri_score:
+                        best_wri_score = sc
+                        best_wri_key = wk
+                if best_wri_key and best_wri_score >= 0.85:
+                    wri_city_name_large = wri_lookup[best_wri_key]
+                    print(f"🔎 WRI FUZZY: '{gpkg_city_raw}' ({join_key}) -> '{best_wri_key}' score={best_wri_score:.3f} -> {wri_city_name_large}")
+                else:
+                    print(f"⚠️ No WRI match for '{gpkg_city_raw}' ({join_key}), best='{best_wri_key}' score={best_wri_score:.3f}. Skipping.")
+                    n_fail += 1
+                    continue
 
-            
+                        
 
             out_dir_s3 = f"{SEARCH_BUFFER_PATH}/{folder_token}"
             out_file_s3 = f"{out_dir_s3}/{folder_token}_search_buffer.geoparquet"
