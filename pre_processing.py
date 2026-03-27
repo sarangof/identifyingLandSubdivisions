@@ -1,6 +1,6 @@
 import dask_geopandas as dgpd
 import geopandas as gpd
-from shapely.geometry import shape, Point, LineString, Polygon, MultiPolygon, MultiLineString
+from shapely.geometry import shape, Point, LineString, Polygon, MultiPolygon, MultiLineString, box
 from shapely.geometry.base import BaseGeometry
 from shapely.strtree import STRtree
 from shapely.errors import ShapelyError
@@ -33,6 +33,8 @@ NATURAL_FEATURES_PATH = os.path.join(INPUT_PATH, "natural_features_and_railroads
 GRIDS_PATH = f'{INPUT_PATH}/city_info/grids'
 SEARCH_BUFFER_PATH = f'{INPUT_PATH}/city_info/search_buffers'
 BLOCKS_PATH = f'{INPUT_PATH}/blocks'
+LAND_POLYGONS_PATH = f"{INPUT_PATH}/land_polygons/land_polygons.geoparquet"
+INLAND_WATER_PATH = f"{INPUT_PATH}/inland_water"
 OUTPUT_PATH = f'{MAIN_PATH}/output'
 OUTPUT_PATH_CSV = f'{OUTPUT_PATH}/csv'
 OUTPUT_PATH_RASTER = f'{OUTPUT_PATH}/raster'
@@ -110,6 +112,115 @@ AUX FUNCTIONS TO CREATE BLOCKS
 '''
 
 
+def load_land_polygon_for_city(ue200_geom, epsg, land_polygons_path):
+    """
+    Load the subset of global land polygons that intersects the city's
+    UE200 buffer. Returns a single geometry in the city's CRS.
+ 
+    The land polygons file covers ocean/sea only (derived from
+    natural=coastline). It does NOT include inland water bodies.
+ 
+    Uses bbox filtering for fast reads from the global file.
+    """
+    try:
+        # Get bounding box in WGS84 for spatial filtering
+        ue200_gdf = gpd.GeoDataFrame(
+            geometry=[ue200_geom], crs=f"EPSG:{epsg}"
+        ).to_crs(epsg=4326)
+        bbox = ue200_gdf.total_bounds  # [minx, miny, maxx, maxy]
+ 
+        # Small buffer to avoid edge effects
+        buffer_deg = 0.01
+       
+        bbox_tuple = (
+            bbox[0] - buffer_deg, bbox[1] - buffer_deg,
+            bbox[2] + buffer_deg, bbox[3] + buffer_deg
+        )
+
+        land = gpd.read_parquet(
+            land_polygons_path,
+            bbox=bbox_tuple
+        )
+ 
+        if land.empty:
+            return None
+ 
+        land = land.to_crs(epsg=epsg)
+        return unary_union(land.geometry).buffer(0)
+ 
+    except Exception as e:
+        print(f"  ⚠ Could not load land polygons: {e}")
+        return None
+ 
+ 
+def load_inland_water_for_city(city_name, epsg, inland_water_path=None):
+    """
+    Load per-city inland water polygons (lakes, lagoons, reservoirs).
+    These were downloaded by gather_data_cities.py.
+ 
+    Returns a single geometry in the city's CRS, or None.
+    """
+    if inland_water_path is None:
+        inland_water_path = f"s3://wri-cities-sandbox/identifyingLandSubdivisions/data/input/inland_water"
+ 
+    water_file = f"{inland_water_path}/{city_name}/{city_name}_OSM_inland_water.geoparquet"
+ 
+    try:
+        if not S3Path(water_file).exists():
+            return None
+ 
+        water = gpd.read_parquet(water_file)
+        if water.empty:
+            return None
+ 
+        water = water.to_crs(epsg=epsg)
+ 
+        # Keep only valid polygon geometries
+        water = water[water.geometry.notnull()]
+        water['geometry'] = water.geometry.make_valid()
+        water = water[water.geometry.type.isin(['Polygon', 'MultiPolygon'])]
+ 
+        if water.empty:
+            return None
+ 
+        return unary_union(water.geometry).buffer(0)
+ 
+    except Exception as e:
+        print(f"  ⚠ Could not load inland water for {city_name}: {e}")
+        return None
+ 
+ 
+def clip_fill_to_land_and_water(fill_geom, land_geom=None, water_geom=None, city_name=""):
+    """
+    Clip fill geometry using the two-step approach:
+      1. Intersect with land polygons (removes ocean/sea)
+      2. Difference with inland water (removes lakes/lagoons/reservoirs)
+ 
+    Small waterways (streams, ditches) are NOT handled here — they
+    act as block splitters via the linework in polygonization.
+    """
+    clipped = fill_geom
+ 
+    # Step 1: Clip to land (ocean/sea removal)
+    if land_geom is not None:
+        try:
+            clipped = clipped.intersection(land_geom)
+            clipped = clipped.buffer(0)
+            print(f"  🌊 Clipped to land for {city_name}")
+        except Exception as e:
+            print(f"  ⚠ Land clipping failed for {city_name}: {e}")
+ 
+    # Step 2: Remove inland water bodies
+    if water_geom is not None:
+        try:
+            clipped = clipped.difference(water_geom)
+            clipped = clipped.buffer(0)
+            print(f"  💧 Removed inland water for {city_name}")
+        except Exception as e:
+            print(f"  ⚠ Inland water removal failed for {city_name}: {e}")
+ 
+    return clipped
+
 @delayed
 def produce_blocks(city_name, YOUR_NAME):
     # Construct file paths for the city
@@ -141,7 +252,7 @@ def produce_blocks(city_name, YOUR_NAME):
     ue200_geom = urban_extent_200m.geometry.iloc[0]
 
     # -----------------------------
-    # A) BASELINE BLOCKS (unchanged)
+    # A) BASELINE BLOCKS 
     # -----------------------------
     linework_all = pd.concat([roads, natural_features], ignore_index=True)
 
@@ -152,6 +263,37 @@ def produce_blocks(city_name, YOUR_NAME):
 
     base_blocks["is_fill_block"] = False
     base_blocks["fill_method"] = None
+
+    # ── Water boundary clipping ───────────────────────────────────
+    # Three-tier water handling:
+    #   - Ocean/sea: clipped via pre-built land polygons (global file)
+    #   - Inland water (lakes, lagoons): subtracted via per-city OSM polygons
+    #   - Small waterways (streams, ditches): already in linework as block splitters
+    land_geom = load_land_polygon_for_city(ue200_geom, epsg, LAND_POLYGONS_PATH)
+    water_geom = load_inland_water_for_city(city_name, epsg, INLAND_WATER_PATH)
+
+    # 2b) Cut BASE blocks with water bodies (coastline + inland water)
+    if land_geom is not None or water_geom is not None:
+        clipped_geoms = []
+        for geom in base_blocks.geometry:
+            g = geom
+            try:
+                if land_geom is not None:
+                    g = g.intersection(land_geom).buffer(0)
+                if water_geom is not None:
+                    g = g.difference(water_geom).buffer(0)
+            except Exception:
+                pass
+            clipped_geoms.append(g)
+        base_blocks = base_blocks.copy()
+        base_blocks['geometry'] = clipped_geoms
+        # Explode multipolygons and drop empties
+        base_blocks = base_blocks[~base_blocks.geometry.is_empty].copy()
+        base_blocks = base_blocks.explode(index_parts=False).reset_index(drop=True)
+        base_blocks = base_blocks[base_blocks.geometry.type.isin(['Polygon', 'MultiPolygon'])].copy()
+        # Recompute inscribed circles after clipping changed geometry
+        base_blocks = add_inscribed_circle_info(base_blocks)
+        print(f"  🌊💧 Clipped {len(base_blocks)} base blocks with water for {city_name}")
 
     # 3) Compute fill geometry = UE200 minus union(base_blocks)
     base_union = unary_union(base_blocks.geometry).buffer(0.)
@@ -165,6 +307,9 @@ def produce_blocks(city_name, YOUR_NAME):
         fill_geom = fill_geom.buffer(0)
     except Exception:
         pass
+
+    # 3b) Clip fill geometry to land and remove inland water
+    fill_geom = clip_fill_to_land_and_water(fill_geom, land_geom, water_geom, city_name)
 
     # 4) Generate fill blocks from existing linework + fill boundary; fallback to fill polygons
     fill_blocks = make_fill_blocks_from_linework(
