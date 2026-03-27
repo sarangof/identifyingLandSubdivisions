@@ -2,11 +2,11 @@
 
 ## Project summary
 
-This project develops a scalable, automated method to measure the physical regularity of urban blocks across cities in Sub-Saharan Africa and Latin America. The goal is to distinguish planned land subdivisions from irregular settlements using only publicly available geospatial data — specifically OpenStreetMap road networks and Overture Maps building footprints.
+This project develops a scalable, automated method to measure the physical regularity of urban blocks across cities in Sub-Saharan Africa and Latin America. The goal is to distinguish planned land subdivisions from irregular settlements using only publicly available geospatial data, specifically OpenStreetMap road networks and Overture Maps building footprints.
 
 The pipeline computes 13 morphometric indicators for each urban block (the polygon enclosed by surrounding roads). These indicators capture characteristics like road straightness, intersection geometry, building alignment, and block shape. A calibrated logistic regression model combines these indicators into a single regularity index: a continuous score between 0 (irregular) and 1 (planned subdivision) for every block. The model was validated against 60,000 human-labeled blocks across 102 cities in both regions, achieving an AUC of 0.84 and near-perfect probability calibration (ECE = 0.003).
 
-The resulting dataset covers approximately 1,200 cities and can be used to study relationships between urban form, infrastructure access, and health outcomes at the neighborhood scale.
+The resulting dataset covers approximately 1,238 cities.
 
 This work was conducted in partnership between the World Resources Institute (WRI Ross Center for Sustainable Cities), New York University, and the SALURBAL project.
 
