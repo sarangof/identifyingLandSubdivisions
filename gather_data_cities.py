@@ -32,6 +32,7 @@ URBAN_EXTENTS_PATH = os.path.join(INPUT_PATH, "urban_extents")
 OUTPUT_PATH = os.path.join(MAIN_PATH, "output")
 OUTPUT_PATH_CSV = os.path.join(OUTPUT_PATH, "csv")
 SEARCH_BUFFER_PATH = os.path.join(INPUT_PATH, "city_info", "search_buffers")
+INLAND_WATER_PATH = os.path.join(INPUT_PATH, "inland_water")
 
 # Utility Functions
 
@@ -137,6 +138,7 @@ def osm_command(city_name, search_area, utm_proj_city):
 
     polygon = search_area.geometry.iloc[0]
 
+    '''
     # ---------------------------
     # 1) ROADS + INTERSECTIONS (REQUIRED)
     # ---------------------------
@@ -202,6 +204,36 @@ def osm_command(city_name, search_area, utm_proj_city):
         osm_natural_features = gpd.GeoDataFrame(geometry=[], crs="EPSG:4326")
         print(f"🌿 Natural features failed for {city_name} but continuing: {repr(e)}")
 
+    '''
+    # NOTE: Coastline clipping is now handled via pre-built land polygons
+    # from osmdata.openstreetmap.de (see download_land_polygons.py).
+
+    # ── Inland water polygons (lakes, lagoons, reservoirs) ────────────
+    # These are POLYGON features, not lines. Used to clip fill blocks
+    # so they don't extend into inland water bodies.
+    # Distinct from waterway linework (streams, ditches) which act as
+    # block splitters via natural_features.
+    try:
+        inland_water_tags = {
+            "natural": "water",        # lakes, ponds, lagoons, reservoirs, rivers (primary tag)
+            "landuse": ["reservoir", "basin"],  # reservoirs + managed water basins
+            "waterway": "riverbank",   # wide river polygons (older tagging convention)
+        }
+        osm_inland_water = ox.features_from_polygon(polygon, tags=inland_water_tags)
+ 
+        # Keep only polygon geometries (points/lines are not useful here)
+        osm_inland_water = osm_inland_water[
+            osm_inland_water.geometry.type.isin(['Polygon', 'MultiPolygon'])
+        ]
+        osm_inland_water = osm_inland_water.reset_index(drop=False)
+        osm_inland_water = remove_list_columns(osm_inland_water)
+ 
+        print(f"💧 Inland water polygons for {city_name}: {len(osm_inland_water)}")
+    except Exception as e:
+        osm_inland_water = gpd.GeoDataFrame(geometry=[], crs="EPSG:4326")
+        print(f"💧 Inland water query failed for {city_name} (continuing): {repr(e)}")
+ 
+    '''
     # ---------------------------
     # 3) SAVE OUTPUTS (ALWAYS)
     # ---------------------------
@@ -224,6 +256,13 @@ def osm_command(city_name, search_area, utm_proj_city):
         output_file=f"{city_name}_OSM_natural_features_and_railroads.geoparquet",
         output_temp_path=".",
         remote_path=f"{NATURAL_FEATURES_PATH}/{city_name}/{city_name}_OSM_natural_features_and_railroads.geoparquet"
+    )
+    '''
+    s3_save(
+    file=osm_inland_water,
+    output_file=f"{city_name}_OSM_inland_water.geoparquet",
+    output_temp_path=".",
+    remote_path=f"{INLAND_WATER_PATH}/{city_name}/{city_name}_OSM_inland_water.geoparquet"
     )
 
     print(f"✅ OSM completed for {city_name}")
