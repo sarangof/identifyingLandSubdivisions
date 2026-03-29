@@ -177,35 +177,27 @@ def osm_command(city_name, search_area, utm_proj_city):
 
     if "osmid" not in osm_intersections:
         osm_intersections["osmid"] = None
-
+    '''
     # ---------------------------
     # 2) NATURAL FEATURES (OPTIONAL — NEVER FAIL)
     # ---------------------------
     custom_filter = ['["waterway"~"stream|ditch|river|canal|dam|weir|rapids|waterfall"]']
 
     try:
-        G_nf = ox.graph_from_polygon(
-            polygon=polygon,
-            custom_filter=custom_filter,
-            retain_all=True
-        )
-        _, osm_natural_features = ox.graph_to_gdfs(G_nf)
+        tags = {"waterway": ["stream", "ditch", "river", "canal", "dam", "weir", "rapids", "waterfall"]}
+        osm_natural_features = ox.features_from_polygon(polygon, tags=tags)
+        osm_natural_features = osm_natural_features.reset_index(drop=False)
         osm_natural_features = remove_list_columns(osm_natural_features)
         print(f"🌿 Natural features found for {city_name}")
-
-    except (InsufficientResponseError, ValueError):
-        # ✅ This covers the exact error in your logs:
-        # ValueError: Found no graph nodes within the requested polygon. 
+    except InsufficientResponseError:
         osm_natural_features = gpd.GeoDataFrame(geometry=[], crs="EPSG:4326")
         print(f"🌿 No natural features for {city_name} (expected)")
-
     except Exception as e:
-        # optional: also never fail city on any other nf weirdness
         osm_natural_features = gpd.GeoDataFrame(geometry=[], crs="EPSG:4326")
         print(f"🌿 Natural features failed for {city_name} but continuing: {repr(e)}")
 
     '''
-    # NOTE: Coastline clipping is now handled via pre-built land polygons
+    # Coastline clipping is now handled via pre-built land polygons
     # from osmdata.openstreetmap.de (see download_land_polygons.py).
 
     # ── Inland water polygons (lakes, lagoons, reservoirs) ────────────
@@ -233,7 +225,7 @@ def osm_command(city_name, search_area, utm_proj_city):
         osm_inland_water = gpd.GeoDataFrame(geometry=[], crs="EPSG:4326")
         print(f"💧 Inland water query failed for {city_name} (continuing): {repr(e)}")
  
-    '''
+   
     # ---------------------------
     # 3) SAVE OUTPUTS (ALWAYS)
     # ---------------------------
@@ -250,6 +242,17 @@ def osm_command(city_name, search_area, utm_proj_city):
         output_temp_path=".",
         remote_path=f"{INTERSECTIONS_PATH}/{city_name}/{city_name}_OSM_intersections.geoparquet"
     )
+    
+
+    
+    s3_save(
+        file=osm_inland_water,
+        output_file=f"{city_name}_OSM_inland_water.geoparquet",
+        output_temp_path=".",
+        remote_path=f"{INLAND_WATER_PATH}/{city_name}/{city_name}_OSM_inland_water.geoparquet"
+    )
+    '''
+    print(f"✅ OSM completed for {city_name}")
 
     s3_save(
         file=osm_natural_features,
@@ -257,15 +260,6 @@ def osm_command(city_name, search_area, utm_proj_city):
         output_temp_path=".",
         remote_path=f"{NATURAL_FEATURES_PATH}/{city_name}/{city_name}_OSM_natural_features_and_railroads.geoparquet"
     )
-    '''
-    s3_save(
-    file=osm_inland_water,
-    output_file=f"{city_name}_OSM_inland_water.geoparquet",
-    output_temp_path=".",
-    remote_path=f"{INLAND_WATER_PATH}/{city_name}/{city_name}_OSM_inland_water.geoparquet"
-    )
-
-    print(f"✅ OSM completed for {city_name}")
 
 
 def overturemaps_download_and_save(bbox_str, request_type: str, output_dir, city_name: str):

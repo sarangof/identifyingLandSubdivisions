@@ -13,8 +13,8 @@ def standardize_metric_2(series):
     return pd.Series(1 - (result / 100), index=series.index)
 
 def standardize_metric_3(series):
-    series = np.where(series > 40, 40, series)
-    return series/40
+    series = np.where(series > 80, 80, series)
+    return series/80
 
 def standardize_metric_4(series):
     return series
@@ -50,8 +50,8 @@ def standardize_metric_12(series):
     return series/200.
 
 def standardize_metric_k(series):
-    series = np.where(series > 6, 6, series)
-    return 1-(series/6.)
+    series = np.where(series > 13, 13, series)
+    return 1-(series/13.)
 
 # Map metrics to their respective functions
 standardization_functions = {

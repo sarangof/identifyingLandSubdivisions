@@ -3,7 +3,7 @@
 Score city blocks and generate interactive regularity maps
 ==========================================================================
 
-Usage (in your notebook, after running cascade_models.py):
+Usage (in notebook, after running cascade_models.py):
 
     from score_and_map import score_cities, make_interactive_map
 
@@ -25,7 +25,7 @@ from sklearn.preprocessing import StandardScaler
 import os
 
 # ======================================================================
-# PATHS (match your pipeline structure)
+# PATHS 
 # ======================================================================
 
 MAIN_PATH = "s3://wri-cities-sandbox/identifyingLandSubdivisions/data"
@@ -143,11 +143,11 @@ def score_single_city(city_df, cascade_results):
     df.loc[mask_nonres, 'classification'] = 'non_residential'
 
     # Irregular: residential but P(subdivision) < 0.5
-    mask_irreg = (~mask_open) & (~mask_nonres) & (df.get('p_subdivision', pd.Series(1.0, index=df.index)) < 0.5)
+    mask_irreg = (~mask_open) & (~mask_nonres) & (df.get('p_subdivision', pd.Series(1.0, index=df.index)) < 0.8)
     df.loc[mask_irreg, 'classification'] = 'irregular_settlement'
 
     # Subdivision: residential and P(subdivision) >= 0.5
-    mask_subdiv = (~mask_open) & (~mask_nonres) & (df.get('p_subdivision', pd.Series(0.0, index=df.index)) >= 0.5)
+    mask_subdiv = (~mask_open) & (~mask_nonres) & (df.get('p_subdivision', pd.Series(0.0, index=df.index)) >= 0.8)
 
     # Formal/informal split
     if 'p_formal' in df.columns and df['p_formal'].notna().any():
@@ -180,12 +180,6 @@ def score_cities(city_names, cascade_results, your_name='sara'):
 
         try:
             city_df = gpd.read_parquet(remote).to_crs(epsg=4326)
-            # Harmonize k-complexity
-            if 'k_k_complexity' in city_df.columns:
-                city_df = city_df.rename(columns={'k_k_complexity': 'k_complexity_raw'})
-            if 'k_complexity_raw' in city_df.columns and 'k_complexity_std' not in city_df.columns:
-                city_df['k_complexity_std'] = np.where(city_df['k_complexity_raw'] > 10, 10, city_df['k_complexity_raw'])
-                city_df['k_complexity_std'] = 1 - (city_df['k_complexity_std'] / 10.)
             city_df['city_name'] = city_name
 
             # Filter
@@ -427,7 +421,7 @@ def save_scored_results(scored_gdf, your_name='sara'):
 
 if __name__ == "__main__":
     print("""
-    Usage in your notebook:
+    Usage in notebook:
 
         from score_and_map import score_cities, make_fast_map, save_scored_results
 

@@ -9,8 +9,7 @@ import os, uuid
 import dask_geopandas as dgpd
 import geopandas as gpd
 
-from standardize_metrics import *
-
+import re
 
 # ------------------------------------------------------------------------------
 # PATHS
@@ -287,9 +286,16 @@ def apply_metric_standardization(df):
     Adds m{i}_std from m{i}_raw using the per-metric functions in standardize_metrics.py.
     Expects keys like 'metric_1', 'metric_2', ...
     """
-    import re
+
 
     for key, std_func in standardization_functions.items():
+        # Handle k_complexity separately (not named metric_N)
+        if 'k_k_complexity' in df.columns and 'k_complexity_std' not in df.columns:
+            
+            df['k_complexity_std'] = df['k_k_complexity'].map_partitions(
+                standardize_metric_k,
+                meta=('k_complexity_std', 'float64')
+            )
         m = re.match(r"metric_(\d+)$", str(key))
         if not m:
             continue
@@ -333,12 +339,12 @@ def consolidate_city_to_all(city_name: str, YOUR_NAME: str):
         pass
 
     # geometry master
-    g_base = dgpd.read_parquet(p_345101112)
+    g_base = dgpd.read_parquet(p_345101112,storage_options={"anon": False})
 
-    g_12 = dgpd.read_parquet(p_12)
-    g_67 = dgpd.read_parquet(p_67)
-    g_89 = dgpd.read_parquet(p_89)
-    g_k  = dgpd.read_parquet(p_k)
+    g_12 = dgpd.read_parquet(p_12,storage_options={"anon": False})
+    g_67 = dgpd.read_parquet(p_67,storage_options={"anon": False})
+    g_89 = dgpd.read_parquet(p_89,storage_options={"anon": False})
+    g_k  = dgpd.read_parquet(p_k,storage_options={"anon": False})
 
     df = g_base
     df = safe_merge_on_index(df, g_12)
@@ -353,6 +359,7 @@ def consolidate_city_to_all(city_name: str, YOUR_NAME: str):
 
     pdf = df.compute()
     gdf = gpd.GeoDataFrame(pdf, geometry="geometry", crs=g_base.crs)
+    gdf = gdf.rename(columns={'k_k_complexity': 'k_complexity'})
 
     write_parquet_to_s3_atomic(gdf, out, fs, city_name=city_name)
     return out

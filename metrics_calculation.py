@@ -67,9 +67,6 @@ def building_and_intersection_metrics(city_name, YOUR_NAME, boundary_eps=0.75):
     defined as: interior segments + the segments that run along the block boundary
     (enclosing). Intersections are counted only if they lie on those associated
     road segments (and only on the valid portions).
-
-    dask-expr compatible; writes a Parquet dataset dir and returns its path.
-    boundary_eps is in CRS units (meters if projected).
     """
     # -------- Paths --------
     paths = {
@@ -216,7 +213,6 @@ def building_and_intersection_metrics(city_name, YOUR_NAME, boundary_eps=0.75):
     ).persist()
 
     # Compute total length per block from associated segments
-    # Compute total length per block from associated segments
     # IMPORTANT: keep block_id as a COLUMN (never index) until AFTER the groupby
     def seglen_partition(df: gpd.GeoDataFrame) -> pd.DataFrame:
         # Return a plain pandas DF with RangeIndex
@@ -361,10 +357,6 @@ def building_distance_metrics(city_name, YOUR_NAME):
     Block-native M1 & M2 (using buildings_with_distances):
       - M1: share of buildings within 20m of a road (per block)
       - M2: average building→nearest-road distance (per block)
-    Avoids dask-expr pitfalls:
-      * 'block_id' is the index ONLY on the dask frame
-      * sjoin uses pandas frames inside map_partitions
-      * groupby folds via reset_index() → groupby('block_id') → sum
     Writes a Parquet dataset dir and returns its path.
     """
 
@@ -822,6 +814,13 @@ def metrics_roads_intersections(city_name, YOUR_NAME):
 
     m9_for_std = blocks['m9_raw'].fillna(m9_median)
     blocks['m9_std'] = m9_for_std.map_partitions(standardize_metric_9, meta=('m9', 'float64'))
+
+    m9_median = blocks['m9_raw'].dropna().quantile(0.5).compute()
+    if pd.isna(m9_median):
+        m9_median = 0.0
+
+    blocks['m9_raw'] = blocks['m9_raw'].fillna(m9_median)
+    blocks['m9_std'] = blocks['m9_raw'].map_partitions(standardize_metric_9, meta=('m9', 'float64'))
 
 
     # ======================================================================

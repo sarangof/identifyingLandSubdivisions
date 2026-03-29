@@ -2,11 +2,11 @@
 
 ## Project summary
 
-This project develops a scalable, automated method to measure the physical regularity of urban blocks across cities in Sub-Saharan Africa and Latin America. The goal is to distinguish planned land subdivisions from irregular settlements using only publicly available geospatial data, specifically OpenStreetMap road networks and Overture Maps building footprints.
+This project develops a scalable, automated method to measure the physical regularity of urban blocks across cities in Sub-Saharan Africa and Latin America. The goal is to distinguish planned land subdivisions from irregular settlements using only publicly available geospatial data — specifically OpenStreetMap road networks and Overture Maps building footprints.
 
 The pipeline computes 13 morphometric indicators for each urban block (the polygon enclosed by surrounding roads). These indicators capture characteristics like road straightness, intersection geometry, building alignment, and block shape. A calibrated logistic regression model combines these indicators into a single regularity index: a continuous score between 0 (irregular) and 1 (planned subdivision) for every block. The model was validated against 60,000 human-labeled blocks across 102 cities in both regions, achieving an AUC of 0.84 and near-perfect probability calibration (ECE = 0.003).
 
-The resulting dataset covers approximately 1,238 cities.
+The resulting dataset covers 1,234 cities and can be used to study relationships between urban form, infrastructure access, and health outcomes at the neighborhood scale.
 
 This work was conducted in partnership between the World Resources Institute (WRI Ross Center for Sustainable Cities), New York University, and the SALURBAL project.
 
@@ -28,7 +28,7 @@ The pipeline computes the following block-level indicators:
 | M10 | Building density (count per unit block area) |
 | M11 | Built-up area fraction (total building footprint area / block area) |
 | M12 | Average building footprint size |
-| K | Parcel-layer complexity (Voronoi peeling depth) |
+| K | Block complexity (Voronoi peeling depth), adapted from the [Million Neighborhoods](https://www.millionneighborhoods.africa/) project. See: Bettencourt, L.M.A. & Marchio, N. "Infrastructure deficits and informal settlements in sub-Saharan Africa." *Nature* (2025). [doi:10.1038/s41586-025-09465-2](https://doi.org/10.1038/s41586-025-09465-2) |
 
 Each metric is standardized to a 0-1 scale where 0 indicates irregular and 1 indicates planned subdivision.
 
@@ -140,7 +140,7 @@ data/
 
 ## Environment
 
-The primary environment is defined in `subdivisions.yml`. Key dependencies include Python 3.12, GeoPandas, Shapely, OSMnx, scikit-learn, Dask, and Folium. The pipeline uses AWS S3 for storage and Coiled for distributed computation.
+The primary environment is defined in `environment.yml`. Key dependencies include Python 3.12, GeoPandas, Shapely, OSMnx, scikit-learn, Dask, and Folium. The pipeline uses AWS S3 for storage and Coiled for distributed computation.
 
 ## License
 
